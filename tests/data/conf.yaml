@@ -1,0 +1,33 @@
+content_sets:
+  # This defines the mapping between UBI content sets and underlying content sets
+  rpm:
+    output: ubi-7-server-rpms
+    input: rhel-7-server-rpms
+  srpm:
+    output: ubi-7-server-source-rpms
+    input: rhel-7-server-source-rpms
+  debuginfo:
+    output: ubi-7-server-debuginfo-rpms
+    input: rhel-7-server-debuginfo-rpms
+
+arches:
+  - src
+  - x86_64
+modules:
+  include:
+  - name: n1
+    stream: s1
+    profiles:
+    - prof1
+    - test2
+
+packages:
+  include:
+#  - tomcatjss
+  - foo-pkg
+
+  # Blacklist of packages to exclude
+  exclude:
+  - kernel*
+  - linux-firmware
+  - foo-pkg*

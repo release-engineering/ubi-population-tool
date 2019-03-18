@@ -1,0 +1,66 @@
+import ubipop
+import sys
+import argparse
+import logging
+
+DEFAULT_LOG_FMT = "%(asctime)s [%(levelname)-8s] %(message)s"
+DEFAULT_DATE_FMT = "%Y-%m-%d %H:%M:%S %z"
+logging.basicConfig(format=DEFAULT_LOG_FMT, datefmt=DEFAULT_DATE_FMT)
+_LOG = logging.getLogger("ubipop")
+_LOG.setLevel(logging.DEBUG)
+
+
+def parse_args(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input', action="store", nargs='*',
+                        help="path to ubi config file")
+    parser.add_argument('--conf-src', action="store",
+                        help="source of ubi config, directory or url")
+    parser.add_argument('--dry-run', action='store_true', default=False,
+                        help="if True, print pulp actions")
+    parser.add_argument('--pulp-hostname', action="store", required=True,
+                        help="hostname of pulp_server")
+    parser.add_argument('--insecure', action="store_true", default=False,
+                        help="use insecure connection to pulp server")
+    parser.add_argument('--user', action="store", required=False,
+                        help="pulp user")
+    parser.add_argument('--password', action="store", required=False,
+                        help="pulp password")
+    parser.add_argument('--cert',  action="store", required=False,
+                        help="path to to user cert")
+    parser.add_argument('--workers', action="store", type=int, default=4,
+                        help="Number of workers for parallel execution")
+
+    parsed = parser.parse_args(args)
+
+    auth_err_msg = "Provide --user and --password options or --cert"
+    if all((parsed.user, parsed.password, parsed.cert)):
+        parser.error(auth_err_msg)
+
+    auth = None
+    if parsed.user and parsed.password:
+        auth = (parsed.user, parsed.password)
+    elif parsed.user and not parsed.password or not parsed.user and parsed.password:
+        parser.error(auth_err_msg)
+    elif parsed.cert:
+        auth = (parsed.cert,)
+    else:
+        parser.error(auth_err_msg)
+
+    return parser.parse_args(args), auth
+
+
+def main(args):
+    opts, auth = parse_args(args)
+
+    ubipop.UbiPopulate(opts.pulp_hostname, auth, opts.dry_run, opts.input,
+                       opts.conf_src, opts.insecure, opts.workers)\
+        .populate_ubi_repos()
+
+
+def entry_point():
+    main(sys.argv[1:])
+
+
+if __name__ == "__main__":
+    entry_point()

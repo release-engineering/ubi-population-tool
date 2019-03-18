@@ -1,0 +1,3 @@
+[console_scripts]
+ubipop = ubipop.cli:entry_point
+
