@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 def get_description():
-    return 'Ubi popopulation library for populating ubi repositories'
+    return 'Ubi population library for populating ubi repositories'
 
 
 def get_long_description():
