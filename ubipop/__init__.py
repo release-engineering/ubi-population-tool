@@ -1,13 +1,12 @@
 import re
 import logging
-import ubi_config
+import ubiconfig
 from more_executors import Executors
 from concurrent.futures import as_completed
 from collections import namedtuple, defaultdict
-from _pulp import Pulp, Package
-from rpmUtils.miscutils import splitFilename, compareVerOnly
+from ubipop._pulp import Pulp, Package
+from ubipop._utils import splitFilename
 from itertools import chain
-
 
 _LOG = logging.getLogger("ubipop")
 
@@ -61,17 +60,17 @@ class UbiRepoSet(object):
 
 
 class UbiPopulate(object):
-    def __init__(self, pulp_hostname, pulp_auth, dry_run, ubi_config_filename_list=None,
-                 ubi_config_dir_or_url=None, insecure=False, workers_count=4):
+    def __init__(self, pulp_hostname, pulp_auth, dry_run, ubiconfig_filename_list=None,
+                 ubiconfig_dir_or_url=None, insecure=False, workers_count=4):
 
-        self.ubi_config_list = self._load_ubi_config(ubi_config_filename_list,
-                                                     ubi_config_dir_or_url)
+        self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list,
+                                                   ubiconfig_dir_or_url)
         self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
         self.dry_run = dry_run
         self._executor = Executors.thread_pool(max_workers=workers_count).with_retry()
 
-    def _load_ubi_config(self, filenames, ubi_config_dir_or_url):
-        loader = ubi_config.get_loader(ubi_config_dir_or_url)
+    def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url):
+        loader = ubiconfig.get_loader(ubiconfig_dir_or_url)
         ubi_conf_list = []
         if filenames:
             ubi_conf_list.extend(loader.load(filename) for filename in filenames)
@@ -81,7 +80,7 @@ class UbiPopulate(object):
         return ubi_conf_list
 
     def populate_ubi_repos(self):
-        for config in self.ubi_config_list:
+        for config in self.ubiconfig_list:
             try:
                 output_repo_sets = self._get_input_and_output_repo_pairs(config)
             except RepoMissing:
@@ -92,26 +91,26 @@ class UbiPopulate(object):
                 UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run, self._executor)\
                     .run_ubi_population()
 
-    def _get_input_and_output_repo_pairs(self, ubi_config):
+    def _get_input_and_output_repo_pairs(self, ubiconfig_item):
         """
         Determines pairs of input and output repos and also find correct source and debuginfo
         counterpart of repos.
         """
 
-        rpms_cs = ubi_config.content_sets.rpm
-        source_cs = ubi_config.content_sets.srpm
-        debug_cs = ubi_config.content_sets.debuginfo
+        rpms_cs = ubiconfig_item.content_sets.rpm
+        source_cs = ubiconfig_item.content_sets.srpm
+        debug_cs = ubiconfig_item.content_sets.debuginfo
         _LOG.info(
-            "Getting input repos for input content sets:\n\t{rpm}\n\t{source}\n\t{debug}".format(
-                rpm=rpms_cs.input, source=source_cs.input, debug=debug_cs.input))
+            "Getting input repos for input content sets:\n\t%s\n\t%s\n\t%s",
+            rpms_cs.input, source_cs.input, debug_cs.input)
 
         in_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs, rpms_cs.input)
         in_source_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs, source_cs.input)
         in_debug_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs, debug_cs.input)
 
         _LOG.info(
-            "Getting output repos for output content sets:\n\t{rpm}\n\t{source}\n\t{debug}".format(
-                rpm=rpms_cs.output, source=source_cs.output, debug=debug_cs.output))
+            "Getting output repos for output content sets:\n\t%s\n\t%s\n\t%s",
+            rpms_cs.output, source_cs.output, debug_cs.output)
 
         out_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs, rpms_cs.output)
         out_source_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs, source_cs.output)
@@ -143,10 +142,10 @@ class UbiPopulate(object):
 
 
 class UbiPopulateRunner(object):
-    def __init__(self, pulp, output_repo_set, ubi_config, dry_run, executor):
+    def __init__(self, pulp, output_repo_set, ubiconfig_item, dry_run, executor):
         self.pulp = pulp
         self.out_repo_set = output_repo_set
-        self.ubi_config = ubi_config
+        self.ubiconfig = ubiconfig_item
         self.dry_run = dry_run
         self._executor = executor
 
@@ -154,9 +153,10 @@ class UbiPopulateRunner(object):
         # Add matching modules
 
         fts = {}
-        for module in self.ubi_config.modules:
+        for module in self.ubiconfig.modules:
             fts[self._executor.submit(self.pulp.search_modules,
-                                      self.out_repo_set.in_repos.rpm, module.name, str(module.stream))] = \
+                                      self.out_repo_set.in_repos.rpm, module.name,
+                                      str(module.stream))] = \
                 (module.name + str(module.stream), module.profiles)
 
         for ft in as_completed(fts):
@@ -183,7 +183,7 @@ class UbiPopulateRunner(object):
         # Globbing package name is not possible
 
         fts = {}
-        for package_pattern in self.ubi_config.packages.whitelist:
+        for package_pattern in self.ubiconfig.packages.whitelist:
             name = package_pattern.name
             arch = None if package_pattern.arch in ('*', None) else package_pattern.arch
             fts[(self._executor.submit(self.pulp.search_rpms,
@@ -196,7 +196,7 @@ class UbiPopulateRunner(object):
 
     def _parse_blacklist_config(self):
         packages_to_exclude = []
-        for package_pattern in self.ubi_config.packages.blacklist:
+        for package_pattern in self.ubiconfig.packages.blacklist:
             name_to_parse = package_pattern.name
             globbing = True if '*' in name_to_parse else False
             if globbing:
@@ -218,12 +218,12 @@ class UbiPopulateRunner(object):
             self.out_repo_set.pkgs_from_modules.pop(pkg.name, None)
 
     def _finalize_modules_output_set(self):
-        for module_name_stream, modules in self.out_repo_set.modules.items():
+        for _, modules in self.out_repo_set.modules.items():
             self.sort_modules(modules)
             self.keep_n_latest_modules(modules)
 
     def _finalize_rpms_output_set(self):
-        for package_name, packages in self.out_repo_set.packages.items():
+        for _, packages in self.out_repo_set.packages.items():
             self.sort_packages(packages)
             self.keep_n_newest_packages(packages)  # with respect to packages referenced by modules
 
@@ -235,8 +235,7 @@ class UbiPopulateRunner(object):
                 package.sourcerpm_filename = "{n}-{v}-{r}.src.rpm".format(n=name, v=ver, r=rel)
 
             self.out_repo_set.source_rpms.append(Package(package.name,
-                                                               package.sourcerpm_filename))
-
+                                                         package.sourcerpm_filename))
 
         blacklisted = self.get_blacklisted_packages(self.out_repo_set.source_rpms)
         self._diff_packages_by_filename(self.out_repo_set.source_rpms, blacklisted)
@@ -257,7 +256,8 @@ class UbiPopulateRunner(object):
         blacklisted = self.get_blacklisted_packages(self.out_repo_set.debug_rpms)
         self._diff_packages_by_filename(self.out_repo_set.debug_rpms, blacklisted)
 
-    def _determine_pulp_actions(self, current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft):
+    def _determine_pulp_actions(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
+                                current_debug_rpms_ft):
         """
         Determines expected pulp actions by comparing current content of output repos and
         expected content.
@@ -287,10 +287,14 @@ class UbiPopulateRunner(object):
             debug_rpms_unassoc = self._diff_packages_by_filename(current_debug_rpms_ft.result(),
                                                                  expected_debug_rpms)
 
-        assoc_units_repo_triples = ((modules_assoc,  self.out_repo_set.in_repos.rpm, self.out_repo_set.out_repos.rpm),
-                                    (rpms_assoc, self.out_repo_set.in_repos.rpm, self.out_repo_set.out_repos.rpm),
-                                    (srpms_assoc, self.out_repo_set.in_repos.source, self.out_repo_set.out_repos.source),
-                                    (debug_rpms_assoc, self.out_repo_set.in_repos.debug, self.out_repo_set.out_repos.debug))
+        assoc_units_repo_triples = ((modules_assoc,  self.out_repo_set.in_repos.rpm,
+                                     self.out_repo_set.out_repos.rpm),
+                                    (rpms_assoc, self.out_repo_set.in_repos.rpm,
+                                     self.out_repo_set.out_repos.rpm),
+                                    (srpms_assoc, self.out_repo_set.in_repos.source,
+                                     self.out_repo_set.out_repos.source),
+                                    (debug_rpms_assoc, self.out_repo_set.in_repos.debug,
+                                     self.out_repo_set.out_repos.debug))
 
         unassoc_units_repo_pairs = ((modules_unassoc, self.out_repo_set.out_repos.rpm),
                                     (rpms_unassoc, self.out_repo_set.out_repos.rpm),
@@ -312,7 +316,8 @@ class UbiPopulateRunner(object):
         return diff
 
     def run_ubi_population(self):
-        current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft = self._get_current_content()
+        current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft = \
+            self._get_current_content()
 
         self._match_modules()
         self._match_packages()
@@ -325,10 +330,12 @@ class UbiPopulateRunner(object):
             self._create_debuginfo_output_set()
 
         associate, unassociate = self._determine_pulp_actions(current_modules_ft, current_rpms_ft,
-                                                              current_srpms_ft, current_debug_rpms_ft)
+                                                              current_srpms_ft,
+                                                              current_debug_rpms_ft)
 
         if self.dry_run:
-            self.log_curent_content(current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft)
+            self.log_curent_content(current_modules_ft, current_rpms_ft, current_srpms_ft,
+                                    current_debug_rpms_ft)
             self.log_pulp_actions(associate, unassociate)
         else:
             fts = []
@@ -348,61 +355,61 @@ class UbiPopulateRunner(object):
             for ft in as_completed(self._publish_out_repos()):
                 self.pulp.wait_for_tasks(ft.result())
 
-    def log_curent_content(self, current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft):
-        _LOG.info("Current modules in repo: {out_repo}".format(out_repo=self.out_repo_set.out_repos.rpm.repo_id))
+    def log_curent_content(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
+                           current_debug_rpms_ft):
+        _LOG.info("Current modules in repo: %s", self.out_repo_set.out_repos.rpm.repo_id)
         for module in current_modules_ft.result():
             _LOG.info(module.nsvca)
         _LOG.info(
-            "Current rpms in repo: {out_repo}".format(out_repo=self.out_repo_set.out_repos.rpm.repo_id))
+            "Current rpms in repo: %s", self.out_repo_set.out_repos.rpm.repo_id)
         for rpm in current_rpms_ft.result():
             _LOG.info(rpm.filename)
 
         _LOG.info(
-            "Current srpms in repo: {out_repo}".format(out_repo=self.out_repo_set.out_repos.source.repo_id))
+            "Current srpms in repo: %s", self.out_repo_set.out_repos.source.repo_id)
         for rpm in current_srpms_ft.result():
             _LOG.info(rpm.filename)
 
         if self.out_repo_set.out_repos.debug:
             _LOG.info(
-                "Current rpms in repo: {out_repo}".format(
-                    out_repo=self.out_repo_set.out_repos.debug.repo_id))
+                "Current rpms in repo: %s", self.out_repo_set.out_repos.debug.repo_id)
             for rpm in current_debug_rpms_ft.result():
                 _LOG.info(rpm.filename)
 
     def log_pulp_actions(self, associate, unassociate):
         modules, src_repo, dst_repo = associate[0]
         for module in modules:
-            _LOG.info("Would associate {nsvca} from {src} to {dst}".format(nsvca=module.nsvca,
-                                                                           src=src_repo.repo_id,
-                                                                           dst=dst_repo.repo_id))
+            _LOG.info("Would associate %s from %s to %s", module.nsvca, src_repo.repo_id,
+                      dst_repo.repo_id)
 
         for units, src_repo, dst_repo in associate[1:]:
             if units:
                 for unit in units:
-                    _LOG.info("Would associate {rpm} from {src} to {dst}".format(rpm=unit.filename,
-                                                                                 src=src_repo.repo_id,
-                                                                                 dst=dst_repo.repo_id))
+                    _LOG.info("Would associate %s from %s to %s", unit.filename, src_repo.repo_id,
+                              dst_repo.repo_id)
 
         modules, dst_repo = unassociate[0]
         for module in modules:
-            _LOG.info("Would unassociate {nsvca} from {dst}".format(nsvca=module.nsvca,
-                                                                    dst=dst_repo.repo_id))
+            _LOG.info("Would unassociate %s from %s", module.nsvca, dst_repo.repo_id)
 
         for units, dst_repo in unassociate[1:]:
             if units:
                 for unit in units:
-                    _LOG.info("Would unassociate {rpm} from {dst}".format(rpm=unit.filename,
-                                                                         dst=dst_repo.repo_id))
+                    _LOG.info("Would unassociate %s from %s", unit.filename, dst_repo.repo_id)
 
     def _get_current_content(self):
         """
         Gather current content of output repos
         """
-        current_modules_ft = self._executor.submit(self.pulp.search_modules, self.out_repo_set.out_repos.rpm)
-        current_rpms_ft = self._executor.submit(self.pulp.search_rpms, self.out_repo_set.out_repos.rpm)
-        current_srpms_ft = self._executor.submit(self.pulp.search_rpms, self.out_repo_set.out_repos.source)
+        current_modules_ft = self._executor.submit(self.pulp.search_modules,
+                                                   self.out_repo_set.out_repos.rpm)
+        current_rpms_ft = self._executor.submit(self.pulp.search_rpms,
+                                                self.out_repo_set.out_repos.rpm)
+        current_srpms_ft = self._executor.submit(self.pulp.search_rpms,
+                                                 self.out_repo_set.out_repos.source)
         if self.out_repo_set.out_repos.debug:
-            current_debug_rpms_ft = self._executor.submit(self.pulp.search_rpms, self.out_repo_set.out_repos.debug)
+            current_debug_rpms_ft = self._executor.submit(self.pulp.search_rpms,
+                                                          self.out_repo_set.out_repos.debug)
         else:
             current_debug_rpms_ft = None
 
@@ -489,9 +496,7 @@ class UbiPopulateRunner(object):
         """
         Sort packages by vercmp
         """
-        packages.sort(cmp=lambda package1, package2: compareVerOnly(
-                                    splitFilename(package1.filename)[1],
-                                    splitFilename(package2.filename)[1]))
+        packages.sort()
 
     def get_packages_names_by_profiles(self, profiles, modules):
         """
@@ -523,7 +528,7 @@ class UbiPopulateRunner(object):
         for module in input_modules:
             for rpm_nevra in module.packages:
                 rpm_without_epoch = reg.sub('', rpm_nevra)
-                name, ver, rel, epoch, arch = splitFilename(rpm_without_epoch)
+                name, _, _, _, arch = splitFilename(rpm_without_epoch)
                 # skip source package, they are calculated in later stage
                 if arch == 'src':
                     continue
@@ -541,7 +546,8 @@ class UbiPopulateRunner(object):
 
         packages_to_keep = []
         for package in packages_to_delete:
-            for module_name_stream, packages_ref_by_module in self.out_repo_set.pkgs_from_modules.items():
+            for module_name_stream, packages_ref_by_module in \
+                    self.out_repo_set.pkgs_from_modules.items():
                 if package.filename in [pkg.filename for pkg in packages_ref_by_module] and\
                                         module_name_stream in self.out_repo_set.modules:
                     packages_to_keep.append(package)

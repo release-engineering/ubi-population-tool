@@ -1,5 +1,16 @@
 from ubipop._pulp import Repo, Package, Pulp
 import pytest
+import sys
+
+
+if sys.version_info <= (2, 7,):
+    import requests_mock as rm
+
+    @pytest.fixture()
+    def requests_mock():
+        with rm.Mocker() as m:
+            yield m
+
 
 @pytest.fixture()
 def mock_pulp():
@@ -64,19 +75,22 @@ def mock_search_repos(requests_mock, search_repo_response):
 
 @pytest.fixture()
 def mock_publish(requests_mock, mock_repo, mock_response_for_async_req):
-    url = "/pulp/api/v2/repositories/{repo_id}/actions/publish/".format(repo_id=mock_repo.repo_id)
+    url = "/pulp/api/v2/repositories/{repo_id}/actions/publish/"\
+        .format(repo_id=mock_repo.repo_id)
     requests_mock.register_uri('POST', url, json=mock_response_for_async_req)
 
 
 @pytest.fixture()
 def mock_associate(requests_mock, mock_repo, mock_response_for_async_req):
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/".format(dst_repo=mock_repo.repo_id)
+    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/"\
+        .format(dst_repo=mock_repo.repo_id)
     yield requests_mock.register_uri('POST', url, json=mock_response_for_async_req)
 
 
 @pytest.fixture()
 def mock_unassociate(requests_mock, mock_repo, mock_response_for_async_req):
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/".format(dst_repo=mock_repo.repo_id)
+    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/"\
+        .format(dst_repo=mock_repo.repo_id)
     requests_mock.register_uri('POST', url, json=mock_response_for_async_req)
 
 
@@ -125,6 +139,7 @@ def test_search_modules(mock_pulp, mock_search_modules, mock_repo):
     assert found_modules[0].nsvca == "foo-module:9.6:1111:foo-context:x86_64"
     assert found_modules[0].packages == ["foo-pkg"]
     assert found_modules[0].profiles == {"foo-prof": ["pkg-name"]}
+
 
 @pytest.fixture()
 def search_task_response():

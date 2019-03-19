@@ -5,7 +5,7 @@ from ubipop._pulp import Module, Package
 from mock import MagicMock
 from mock import patch
 import os
-import ubi_config
+import ubiconfig
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), './data')
 
@@ -18,8 +18,8 @@ def ubi_repo_set():
 
 
 @pytest.fixture()
-def test_ubi_config():
-    yield ubi_config.get_loader(TEST_DATA_DIR).load("conf.yaml")
+def test_ubiconfig():
+    yield ubiconfig.get_loader(TEST_DATA_DIR).load("conf.yaml")
 
 
 @pytest.fixture()
@@ -28,8 +28,8 @@ def executor():
 
 
 @pytest.fixture()
-def mock_ubipop_runner(ubi_repo_set, test_ubi_config, executor):
-    yield UbiPopulateRunner(MagicMock(), ubi_repo_set, test_ubi_config, False, executor)
+def mock_ubipop_runner(ubi_repo_set, test_ubiconfig, executor):
+    yield UbiPopulateRunner(MagicMock(), ubi_repo_set, test_ubiconfig, False, executor)
 
 
 def get_test_pkg(**kwargs):
@@ -48,24 +48,27 @@ def get_test_mod(**kwargs):
 
 def test_get_packages_from_module(mock_ubipop_runner):
     package_name = "postgresql"
-    input_modules = [get_test_mod(packages=["postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
-                                            "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-                                            "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-                                            "postgresql-contrib-debuginfo-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
-                                  )]
+    input_modules = \
+        [get_test_mod(
+            packages=["postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
+                      "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
+                      "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
+                      "postgresql-contrib-debuginfo-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
+                      )]
 
     pkgs_from_modules = mock_ubipop_runner.get_packages_from_module(package_name, input_modules)
     assert len(pkgs_from_modules) == 1
-    assert pkgs_from_modules[0].name == "postgresql"
+    pkg = pkgs_from_modules[0]
+    assert pkg.name == "postgresql"
     # filename is without  epoch
-    assert pkgs_from_modules[0].filename == "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"
+    assert pkg.filename == "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"
 
 
 def test_packages_names_by_profiles(mock_ubipop_runner):
-    profiles_from_ubi_config = ["prof2", "prof3"]
+    profiles_from_ubiconfig = ["prof2", "prof3"]
     profiles = {"prof1": ["pkg1", "pkg2"], 'prof2': ["pkg3"]}
     modules = [get_test_mod(profiles=profiles)]
-    pkg_names = mock_ubipop_runner.get_packages_names_by_profiles(profiles_from_ubi_config, modules)
+    pkg_names = mock_ubipop_runner.get_packages_names_by_profiles(profiles_from_ubiconfig, modules)
 
     assert len(pkg_names) == 1
     assert pkg_names[0] == "pkg3"
@@ -143,8 +146,9 @@ def test_match_modules(mock_ubipop_runner):
     assert len(mock_ubipop_runner.out_repo_set.modules) == 1
     assert len(mock_ubipop_runner.out_repo_set.modules["n1s1"]) == 1
     assert mock_ubipop_runner.out_repo_set.modules["n1s1"][0].name == 'm1'
-    assert mock_ubipop_runner.out_repo_set.pkgs_from_modules["n1s1"][0].filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
-    assert mock_ubipop_runner.out_repo_set.packages['tomcatjss'][0].filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
+    pkg = mock_ubipop_runner.out_repo_set.pkgs_from_modules["n1s1"][0]
+    assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
+    assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
 
 
 def test_diff_modules(mock_ubipop_runner):
@@ -189,9 +193,11 @@ def test_keep_n_newest_packages_with_referenced_pkg_in_module(mock_ubipop_runner
 
 
 @pytest.mark.parametrize("rhel_repo_set, ubi_repo_set, fail",
-[(RepoSet(None, None, "foo-debug"), RepoSet(None, None, "ubi-foo-debug"), True),
- (RepoSet('foo-rpms', "foo-source", None), RepoSet("ubi-foo-rpms", "ubi-foo-source", None), False),
-])
+                         [(RepoSet(None, None, "foo-debug"),
+                           RepoSet(None, None, "ubi-foo-debug"), True),
+                          (RepoSet('foo-rpms', "foo-source", None),
+                           RepoSet("ubi-foo-rpms", "ubi-foo-source", None), False),
+                          ])
 def test_ubi_repo_set(rhel_repo_set, ubi_repo_set, fail, caplog):
     from ubipop import RepoMissing
 
@@ -211,26 +217,26 @@ def test_ubi_repo_set(rhel_repo_set, ubi_repo_set, fail, caplog):
 
 
 @pytest.fixture()
-def mocked_ubi_config_load():
-    with patch('ubi_config.get_loader') as get_loader:
+def mocked_ubiconfig_load():
+    with patch('ubiconfig.get_loader') as get_loader:
         get_loader.return_value.load.return_value = "test"
         yield get_loader
 
 
-def test_ubipopulate_load_ubi_config(mocked_ubi_config_load):
+def test_ubipopulate_load_ubiconfig(mocked_ubiconfig_load):
     ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False, ['cfg.yaml'])
-    assert len(ubipop.ubi_config_list) == 1
-    assert ubipop.ubi_config_list[0] == "test"
+    assert len(ubipop.ubiconfig_list) == 1
+    assert ubipop.ubiconfig_list[0] == "test"
 
 
 @pytest.fixture()
-def mocked_ubi_config_load_all():
-    with patch('ubi_config.get_loader') as get_loader:
+def mocked_ubiconfig_load_all():
+    with patch('ubiconfig.get_loader') as get_loader:
         get_loader.return_value.load_all.return_value = ["test"]
         yield get_loader
 
 
-def test_ubipopulate_load_all_ubi_config(mocked_ubi_config_load_all):
+def test_ubipopulate_load_all_ubiconfig(mocked_ubiconfig_load_all):
     ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False)
-    assert len(ubipop.ubi_config_list) == 1
-    assert ubipop.ubi_config_list[0] == "test"
+    assert len(ubipop.ubiconfig_list) == 1
+    assert ubipop.ubiconfig_list[0] == "test"

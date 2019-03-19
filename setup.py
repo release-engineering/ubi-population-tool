@@ -1,27 +1,45 @@
-#!/usr/bin/env python
-
-import glob
-import sys
-
 from setuptools import setup
 
-INSTALL_REQUIRES = ['ubi_config']
+
+def get_description():
+    return 'Ubi popopulation library for populating ubi repositories'
 
 
-def get_install_requires():
-    out = INSTALL_REQUIRES[:]
-    if sys.version_info[0] < 3:
-        out.append("futures")
-    return out
+def get_long_description():
+    with open('README.md') as f:
+        text = f.read()
+
+    # Long description is everything after README's initial heading
+    idx = text.find('\n\n')
+    return text[idx:]
+
+
+def get_requirements():
+    with open('requirements.txt') as f:
+        return f.read().splitlines()
 
 
 setup(name='ubi-population-tool',
-      description='###TODO###',
-      version='0.01',
-      #url=
-      install_requires=get_install_requires(),
+      version='0.0.1',
+      license='GNU General Public License',
+      author='',
+      author_email='',
+      description=get_description(),
+      long_description=get_long_description(),
+      long_description_content_type='text/markdown',
+      classifiers=[
+          'Development Status :: 5 - Production/Stable',
+          'Intended Audience :: Developers',
+          'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+          'Programming Language :: Python :: 2',
+          'Programming Language :: Python :: 2.6',
+          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3',
+          'Topic :: Software Development :: Libraries :: Python Modules',
+      ],
+      url="https://github.com/rbikar/ubi-population-tool",
+      install_requires=get_requirements(),
       packages=['ubipop'],
-      dependency_links=['git+http://github.com/release-engineering/ubi-config#egg=ubi_config-0.0.0'],
       entry_points={
           'console_scripts': [
               'ubipop = ubipop.cli:entry_point',

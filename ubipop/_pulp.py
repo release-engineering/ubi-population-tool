@@ -1,7 +1,11 @@
 import requests
-import urlparse
 import time
 import logging
+from rpm_vercmp import vercmp
+try:
+    from urllib.parse import urljoin
+except ImportError:
+    from urlparse import urljoin
 
 _LOG = logging.getLogger("ubipop")
 
@@ -13,7 +17,7 @@ class Pulp(object):
         self.hostname = hostname
         self.auth = auth
         self.scheme = "https://"
-        self.base_url = urlparse.urljoin(self.scheme + hostname, self.PULP_API)
+        self.base_url = urljoin(self.scheme + hostname, self.PULP_API)
         self.session = None
         self.insecure = insecure
 
@@ -26,7 +30,7 @@ class Pulp(object):
             else:
                 self.session.auth = self.auth
 
-        req_url = urlparse.urljoin(self.base_url, url)
+        req_url = urljoin(self.base_url, url)
         ret = None
         if req_type == "post":
             ret = self.session.post(req_url, json=data, verify=not self.insecure)
@@ -37,7 +41,8 @@ class Pulp(object):
 
     def search_repo_by_cs(self, content_set):
         url = "repositories/search/"
-        payload = {"criteria": {"filters": {"notes.content_set": content_set}}, "distributors": True}
+        payload = {"criteria": {"filters": {"notes.content_set": content_set}},
+                   "distributors": True}
 
         ret = self.do_request("post", url, payload)
         ret.raise_for_status()
@@ -75,7 +80,7 @@ class Pulp(object):
         return rpms
 
     def search_modules(self, repo, name=None, stream=None):
-        url ="repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
+        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
         criteria = {"type_ids": ["modulemd"]}
         if name and stream:
             criteria.update({"filters": {"unit": {"name": name, "stream": stream}}})
@@ -183,7 +188,7 @@ class Pulp(object):
     def associate_rpms(self, rpms, src_repo, dst_repo):
         return self.associate_units(src_repo, dst_repo, rpms, "rpm")
 
-    def associate_srpms(self,rpms, src_repo, dst_repo):
+    def associate_srpms(self, rpms, src_repo, dst_repo):
         return self.associate_units(src_repo, dst_repo, rpms, "srpm")
 
     def unassociate_modules(self, modules, repo):
@@ -199,7 +204,7 @@ class Pulp(object):
         url = "repositories/{repo_id}/actions/publish/".format(repo_id=repo.repo_id)
         task_ids = []
         for dist in repo.distributors_ids:
-            _LOG.debug("Publishing {repo} in {dist_id}".format(repo=repo.repo_id, dist_id=dist))
+            _LOG.debug("Publishing %s in %s", repo.repo_id, dist)
             data = {"id": dist}
             ret = self.do_request('post', url, data).json()
             task_ids.extend(task['task_id'] for task in ret['spawned_tasks'])
@@ -220,6 +225,24 @@ class Package(object):
         self.name = name
         self.filename = filename
         self.sourcerpm_filename = sourcerpm_filename
+
+    def __lt__(self, other):
+        return vercmp(self.filename, other.filename) < 0
+
+    def __gt__(self, other):
+        return vercmp(self.filename, other.filename) > 0
+
+    def __eq__(self, other):
+        return vercmp(self.filename, other.filename) == 0
+
+    def __le__(self, other):
+        return vercmp(self.filename, other.filename) <= 0
+
+    def __ge__(self, other):
+        return vercmp(self.filename, other.filename) >= 0
+
+    def __ne__(self, other):
+        return vercmp(self.filename, other.filename) != 0
 
 
 class Module(object):

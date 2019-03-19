@@ -1,6 +1,7 @@
 from ubipop.cli import main
 import pytest
 import mock
+import sys
 
 
 @pytest.fixture()
@@ -19,23 +20,26 @@ def test_help():
 
 def test_no_pulp_hostname(capsys):
     args = ['--user', 'foo', '--pass', 'foo']
-
+    if sys.version_info <= (3, ):
+        expected_err = "argument --pulp-hostname is required"
+    else:
+        expected_err = "the following arguments are required: --pulp-hostname"
     with pytest.raises(SystemExit) as e_info:
         main(args)
 
     _, err = capsys.readouterr()
-    assert "argument --pulp-hostname is required" in err
+    assert expected_err in err
     assert e_info.value.code == 2
 
 
 @pytest.mark.parametrize('auth_args',
-                       [(['--user', 'foo', '--pass', 'foo', '--cert', 'foo/cert.cert']),
-                        (['--pass', 'foo', '--cert', 'foo/cert.cert']),
-                        (['--user', 'foo', '--cert', 'foo/cert.cert']),
-                        (['--user', 'foo']),
-                        (['--pass', 'foo']),
-                        ([]),
-                        ])
+                         [(['--user', 'foo', '--pass', 'foo', '--cert', 'foo/cert.cert']),
+                          (['--pass', 'foo', '--cert', 'foo/cert.cert']),
+                          (['--user', 'foo', '--cert', 'foo/cert.cert']),
+                          (['--user', 'foo']),
+                          (['--pass', 'foo']),
+                          ([]),
+                          ])
 def test_wrong_user_pass_cert_combination(capsys, auth_args):
     args = ['--pulp-hostname', 'foo.pulp.com'] + auth_args
 
@@ -62,6 +66,7 @@ def test_custom_config_source(mock_ubipopulate):
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [],
                                              'custom/conf/dir', False, 4)
+
 
 @mock.patch('ubipop.UbiPopulate')
 def test_crt(mock_ubipopulate):
@@ -97,6 +102,7 @@ def test_custom_workers_number(mock_ubipopulate):
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, ['f1', 'f2'],
                                              'custom/conf/dir', False, 42)
+
 
 @mock.patch('ubipop.UbiPopulate')
 def test_insecure(mock_ubipopulate):

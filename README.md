@@ -1,4 +1,7 @@
 # **ubi-population-tool**
+[![Build Status](https://travis-ci.org/rbikar/ubi-population-tool.svg?branch=master)](https://travis-ci.org/rbikar/ubi-population-tool)
+[![Coverage Status](https://coveralls.io/repos/github/rbikar/ubi-population-tool/badge.svg?branch=master)](https://coveralls.io/github/rbikar/ubi-population-tool?branch=master)
+
 
 A python library and cli for populating ubi repositories.
 
