@@ -37,7 +37,7 @@ setup(name='ubi-population-tool',
           'Programming Language :: Python :: 3',
           'Topic :: Software Development :: Libraries :: Python Modules',
       ],
-      url="https://github.com/rbikar/ubi-population-tool",
+      url="https://github.com/release-engineering/ubi-population-tool",
       install_requires=get_requirements(),
       packages=['ubipop'],
       entry_points={
