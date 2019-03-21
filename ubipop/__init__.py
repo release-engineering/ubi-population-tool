@@ -502,9 +502,16 @@ class UbiPopulateRunner(object):
         """
         Gather package names by module profiles, if no profiles provided, add packages from
         all profiles
-        :param profiles: list of str profiles ubi config
-        :param modules: list pulp.Modules
-        :return: list package names str
+
+        Args:
+            profiles (list of str):
+                profiles ubi config
+            modules (list of _pulp.Module):
+                modules to process
+
+        Returns:
+            list of str:
+                names of packages within matching modules & profiles
         """
         packages_names = []
 
