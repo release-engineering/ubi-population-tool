@@ -1,5 +1,0 @@
-requests
-more_executors
-ubi_config
-rpm-vercmp
-futures; python_version < '3'
