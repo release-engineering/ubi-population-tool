@@ -5,7 +5,7 @@ import logging
 
 DEFAULT_LOG_FMT = "%(asctime)s [%(levelname)-8s] %(message)s"
 DEFAULT_DATE_FMT = "%Y-%m-%d %H:%M:%S %z"
-logging.basicConfig(format=DEFAULT_LOG_FMT, datefmt=DEFAULT_DATE_FMT)
+
 _LOG = logging.getLogger("ubipop")
 _LOG.setLevel(logging.DEBUG)
 
@@ -51,6 +51,8 @@ def parse_args(args):
 
 
 def main(args):
+    logging.basicConfig(format=DEFAULT_LOG_FMT, datefmt=DEFAULT_DATE_FMT)
+
     opts, auth = parse_args(args)
 
     ubipop.UbiPopulate(opts.pulp_hostname, auth, opts.dry_run, opts.input,
