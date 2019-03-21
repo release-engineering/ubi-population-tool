@@ -32,15 +32,14 @@ ubi repos and required action is started.
 
 # Cli usage
 
-Cli can be run by *ubi_population_cli* with arguments:
+Cli can be run by *ubipop* with arguments:
 
 - positional arguments:
   - content_sets: list of content sets to be processed
 
 - optional arguments:
-  -  -h, --help: show this help message and exit
-  -  --pulp_url PULP_URL: url of pulp_server
-  - --user USER: pulp user
-  -  --password PASSWORD: pulp password
-  -  --dry_run: if True, print pulp actions only, do not execute
-  
+  - -h, --help: show this help message and exit
+  - --pulp-hostname HOSTNAME: hostname of Pulp server
+  - --user USER: username for authentication to Pulp
+  - --password PASSWORD: password for authentication to Pulp
+  - --dry-run: if True, print pulp actions only, do not execute
