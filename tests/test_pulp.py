@@ -23,12 +23,13 @@ def search_repo_response():
             "notes":
                 {"arch": "x86_64",
                  "platform_full_version": "7"},
-            "distributors": [{"id": "dist_id"}]}]
+            "distributors": [{"id": "dist_id", "distributor_type_id": "d_type_id"}]}]
 
 
 @pytest.fixture()
 def mock_repo():
-    yield Repo("test_repo", "x86_64", "7", ["dist_id_1", "dist_id2"])
+    yield Repo("test_repo", "x86_64", "7", [("dist_id_1", "dist_type_id_1"),
+                                            ("dist_id_2", "dist_type_id_2")])
 
 
 @pytest.fixture()
@@ -102,7 +103,7 @@ def test_search_repo_by_cs(mock_pulp, mock_search_repos):
     assert repo.repo_id == "test_repo"
     assert repo.arch == "x86_64"
     assert repo.platform_full_version == "7"
-    assert repo.distributors_ids[0] == "dist_id"
+    assert repo.distributors_ids_type_ids_tuples[0] == ("dist_id", "d_type_id")
 
 
 def test_publish_repo(mock_pulp, mock_publish, mock_repo):
