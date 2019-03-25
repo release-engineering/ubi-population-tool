@@ -151,6 +151,9 @@ class Pulp(object):
                 }
             },
         }
+        log_msg = "Unassociating %s from %s"
+        for unit in units:
+            _LOG.info(log_msg, str(unit), repo.repo_id)
 
         ret = self.do_request('post', url, data).json()
         return [task['task_id'] for task in ret['spawned_tasks']]
@@ -168,7 +171,9 @@ class Pulp(object):
             }
           },
         }
-
+        log_msg = "Associating %s from %s to %s"
+        for unit in units:
+            _LOG.info(log_msg, str(unit), src_repo.repo_id, dest_repo.repo_id)
         ret = self.do_request('post', url, data)
         ret.raise_for_status()
         ret_json = ret.json()
@@ -201,7 +206,7 @@ class Pulp(object):
         url = "repositories/{repo_id}/actions/publish/".format(repo_id=repo.repo_id)
         task_ids = []
         for dist_id, dist_type_id in repo.distributors_ids_type_ids_tuples:
-            _LOG.debug("Publishing %s in %s", repo.repo_id, dist_id)
+            _LOG.info("Publishing %s in %s", repo.repo_id, dist_id)
             data = {"id": dist_id}
             if dist_type_id in ("rpm_rsync_distributor", "cdn_distributor"):
                 data["override_config"] = {"delete": True}
@@ -243,6 +248,9 @@ class Package(object):
     def __ne__(self, other):
         return vercmp(self.filename, other.filename) != 0
 
+    def __str__(self):
+        return self.filename
+
 
 class Module(object):
     def __init__(self, name, stream, version, context, arch, packages, profiles):
@@ -257,3 +265,6 @@ class Module(object):
     @property
     def nsvca(self):
         return ':'.join((self.name, self.stream, str(self.version), self.context, self.arch))
+
+    def __str__(self):
+        return self.nsvca
