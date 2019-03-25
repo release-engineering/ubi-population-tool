@@ -54,7 +54,8 @@ class Pulp(object):
         for item in ret.json():
             notes = item['notes']
             repos.append(Repo(item['id'], notes['arch'], notes['platform_full_version'],
-                              [distributor['id'] for distributor in item['distributors']]))
+                              [(distributor['id'], distributor['distributor_type_id'])
+                               for distributor in item['distributors']]))
 
         return repos
 
@@ -196,9 +197,11 @@ class Pulp(object):
     def publish_repo(self, repo):
         url = "repositories/{repo_id}/actions/publish/".format(repo_id=repo.repo_id)
         task_ids = []
-        for dist in repo.distributors_ids:
-            _LOG.debug("Publishing %s in %s", repo.repo_id, dist)
-            data = {"id": dist}
+        for dist_id, dist_type_id in repo.distributors_ids_type_ids_tuples:
+            _LOG.debug("Publishing %s in %s", repo.repo_id, dist_id)
+            data = {"id": dist_id}
+            if dist_type_id in ("rpm_rsync_distributor", "cdn_distributor"):
+                data["override_config"] = {"delete": True}
             ret = self.do_request('post', url, data).json()
             task_ids.extend(task['task_id'] for task in ret['spawned_tasks'])
 
@@ -206,11 +209,11 @@ class Pulp(object):
 
 
 class Repo(object):
-    def __init__(self, repo_id, arch, platform_full_version, distributors_ids):
+    def __init__(self, repo_id, arch, platform_full_version, distributors_ids_type_ids):
         self.repo_id = repo_id
         self.arch = arch
         self.platform_full_version = platform_full_version
-        self.distributors_ids = distributors_ids
+        self.distributors_ids_type_ids_tuples = distributors_ids_type_ids
 
 
 class Package(object):
