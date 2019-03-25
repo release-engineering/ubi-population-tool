@@ -1,7 +1,7 @@
 from more_executors import Executors
 import pytest
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
-from ubipop._pulp import Module, Package
+from ubipop._pulp_client import Module, Package
 from mock import MagicMock
 from mock import patch
 import os

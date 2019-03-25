@@ -1,4 +1,4 @@
-from ubipop._pulp import Repo, Package, Pulp
+from ubipop._pulp_client import Repo, Package, Pulp
 import pytest
 import sys
 

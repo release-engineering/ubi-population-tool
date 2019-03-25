@@ -66,7 +66,7 @@ class Pulp(object):
         filters = {"filters": {"unit": {}}}
         if name:
             if name_globbing:
-                filters["filters"]["unit"]["name"] = {"$regex": name + "*"}
+                filters["filters"]["unit"]["name"] = {"$regex": name + ".*"}
             else:
                 filters["filters"]["unit"]["name"] = name
 
@@ -120,7 +120,8 @@ class Pulp(object):
         url = "tasks/{task_id}/"
         statuses = []
         for task_id in task_ids:
-            statuses.append(self.do_request('get', url.format(task_id=task_id)).json())
+            ret = self.do_request('get', url.format(task_id=task_id))
+            statuses.append(ret.json())
         return statuses
 
     def _modules_query(self, modules):
@@ -168,8 +169,10 @@ class Pulp(object):
           },
         }
 
-        ret = self.do_request('post', url, data).json()
-        return [task['task_id'] for task in ret['spawned_tasks']]
+        ret = self.do_request('post', url, data)
+        ret.raise_for_status()
+        ret_json = ret.json()
+        return [task['task_id'] for task in ret_json['spawned_tasks']]
 
     def _get_query_list(self, type_ids, units):
         if "modulemd" in type_ids:
