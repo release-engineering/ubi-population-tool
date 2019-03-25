@@ -10,6 +10,10 @@ except ImportError:
 _LOG = logging.getLogger("ubipop")
 
 
+class UnsupportedTypeId(Exception):
+    pass
+
+
 class Pulp(object):
     PULP_API = "/pulp/api/v2/"
 
@@ -50,7 +54,8 @@ class Pulp(object):
         for item in ret.json():
             notes = item['notes']
             repos.append(Repo(item['id'], notes['arch'], notes['platform_full_version'],
-                              [distributor['id'] for distributor in item['distributors']]))
+                              [(distributor['id'], distributor['distributor_type_id'])
+                               for distributor in item['distributors']]))
 
         return repos
 
@@ -97,33 +102,6 @@ class Pulp(object):
                                   metadata['arch'], metadata['artifacts'], metadata['profiles']))
         return modules
 
-    def associate_units(self, src_repo, dest_repo, units, type_id):
-        url = "repositories/{dst_repo}/actions/associate/".format(dst_repo=dest_repo.repo_id)
-        if type_id == "modulemd":
-            query_list = self._modules_query(units)
-
-        elif type_id in ("rpm", "srpm"):
-            query_list = self._rpms_query(units)
-        else:
-            raise Exception
-
-        data = {
-          'source_repo_id': src_repo.repo_id,
-          'criteria': {
-            'type_ids': [type_id],
-            'filters': {
-              'unit': {
-                '$or':  query_list
-              }
-            }
-          },
-        }
-
-        ret = self.do_request('post', url, data)
-        ret.raise_for_status()
-        ret_json = ret.json()
-        return [task['task_id'] for task in ret_json['spawned_tasks']]
-
     def wait_for_tasks(self, task_id_list,  delay=5.0):
         results = {}
 
@@ -161,25 +139,34 @@ class Pulp(object):
     def _rpms_query(self, rpms):
         return [{"filename": rpm.filename} for rpm in rpms]
 
-    def unassociate_units(self, repo, units, type_id):
+    def unassociate_units(self, repo, units, type_ids):
         url = "repositories/{dst_repo}/actions/unassociate/".format(dst_repo=repo.repo_id)
-        if type_id == "modulemd":
-            query_list = self._modules_query(units)
-
-        elif type_id in ("rpm", "srpm"):
-            query_list = self._rpms_query(units)
-        else:
-            raise Exception
-
         data = {
             'criteria': {
-                'type_ids': [type_id],
+                'type_ids': list(type_ids),
                 'filters': {
                     'unit': {
-                        "$or": query_list
+                        "$or": self._get_query_list(type_ids, units)
                     }
                 }
             },
+        }
+
+        ret = self.do_request('post', url, data).json()
+        return [task['task_id'] for task in ret['spawned_tasks']]
+
+    def associate_units(self, src_repo, dest_repo, units, type_ids):
+        url = "repositories/{dst_repo}/actions/associate/".format(dst_repo=dest_repo.repo_id)
+        data = {
+          'source_repo_id': src_repo.repo_id,
+          'criteria': {
+            'type_ids': list(type_ids),
+            'filters': {
+              'unit': {
+                '$or':  self._get_query_list(type_ids, units)
+              }
+            }
+          },
         }
 
         ret = self.do_request('post', url, data)
@@ -187,44 +174,49 @@ class Pulp(object):
         ret_json = ret.json()
         return [task['task_id'] for task in ret_json['spawned_tasks']]
 
+    def _get_query_list(self, type_ids, units):
+        if "modulemd" in type_ids:
+            query_list = self._modules_query(units)
+
+        elif "rpm" in type_ids or "srpm" in type_ids:
+            query_list = self._rpms_query(units)
+        else:
+            raise UnsupportedTypeId
+
+        return query_list
+
     def associate_modules(self, src_repo, dst_repo, modules):
         return self.associate_units(src_repo, dst_repo, modules, "modulemd")
 
-    def associate_rpms(self, rpms, src_repo, dst_repo):
-        return self.associate_units(src_repo, dst_repo, rpms, "rpm")
-
-    def associate_srpms(self, rpms, src_repo, dst_repo):
-        return self.associate_units(src_repo, dst_repo, rpms, "srpm")
+    def associate_packages(self, rpms, src_repo, dst_repo):
+        return self.associate_units(src_repo, dst_repo, rpms, ("rpm", "srpm"))
 
     def unassociate_modules(self, modules, repo):
-        return self.unassociate_units(repo, modules, "modulemd")
+        return self.unassociate_units(repo, modules, ("modulemd", ))
 
-    def unassociate_rpms(self, rpms, repo):
-        return self.unassociate_units(repo, rpms, "rpm")
-
-    def unassociate_srpms(self, srpms, repo):
-        return self.unassociate_units(repo, srpms, "srpm")
+    def unassociate_packages(self, rpms, repo):
+        return self.unassociate_units(repo, rpms, ("rpm", "srpm"))
 
     def publish_repo(self, repo):
         url = "repositories/{repo_id}/actions/publish/".format(repo_id=repo.repo_id)
         task_ids = []
-        for dist in repo.distributors_ids:
-            _LOG.debug("Publishing %s in %s", repo.repo_id, dist)
-            data = {"id": dist}
-            ret = self.do_request('post', url, data)
-            ret.raise_for_status()
-            ret_json = ret.json()
-            task_ids.extend(task['task_id'] for task in ret_json['spawned_tasks'])
+        for dist_id, dist_type_id in repo.distributors_ids_type_ids_tuples:
+            _LOG.debug("Publishing %s in %s", repo.repo_id, dist_id)
+            data = {"id": dist_id}
+            if dist_type_id in ("rpm_rsync_distributor", "cdn_distributor"):
+                data["override_config"] = {"delete": True}
+            ret = self.do_request('post', url, data).json()
+            task_ids.extend(task['task_id'] for task in ret['spawned_tasks'])
 
         return task_ids
 
 
 class Repo(object):
-    def __init__(self, repo_id, arch, platform_full_version, distributors_ids):
+    def __init__(self, repo_id, arch, platform_full_version, distributors_ids_type_ids):
         self.repo_id = repo_id
         self.arch = arch
         self.platform_full_version = platform_full_version
-        self.distributors_ids = distributors_ids
+        self.distributors_ids_type_ids_tuples = distributors_ids_type_ids
 
 
 class Package(object):

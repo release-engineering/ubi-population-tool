@@ -240,3 +240,36 @@ def test_ubipopulate_load_all_ubiconfig(mocked_ubiconfig_load_all):
     ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False)
     assert len(ubipop.ubiconfig_list) == 1
     assert ubipop.ubiconfig_list[0] == "test"
+
+
+def test_create_srpms_output_set(mock_ubipop_runner):
+    expected_src_rpm_filename = "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.src.rpm"
+    mock_ubipop_runner.out_repo_set.packages['foo'] = \
+        [get_test_pkg(name="tomcatjss",
+                      filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
+         get_test_pkg(name="kernel",
+                      filename="kernel-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm")
+         ]
+
+    mock_ubipop_runner._create_srpms_output_set()
+    out_srpms = mock_ubipop_runner.out_repo_set.source_rpms
+    assert len(out_srpms) == 1
+    assert out_srpms[0].name == "tomcatjss"
+    assert out_srpms[0].filename == expected_src_rpm_filename
+
+
+def test_create_debug_output_set(mock_ubipop_runner):
+    expected_debug_filename = "tomcatjss-debuginfo-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
+    mock_ubipop_runner.out_repo_set.packages['foo'] = \
+        [get_test_pkg(name="tomcatjss",
+                      filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
+         get_test_pkg(name="kernel",
+                      filename="kernel-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm")
+         ]
+
+    mock_ubipop_runner._create_debuginfo_output_set()
+    out_debug_rpms = mock_ubipop_runner.out_repo_set.debug_rpms
+    assert len(out_debug_rpms) == 1
+    assert out_debug_rpms[0].name == "tomcatjss"
+    assert out_debug_rpms[0].filename == expected_debug_filename
+

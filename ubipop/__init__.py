@@ -238,7 +238,8 @@ class UbiPopulateRunner(object):
                                                          package.sourcerpm_filename))
 
         blacklisted = self.get_blacklisted_packages(self.out_repo_set.source_rpms)
-        self._diff_packages_by_filename(self.out_repo_set.source_rpms, blacklisted)
+        self.out_repo_set.source_rpms = \
+            self._diff_packages_by_filename(self.out_repo_set.source_rpms, blacklisted)
 
     def _create_debuginfo_output_set(self):
         """
@@ -254,7 +255,8 @@ class UbiPopulateRunner(object):
             self.out_repo_set.debug_rpms.append(Package(name, debug_pkg_filename))
 
         blacklisted = self.get_blacklisted_packages(self.out_repo_set.debug_rpms)
-        self._diff_packages_by_filename(self.out_repo_set.debug_rpms, blacklisted)
+        self.out_repo_set.debug_rpms = \
+            self._diff_packages_by_filename(self.out_repo_set.debug_rpms, blacklisted)
 
     def _determine_pulp_actions(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
                                 current_debug_rpms_ft):
@@ -433,7 +435,7 @@ class UbiPopulateRunner(object):
         for units, src_repo, dst_repo in associate_triple_list:
             if not units:
                 continue
-            fts.append(self._executor.submit(self.pulp.associate_rpms, units, src_repo, dst_repo))
+            fts.append(self._executor.submit(self.pulp.associate_packages, units, src_repo, dst_repo))
         return fts
 
     def _unassociate_packages(self, unassociate_triple_list):
@@ -441,7 +443,7 @@ class UbiPopulateRunner(object):
         for units, repo in unassociate_triple_list:
             if not units:
                 continue
-            fts.append(self._executor.submit(self.pulp.unassociate_rpms, units, repo))
+            fts.append(self._executor.submit(self.pulp.unassociate_packages, units, repo))
         return fts
 
     def _publish_out_repos(self):
