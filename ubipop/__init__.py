@@ -380,6 +380,9 @@ class UbiPopulateRunner(object):
 
     def log_pulp_actions(self, associate, unassociate):
         modules, src_repo, dst_repo = associate[0]
+        if not modules:
+            _LOG.info("No association expected for modules from %s to %s", src_repo.repo_id,
+                      dst_repo.repo_id)
         for module in modules:
             _LOG.info("Would associate %s from %s to %s", module.nsvca, src_repo.repo_id,
                       dst_repo.repo_id)
@@ -389,8 +392,15 @@ class UbiPopulateRunner(object):
                 for unit in units:
                     _LOG.info("Would associate %s from %s to %s", unit.filename, src_repo.repo_id,
                               dst_repo.repo_id)
+            else:
+                _LOG.info("No association expected for packages from %s to %s", src_repo.repo_id,
+                          dst_repo.repo_id)
 
         modules, dst_repo = unassociate[0]
+
+        if not modules:
+            _LOG.info("No unassociation expected for modules from %s", dst_repo.repo_id)
+
         for module in modules:
             _LOG.info("Would unassociate %s from %s", module.nsvca, dst_repo.repo_id)
 
@@ -398,6 +408,8 @@ class UbiPopulateRunner(object):
             if units:
                 for unit in units:
                     _LOG.info("Would unassociate %s from %s", unit.filename, dst_repo.repo_id)
+            else:
+                _LOG.info("No unassociation expected for packages from %s", dst_repo.repo_id)
 
     def _get_current_content(self):
         """
