@@ -112,14 +112,14 @@ def test_publish_repo(mock_pulp, mock_publish, mock_repo):
     assert task_ids[0] == "foo_task_id"
 
 
-def test_associate_rpms(mock_pulp, mock_associate, mock_repo, mock_package):
-    task_ids = mock_pulp.associate_rpms([mock_package], mock_repo, mock_repo)
+def test_associate_packages(mock_pulp, mock_associate, mock_repo, mock_package):
+    task_ids = mock_pulp.associate_packages([mock_package], mock_repo, mock_repo)
     assert len(task_ids[0])
     assert task_ids[0] == "foo_task_id"
 
 
-def test_unassociate_rpms(mock_pulp, mock_unassociate, mock_repo, mock_package):
-    task_ids = mock_pulp.unassociate_rpms([mock_package], mock_repo)
+def test_unassociate_packages(mock_pulp, mock_unassociate, mock_repo, mock_package):
+    task_ids = mock_pulp.unassociate_packages([mock_package], mock_repo)
     assert len(task_ids[0])
     assert task_ids[0] == "foo_task_id"
 
