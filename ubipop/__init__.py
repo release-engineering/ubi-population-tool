@@ -433,7 +433,7 @@ class UbiPopulateRunner(object):
         for units, src_repo, dst_repo in associate_triple_list:
             if not units:
                 continue
-            fts.append(self._executor.submit(self.pulp.associate_rpms, units, src_repo, dst_repo))
+            fts.append(self._executor.submit(self.pulp.associate_packages, units, src_repo, dst_repo))
         return fts
 
     def _unassociate_packages(self, unassociate_triple_list):
@@ -441,7 +441,7 @@ class UbiPopulateRunner(object):
         for units, repo in unassociate_triple_list:
             if not units:
                 continue
-            fts.append(self._executor.submit(self.pulp.unassociate_rpms, units, repo))
+            fts.append(self._executor.submit(self.pulp.unassociate_packages, units, repo))
         return fts
 
     def _publish_out_repos(self):

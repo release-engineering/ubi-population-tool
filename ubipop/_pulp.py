@@ -10,6 +10,10 @@ except ImportError:
 _LOG = logging.getLogger("ubipop")
 
 
+class UnsupportedTypeId(Exception):
+    pass
+
+
 class Pulp(object):
     PULP_API = "/pulp/api/v2/"
 
@@ -97,31 +101,6 @@ class Pulp(object):
                                   metadata['arch'], metadata['artifacts'], metadata['profiles']))
         return modules
 
-    def associate_units(self, src_repo, dest_repo, units, type_id):
-        url = "repositories/{dst_repo}/actions/associate/".format(dst_repo=dest_repo.repo_id)
-        if type_id == "modulemd":
-            query_list = self._modules_query(units)
-
-        elif type_id in ("rpm", "srpm"):
-            query_list = self._rpms_query(units)
-        else:
-            raise Exception
-
-        data = {
-          'source_repo_id': src_repo.repo_id,
-          'criteria': {
-            'type_ids': [type_id],
-            'filters': {
-              'unit': {
-                '$or':  query_list
-              }
-            }
-          },
-        }
-
-        ret = self.do_request('post', url, data).json()
-        return [task['task_id'] for task in ret['spawned_tasks']]
-
     def wait_for_tasks(self, task_id_list,  delay=5.0):
         results = {}
 
@@ -158,22 +137,14 @@ class Pulp(object):
     def _rpms_query(self, rpms):
         return [{"filename": rpm.filename} for rpm in rpms]
 
-    def unassociate_units(self, repo, units, type_id):
+    def unassociate_units(self, repo, units, type_ids):
         url = "repositories/{dst_repo}/actions/unassociate/".format(dst_repo=repo.repo_id)
-        if type_id == "modulemd":
-            query_list = self._modules_query(units)
-
-        elif type_id in ("rpm", "srpm"):
-            query_list = self._rpms_query(units)
-        else:
-            raise Exception
-
         data = {
             'criteria': {
-                'type_ids': [type_id],
+                'type_ids': list(type_ids),
                 'filters': {
                     'unit': {
-                        "$or": query_list
+                        "$or": self._get_query_list(type_ids, units)
                     }
                 }
             },
@@ -182,23 +153,45 @@ class Pulp(object):
         ret = self.do_request('post', url, data).json()
         return [task['task_id'] for task in ret['spawned_tasks']]
 
+    def associate_units(self, src_repo, dest_repo, units, type_ids):
+        url = "repositories/{dst_repo}/actions/associate/".format(dst_repo=dest_repo.repo_id)
+        data = {
+          'source_repo_id': src_repo.repo_id,
+          'criteria': {
+            'type_ids': list(type_ids),
+            'filters': {
+              'unit': {
+                '$or':  self._get_query_list(type_ids, units)
+              }
+            }
+          },
+        }
+
+        ret = self.do_request('post', url, data).json()
+        return [task['task_id'] for task in ret['spawned_tasks']]
+
+    def _get_query_list(self, type_ids, units):
+        if "modulemd" in type_ids:
+            query_list = self._modules_query(units)
+
+        elif "rpm" in type_ids or "srpm" in type_ids:
+            query_list = self._rpms_query(units)
+        else:
+            raise UnsupportedTypeId
+
+        return query_list
+
     def associate_modules(self, src_repo, dst_repo, modules):
         return self.associate_units(src_repo, dst_repo, modules, "modulemd")
 
-    def associate_rpms(self, rpms, src_repo, dst_repo):
-        return self.associate_units(src_repo, dst_repo, rpms, "rpm")
-
-    def associate_srpms(self, rpms, src_repo, dst_repo):
-        return self.associate_units(src_repo, dst_repo, rpms, "srpm")
+    def associate_packages(self, rpms, src_repo, dst_repo):
+        return self.associate_units(src_repo, dst_repo, rpms, ("rpm", "srpm"))
 
     def unassociate_modules(self, modules, repo):
-        return self.unassociate_units(repo, modules, "modulemd")
+        return self.unassociate_units(repo, modules, ("modulemd", ))
 
-    def unassociate_rpms(self, rpms, repo):
-        return self.unassociate_units(repo, rpms, "rpm")
-
-    def unassociate_srpms(self, srpms, repo):
-        return self.unassociate_units(repo, srpms, "srpm")
+    def unassociate_packages(self, rpms, repo):
+        return self.unassociate_units(repo, rpms, ("rpm", "srpm"))
 
     def publish_repo(self, repo):
         url = "repositories/{repo_id}/actions/publish/".format(repo_id=repo.repo_id)
