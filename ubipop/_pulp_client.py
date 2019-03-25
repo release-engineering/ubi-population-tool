@@ -61,7 +61,7 @@ class Pulp(object):
         filters = {"filters": {"unit": {}}}
         if name:
             if name_globbing:
-                filters["filters"]["unit"]["name"] = {"$regex": name + "*"}
+                filters["filters"]["unit"]["name"] = {"$regex": name + ".*"}
             else:
                 filters["filters"]["unit"]["name"] = name
 
@@ -119,8 +119,10 @@ class Pulp(object):
           },
         }
 
-        ret = self.do_request('post', url, data).json()
-        return [task['task_id'] for task in ret['spawned_tasks']]
+        ret = self.do_request('post', url, data)
+        ret.raise_for_status()
+        ret_json = ret.json()
+        return [task['task_id'] for task in ret_json['spawned_tasks']]
 
     def wait_for_tasks(self, task_id_list,  delay=5.0):
         results = {}
@@ -140,7 +142,8 @@ class Pulp(object):
         url = "tasks/{task_id}/"
         statuses = []
         for task_id in task_ids:
-            statuses.append(self.do_request('get', url.format(task_id=task_id)).json())
+            ret = self.do_request('get', url.format(task_id=task_id))
+            statuses.append(ret.json())
         return statuses
 
     def _modules_query(self, modules):
@@ -179,8 +182,10 @@ class Pulp(object):
             },
         }
 
-        ret = self.do_request('post', url, data).json()
-        return [task['task_id'] for task in ret['spawned_tasks']]
+        ret = self.do_request('post', url, data)
+        ret.raise_for_status()
+        ret_json = ret.json()
+        return [task['task_id'] for task in ret_json['spawned_tasks']]
 
     def associate_modules(self, src_repo, dst_repo, modules):
         return self.associate_units(src_repo, dst_repo, modules, "modulemd")
@@ -206,8 +211,10 @@ class Pulp(object):
         for dist in repo.distributors_ids:
             _LOG.debug("Publishing %s in %s", repo.repo_id, dist)
             data = {"id": dist}
-            ret = self.do_request('post', url, data).json()
-            task_ids.extend(task['task_id'] for task in ret['spawned_tasks'])
+            ret = self.do_request('post', url, data)
+            ret.raise_for_status()
+            ret_json = ret.json()
+            task_ids.extend(task['task_id'] for task in ret_json['spawned_tasks'])
 
         return task_ids
 
