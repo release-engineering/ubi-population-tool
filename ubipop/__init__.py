@@ -4,7 +4,7 @@ import ubiconfig
 from more_executors import Executors
 from concurrent.futures import as_completed
 from collections import namedtuple, defaultdict
-from ubipop._pulp import Pulp, Package
+from ubipop._pulp_client import Pulp, Package
 from ubipop._utils import splitFilename
 from itertools import chain
 
@@ -506,7 +506,7 @@ class UbiPopulateRunner(object):
         Args:
             profiles (list of str):
                 profiles ubi config
-            modules (list of _pulp.Module):
+            modules (list of _pulp_client.Module):
                 modules to process
 
         Returns:
