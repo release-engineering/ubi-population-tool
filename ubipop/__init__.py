@@ -238,7 +238,8 @@ class UbiPopulateRunner(object):
                                                          package.sourcerpm_filename))
 
         blacklisted = self.get_blacklisted_packages(self.out_repo_set.source_rpms)
-        self._diff_packages_by_filename(self.out_repo_set.source_rpms, blacklisted)
+        self.out_repo_set.source_rpms = \
+            self._diff_packages_by_filename(self.out_repo_set.source_rpms, blacklisted)
 
     def _create_debuginfo_output_set(self):
         """
@@ -254,7 +255,8 @@ class UbiPopulateRunner(object):
             self.out_repo_set.debug_rpms.append(Package(name, debug_pkg_filename))
 
         blacklisted = self.get_blacklisted_packages(self.out_repo_set.debug_rpms)
-        self._diff_packages_by_filename(self.out_repo_set.debug_rpms, blacklisted)
+        self.out_repo_set.debug_rpms = \
+            self._diff_packages_by_filename(self.out_repo_set.debug_rpms, blacklisted)
 
     def _determine_pulp_actions(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
                                 current_debug_rpms_ft):
