@@ -30,6 +30,9 @@ def parse_args(args):
                         help="path to to user cert")
     parser.add_argument('--workers', action="store", type=int, default=4,
                         help="Number of workers for parallel execution")
+    parser.add_argument('--output-changed-repos', action="store", required=False,
+                        help="Path for output file. "
+                             "If provided, file containing repo ids of changed repos is created.",)
 
     parsed = parser.parse_args(args)
 
@@ -56,7 +59,8 @@ def main(args):
     opts, auth = parse_args(args)
 
     ubipop.UbiPopulate(opts.pulp_hostname, auth, opts.dry_run, opts.input,
-                       opts.conf_src, opts.insecure, opts.workers)\
+                       opts.conf_src, opts.insecure, opts.workers,
+                       opts.output_changed_repos)\
         .populate_ubi_repos()
 
 
