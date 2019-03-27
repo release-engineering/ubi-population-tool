@@ -304,7 +304,7 @@ def test_create_output_file(mock_ubipop_runner, mock_get_repo_pairs, mocked_ubic
             content = f.readlines()
 
         assert len(content) == 2
-        assert content == ['repo1\n', 'repo2\n']
+        assert sorted(content) == ['repo1\n', 'repo2\n']
 
     finally:
         shutil.rmtree(path)
