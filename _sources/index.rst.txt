@@ -1,7 +1,7 @@
 ubi-population-tool
 ===================
 
-A python library and cli for populating ubi repositories.
+A command-line tool for populating UBI repositories.
 
 .. contents::
   :local:
@@ -23,21 +23,3 @@ Then run ``ubipop`` command against a Pulp server, e.g.
       --pulp-hostname mypulp.example.com \
       --user admin --password admin \
       --conf-src https://mygit.example.com/ubi/config
-
-Or import & use classes from ``ubipop`` module:
-
-.. code-block:: python
-
-    from ubipop import UbiPopulateRunner
-
-    UbiPopulateRunner(...).run_ubi_population()
-
-
-API Reference
--------------
-
-.. autoclass:: ubipop.UbiPopulate
-    :members:
-
-.. autoclass:: ubipop.UbiPopulateRunner
-    :members:

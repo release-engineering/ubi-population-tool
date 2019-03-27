@@ -34,11 +34,10 @@
             
   <div class="section" id="ubi-population-tool">
 <h1>ubi-population-tool<a class="headerlink" href="#ubi-population-tool" title="Permalink to this headline">¶</a></h1>
-<p>A python library and cli for populating ubi repositories.</p>
+<p>A command-line tool for populating UBI repositories.</p>
 <div class="contents local topic" id="contents">
 <ul class="simple">
 <li><a class="reference internal" href="#quick-start" id="id1">Quick Start</a></li>
-<li><a class="reference internal" href="#api-reference" id="id2">API Reference</a></li>
 </ul>
 </div>
 <div class="section" id="quick-start">
@@ -54,87 +53,6 @@
   <span class="o">--</span><span class="n">conf</span><span class="o">-</span><span class="n">src</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">mygit</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">ubi</span><span class="o">/</span><span class="n">config</span>
 </pre></div>
 </div>
-<p>Or import &amp; use classes from <code class="docutils literal notranslate"><span class="pre">ubipop</span></code> module:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ubipop</span> <span class="kn">import</span> <span class="n">UbiPopulateRunner</span>
-
-<span class="n">UbiPopulateRunner</span><span class="p">(</span><span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">run_ubi_population</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-<div class="section" id="api-reference">
-<h2><a class="toc-backref" href="#id2">API Reference</a><a class="headerlink" href="#api-reference" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="ubipop.UbiPopulate">
-<em class="property">class </em><code class="descclassname">ubipop.</code><code class="descname">UbiPopulate</code><span class="sig-paren">(</span><em>pulp_hostname</em>, <em>pulp_auth</em>, <em>dry_run</em>, <em>ubiconfig_filename_list=None</em>, <em>ubiconfig_dir_or_url=None</em>, <em>insecure=False</em>, <em>workers_count=4</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulate" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="class">
-<dt id="ubipop.UbiPopulateRunner">
-<em class="property">class </em><code class="descclassname">ubipop.</code><code class="descname">UbiPopulateRunner</code><span class="sig-paren">(</span><em>pulp</em>, <em>output_repo_set</em>, <em>ubiconfig_item</em>, <em>dry_run</em>, <em>executor</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulateRunner" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="method">
-<dt id="ubipop.UbiPopulateRunner.get_blacklisted_packages">
-<code class="descname">get_blacklisted_packages</code><span class="sig-paren">(</span><em>package_list</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulateRunner.get_blacklisted_packages" title="Permalink to this definition">¶</a></dt>
-<dd><p>Finds blacklisted packages in output sets</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="ubipop.UbiPopulateRunner.get_packages_from_module">
-<code class="descname">get_packages_from_module</code><span class="sig-paren">(</span><em>package_name</em>, <em>input_modules</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulateRunner.get_packages_from_module" title="Permalink to this definition">¶</a></dt>
-<dd><p>Gathers packages from modules by package name</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="ubipop.UbiPopulateRunner.get_packages_names_by_profiles">
-<code class="descname">get_packages_names_by_profiles</code><span class="sig-paren">(</span><em>profiles</em>, <em>modules</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulateRunner.get_packages_names_by_profiles" title="Permalink to this definition">¶</a></dt>
-<dd><p>Gather package names by module profiles, if no profiles provided, add packages from
-all profiles</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>profiles</strong> (<em>list of str</em>) – profiles ubi config</li>
-<li><strong>modules</strong> (<em>list of _pulp_client.Module</em>) – modules to process</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">names of packages within matching modules &amp; profiles</p>
-</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">list of str</p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="ubipop.UbiPopulateRunner.keep_n_latest_modules">
-<code class="descname">keep_n_latest_modules</code><span class="sig-paren">(</span><em>modules</em>, <em>n=1</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulateRunner.keep_n_latest_modules" title="Permalink to this definition">¶</a></dt>
-<dd><p>Keeps n latest modules in modules sorted list</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="ubipop.UbiPopulateRunner.keep_n_newest_packages">
-<code class="descname">keep_n_newest_packages</code><span class="sig-paren">(</span><em>packages</em>, <em>n=1</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulateRunner.keep_n_newest_packages" title="Permalink to this definition">¶</a></dt>
-<dd><p>Keep n latest packages,
-package is deleted from output set if it’s not referenced by any remaining module</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="ubipop.UbiPopulateRunner.sort_modules">
-<code class="descname">sort_modules</code><span class="sig-paren">(</span><em>modules</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulateRunner.sort_modules" title="Permalink to this definition">¶</a></dt>
-<dd><p>Sort modules by version</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="ubipop.UbiPopulateRunner.sort_packages">
-<code class="descname">sort_packages</code><span class="sig-paren">(</span><em>packages</em><span class="sig-paren">)</span><a class="headerlink" href="#ubipop.UbiPopulateRunner.sort_packages" title="Permalink to this definition">¶</a></dt>
-<dd><p>Sort packages by vercmp</p>
-</dd></dl>
-
-</dd></dl>
-
 </div>
 </div>
 
@@ -166,9 +84,9 @@ package is deleted from output set if it’s not referenced by any remaining mod
     
     <li class="toctree-l1"><a href="https://github.com/release-engineering/ubi-population-tool">Source</a></li>
     
-    <li class="toctree-l1"><a href="genindex.html">Index</a></li>
-    
     <li class="toctree-l1"><a href="https://pypi.org/project/ubi-population-tool">PyPI</a></li>
+    
+    <li class="toctree-l1"><a href="genindex.html">Index</a></li>
     
 </ul>
 <div class="relations">
