@@ -1,11 +1,13 @@
-from more_executors import Executors
 import pytest
+import ubiconfig
+import tempfile
+import os
+import shutil
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
 from ubipop._pulp_client import Module, Package
 from mock import MagicMock
 from mock import patch
-import os
-import ubiconfig
+from more_executors import Executors
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), './data')
 
@@ -273,3 +275,36 @@ def test_create_debug_output_set(mock_ubipop_runner):
     assert out_debug_rpms[0].name == "tomcatjss"
     assert out_debug_rpms[0].filename == expected_debug_filename
 
+
+@pytest.fixture()
+def mock_get_repo_pairs():
+    with patch('ubipop.UbiPopulate._get_input_and_output_repo_pairs') as get_repo_pairs:
+        get_repo_pairs.return_value = [ubi_repo_set]
+        yield get_repo_pairs
+
+
+@pytest.fixture()
+def mock_run_ubi_population(ubi_repo_set):
+    with patch('ubipop.UbiPopulateRunner.run_ubi_population') as run_ubi_population:
+        run_ubi_population.return_value = set(['repo1', 'repo2'])
+        yield run_ubi_population
+
+
+def test_create_output_file(mock_ubipop_runner, mock_get_repo_pairs, mocked_ubiconfig_load_all,
+                            mock_run_ubi_population):
+    path = tempfile.mkdtemp("ubipop")
+    try:
+        out_file_path = os.path.join(path, 'output.txt')
+        ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False,
+                             output_changed_repos=out_file_path)
+
+        ubipop.populate_ubi_repos()
+
+        with open(out_file_path) as f:
+            content = f.readlines()
+
+        assert len(content) == 2
+        assert content == ['repo1\n', 'repo2\n']
+
+    finally:
+        shutil.rmtree(path)

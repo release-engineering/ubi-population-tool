@@ -61,12 +61,14 @@ class UbiRepoSet(object):
 
 class UbiPopulate(object):
     def __init__(self, pulp_hostname, pulp_auth, dry_run, ubiconfig_filename_list=None,
-                 ubiconfig_dir_or_url=None, insecure=False, workers_count=4):
+                 ubiconfig_dir_or_url=None, insecure=False, workers_count=4,
+                 output_changed_repos=None):
 
         self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list,
                                                    ubiconfig_dir_or_url)
         self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
         self.dry_run = dry_run
+        self.output_changed_repos = output_changed_repos
         self._executor = Executors.thread_pool(max_workers=workers_count).with_retry()
 
     def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url):
@@ -80,6 +82,7 @@ class UbiPopulate(object):
         return ubi_conf_list
 
     def populate_ubi_repos(self):
+        changed_repos = set()
         for config in self.ubiconfig_list:
             try:
                 output_repo_sets = self._get_input_and_output_repo_pairs(config)
@@ -88,8 +91,14 @@ class UbiPopulate(object):
                 continue
 
             for repo_set in output_repo_sets:
-                UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run, self._executor)\
-                    .run_ubi_population()
+                repos = UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run,
+                                          self._executor).run_ubi_population()
+                changed_repos.update(repos)
+
+        if self.output_changed_repos:
+            with open(self.output_changed_repos, 'w') as f:
+                for repo in changed_repos:
+                    f.write(repo.strip() + '\n')
 
     def _get_input_and_output_repo_pairs(self, ubiconfig_item):
         """
@@ -147,6 +156,7 @@ class UbiPopulateRunner(object):
         self.out_repo_set = output_repo_set
         self.ubiconfig = ubiconfig_item
         self.dry_run = dry_run
+        self._changed_repos = set()
         self._executor = executor
 
     def _match_modules(self):
@@ -357,6 +367,8 @@ class UbiPopulateRunner(object):
             for ft in as_completed(self._publish_out_repos()):
                 self.pulp.wait_for_tasks(ft.result())
 
+        return self._changed_repos
+
     def log_curent_content(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
                            current_debug_rpms_ft):
         _LOG.info("Current modules in repo: %s", self.out_repo_set.out_repos.rpm.repo_id)
@@ -431,12 +443,14 @@ class UbiPopulateRunner(object):
 
     def _associate_modules(self, modules, src_repo, dst_repo):
         if modules:
+            self._changed_repos.add(dst_repo.repo_id)
             return [self._executor.submit(self.pulp.associate_modules, src_repo, dst_repo, modules)]
         else:
             return []
 
     def _unassociate_modules(self, modules, repo):
         if modules:
+            self._changed_repos.add(repo.repo_id)
             return [self._executor.submit(self.pulp.unassociate_modules, modules, repo)]
         else:
             return []
@@ -447,6 +461,7 @@ class UbiPopulateRunner(object):
         for units, src_repo, dst_repo in associate_triple_list:
             if not units:
                 continue
+            self._changed_repos.add(dst_repo.repo_id)
             fts.append(self._executor.submit(self.pulp.associate_packages, units, src_repo, dst_repo))
         return fts
 
@@ -455,6 +470,7 @@ class UbiPopulateRunner(object):
         for units, repo in unassociate_triple_list:
             if not units:
                 continue
+            self._changed_repos.add(repo.repo_id)
             fts.append(self._executor.submit(self.pulp.unassociate_packages, units, repo))
         return fts
 
