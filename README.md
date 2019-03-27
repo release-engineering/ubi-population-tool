@@ -3,32 +3,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/release-engineering/ubi-population-tool/badge.svg?branch=master)](https://coveralls.io/github/release-engineering/ubi-population-tool?branch=master)
 
 
-A python library and cli for populating ubi repositories.
-
-The library provides convenient means how to populate ubi repositories: 
-- consumes ubi config using *ubi-config* tool
-- calculates expected content of ubi repositories
-- determines pulp actions which will ensure expected content to be in ubi repos
-
-# Library usage
-Example of typical usage of library follows:
-
- 
-```python
-from ubipop import UbiPopulate
-
-ubi = UbiPopulate(content_sets, pulp_url, ("user", "pass"), dry_run=False)
-ubi.populate_ubi_repos()
-```
-
-Required arguments are:
-- **content_sets**: list of content sets that will be used for reading config
-- **pulp_url**: url of pulp_server
-- **tuple** of username nad password of pulp server
-- **dry_run**: boolean, if True, it calculates and prints expected pulp actions, if False execute pulp actions
-
-By calling *populate_ubi_repos()* whole process of calculation of desired content of
-ubi repos and required action is started.
+A command-line tool for populating ubi repositories.
 
 # Cli usage
 
