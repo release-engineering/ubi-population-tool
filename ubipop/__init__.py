@@ -235,7 +235,7 @@ class UbiPopulateRunner(object):
             self.keep_n_latest_modules(modules)
 
     def _finalize_rpms_output_set(self):
-        for _, packages in self.out_repo_set.packages.items():
+        for _, packages in self.repos.packages.items():
             self.sort_packages(packages)
             self.keep_n_newest_packages(packages)  # with respect to packages referenced by modules
 

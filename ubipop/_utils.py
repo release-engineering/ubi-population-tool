@@ -36,7 +36,7 @@ class PulpAction(object):
         self.dst_repo = dst_repo
 
     def get_action(self, *args):
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class AssociateAction(PulpAction):
