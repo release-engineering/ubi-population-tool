@@ -5,7 +5,9 @@ from more_executors import Executors
 from concurrent.futures import as_completed
 from collections import namedtuple, defaultdict
 from ubipop._pulp_client import Pulp, Package
-from ubipop._utils import splitFilename
+from ubipop._utils import (splitFilename, AssociateActionModules, AssociateActionRpms,
+                           UnassociateActionModules,
+                           UnassociateActionRpms)
 from itertools import chain
 
 _LOG = logging.getLogger("ubipop")
@@ -153,7 +155,7 @@ class UbiPopulate(object):
 class UbiPopulateRunner(object):
     def __init__(self, pulp, output_repo_set, ubiconfig_item, dry_run, executor):
         self.pulp = pulp
-        self.out_repo_set = output_repo_set
+        self.repos = output_repo_set
         self.ubiconfig = ubiconfig_item
         self.dry_run = dry_run
         self._changed_repos = set()
@@ -165,7 +167,7 @@ class UbiPopulateRunner(object):
         fts = {}
         for module in self.ubiconfig.modules:
             fts[self._executor.submit(self.pulp.search_modules,
-                                      self.out_repo_set.in_repos.rpm, module.name,
+                                      self.repos.in_repos.rpm, module.name,
                                       str(module.stream))] = \
                 (module.name + str(module.stream), module.profiles)
 
@@ -176,7 +178,7 @@ class UbiPopulateRunner(object):
                 # fts[ft][1] == module.profiles
                 name_stream = fts[ft][0]
                 profiles = fts[ft][1]
-                self.out_repo_set.modules[name_stream].extend(input_modules)
+                self.repos.modules[name_stream].extend(input_modules)
 
                 # Add packages from module profiles
                 packages_names = self.get_packages_names_by_profiles(profiles, input_modules)
@@ -185,8 +187,8 @@ class UbiPopulateRunner(object):
                     module_packages = self.get_packages_from_module(package_name, input_modules)
 
                     # for reference which pkgs are from modules
-                    self.out_repo_set.pkgs_from_modules[name_stream].extend(module_packages)
-                    self.out_repo_set.packages[package_name].extend(module_packages)
+                    self.repos.pkgs_from_modules[name_stream].extend(module_packages)
+                    self.repos.packages[package_name].extend(module_packages)
 
     def _match_packages(self):
         # Add matching packages from whitelist
@@ -197,12 +199,12 @@ class UbiPopulateRunner(object):
             name = package_pattern.name
             arch = None if package_pattern.arch in ('*', None) else package_pattern.arch
             fts[(self._executor.submit(self.pulp.search_rpms,
-                                       self.out_repo_set.in_repos.rpm, name, arch))] = name
+                                       self.repos.in_repos.rpm, name, arch))] = name
 
         for ft in as_completed(fts):
             packages = ft.result()
             if packages:
-                self.out_repo_set.packages[fts[ft]].extend(packages)
+                self.repos.packages[fts[ft]].extend(packages)
 
     def _parse_blacklist_config(self):
         packages_to_exclude = []
@@ -221,14 +223,14 @@ class UbiPopulateRunner(object):
 
     def _exclude_blacklisted_packages(self):
         blacklisted = self.get_blacklisted_packages(
-            chain.from_iterable(self.out_repo_set.packages.values()))
+            chain.from_iterable(self.repos.packages.values()))
 
         for pkg in blacklisted:
-            self.out_repo_set.packages.pop(pkg.name, None)
-            self.out_repo_set.pkgs_from_modules.pop(pkg.name, None)
+            self.repos.packages.pop(pkg.name, None)
+            self.repos.pkgs_from_modules.pop(pkg.name, None)
 
     def _finalize_modules_output_set(self):
-        for _, modules in self.out_repo_set.modules.items():
+        for _, modules in self.repos.modules.items():
             self.sort_modules(modules)
             self.keep_n_latest_modules(modules)
 
@@ -238,38 +240,53 @@ class UbiPopulateRunner(object):
             self.keep_n_newest_packages(packages)  # with respect to packages referenced by modules
 
     def _create_srpms_output_set(self):
-        packages = chain.from_iterable(self.out_repo_set.packages.values())
+        packages = chain.from_iterable(self.repos.packages.values())
         for package in packages:
             if package.sourcerpm_filename is None:
                 name, ver, rel, _, _ = splitFilename(package.filename)
                 package.sourcerpm_filename = "{n}-{v}-{r}.src.rpm".format(n=name, v=ver, r=rel)
 
-            self.out_repo_set.source_rpms.append(Package(package.name,
-                                                         package.sourcerpm_filename))
+            self.repos.source_rpms.append(Package(package.name,
+                                                  package.sourcerpm_filename))
 
-        blacklisted = self.get_blacklisted_packages(self.out_repo_set.source_rpms)
-        self.out_repo_set.source_rpms = \
-            self._diff_packages_by_filename(self.out_repo_set.source_rpms, blacklisted)
+        blacklisted = self.get_blacklisted_packages(self.repos.source_rpms)
+        self.repos.source_rpms = \
+            self._diff_packages_by_filename(self.repos.source_rpms, blacklisted)
 
     def _create_debuginfo_output_set(self):
         """
         Creates output set for debug repo. Content is based on current rpms output set.
         """
-        packages = chain.from_iterable(self.out_repo_set.packages.values())
+        packages = chain.from_iterable(self.repos.packages.values())
         for package in packages:
             name, ver, rel, _, arch = splitFilename(package.filename)
             debug_pkg_filename = "{n}-debuginfo-{v}-{r}.{a}.rpm".format(n=name,
                                                                         v=ver,
                                                                         r=rel,
                                                                         a=arch)
-            self.out_repo_set.debug_rpms.append(Package(name, debug_pkg_filename))
+            self.repos.debug_rpms.append(Package(name, debug_pkg_filename))
 
-        blacklisted = self.get_blacklisted_packages(self.out_repo_set.debug_rpms)
-        self.out_repo_set.debug_rpms = \
-            self._diff_packages_by_filename(self.out_repo_set.debug_rpms, blacklisted)
+        blacklisted = self.get_blacklisted_packages(self.repos.debug_rpms)
+        self.repos.debug_rpms = \
+            self._diff_packages_by_filename(self.repos.debug_rpms, blacklisted)
 
-    def _determine_pulp_actions(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
-                                current_debug_rpms_ft):
+    def _determine_pulp_actions(self, units, current, diff_f):
+        if isinstance(units, dict):
+            expected = list(chain.from_iterable(units.values()))
+        else:
+            expected = units
+        to_associate = diff_f(expected, current)
+        to_unassociate = diff_f(current, expected)
+        return to_associate, to_unassociate
+
+    def _gets_action_for_mds(self, modules, current):
+        return self._determine_pulp_actions(modules, current, self._diff_modules_by_nsvca)
+
+    def _get_actions_pkgs(self, pkgs, current):
+        return self._determine_pulp_actions(pkgs, current, self._diff_packages_by_filename)
+
+    def _get_pulp_actions(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
+                          current_debug_rpms_ft):
         """
         Determines expected pulp actions by comparing current content of output repos and
         expected content.
@@ -278,42 +295,35 @@ class UbiPopulateRunner(object):
         Content that needs unassociation: unit is in current but not in expected
         No action: unit is in current and in expected
         """
-        expected_modules = list(chain.from_iterable(self.out_repo_set.modules.values()))
-        modules_assoc = self._diff_modules_by_nsvca(expected_modules, current_modules_ft.result())
-        modules_unassoc = self._diff_modules_by_nsvca(current_modules_ft.result(), expected_modules)
+        modules_assoc, modules_unassoc = self._gets_action_for_mds(self.repos.modules,
+                                                                   current_modules_ft.result())
+        rpms_assoc, rpms_unassoc = self._get_actions_pkgs(self.repos.packages,
+                                                          current_rpms_ft.result())
+        srpms_assoc, srpms_unassoc = self._get_actions_pkgs(self.repos.source_rpms,
+                                                            current_srpms_ft.result())
 
-        expected_rpms = list(chain.from_iterable(self.out_repo_set.packages.values()))
-        rpms_assoc = self._diff_packages_by_filename(expected_rpms, current_rpms_ft.result())
-        rpms_unassoc = self._diff_packages_by_filename(current_rpms_ft.result(), expected_rpms)
-
-        expected_srpms = self.out_repo_set.source_rpms
-        srpms_assoc = self._diff_packages_by_filename(expected_srpms, current_srpms_ft.result())
-        srpms_unassoc = self._diff_packages_by_filename(current_srpms_ft.result(), expected_srpms)
-
-        debug_rpms_assoc = None
-        debug_rpms_unassoc = None
+        debug_assoc = None
+        debug_unassoc = None
         if current_debug_rpms_ft is not None:
-            expected_debug_rpms = self.out_repo_set.debug_rpms
-            debug_rpms_assoc = self._diff_packages_by_filename(expected_debug_rpms,
-                                                               current_debug_rpms_ft.result())
-            debug_rpms_unassoc = self._diff_packages_by_filename(current_debug_rpms_ft.result(),
-                                                                 expected_debug_rpms)
+            debug_assoc, debug_unassoc = self._get_actions_pkgs(self.repos.debug_rpms,
+                                                                current_debug_rpms_ft.result())
 
-        assoc_units_repo_triples = ((modules_assoc,  self.out_repo_set.in_repos.rpm,
-                                     self.out_repo_set.out_repos.rpm),
-                                    (rpms_assoc, self.out_repo_set.in_repos.rpm,
-                                     self.out_repo_set.out_repos.rpm),
-                                    (srpms_assoc, self.out_repo_set.in_repos.source,
-                                     self.out_repo_set.out_repos.source),
-                                    (debug_rpms_assoc, self.out_repo_set.in_repos.debug,
-                                     self.out_repo_set.out_repos.debug))
+        associations = (AssociateActionModules(modules_assoc, self.repos.in_repos.rpm,
+                                               self.repos.out_repos.rpm),
+                        AssociateActionRpms(rpms_assoc, self.repos.in_repos.rpm,
+                                            self.repos.out_repos.rpm),
+                        AssociateActionRpms(srpms_assoc, self.repos.in_repos.source,
+                                            self.repos.out_repos.source),
+                        AssociateActionRpms(debug_assoc, self.repos.in_repos.debug,
+                                            self.repos.out_repos.debug)
+                        )
 
-        unassoc_units_repo_pairs = ((modules_unassoc, self.out_repo_set.out_repos.rpm),
-                                    (rpms_unassoc, self.out_repo_set.out_repos.rpm),
-                                    (srpms_unassoc, self.out_repo_set.out_repos.source),
-                                    (debug_rpms_unassoc, self.out_repo_set.out_repos.debug))
+        unassociations = (UnassociateActionModules(modules_unassoc, self.repos.out_repos.rpm),
+                          UnassociateActionRpms(rpms_unassoc, self.repos.out_repos.rpm),
+                          UnassociateActionRpms(srpms_unassoc, self.repos.out_repos.source),
+                          UnassociateActionRpms(debug_unassoc, self.repos.out_repos.debug))
 
-        return assoc_units_repo_triples, unassoc_units_repo_pairs
+        return associations, unassociations
 
     def _diff_modules_by_nsvca(self, modules_1, modules_2):
         return self._diff_lists_by_attr(modules_1, modules_2, 'nsvca')
@@ -338,25 +348,19 @@ class UbiPopulateRunner(object):
         self._finalize_rpms_output_set()
         self._create_srpms_output_set()
 
-        if self.out_repo_set.out_repos.debug:
-            self._create_debuginfo_output_set()
-
-        associate, unassociate = self._determine_pulp_actions(current_modules_ft, current_rpms_ft,
+        associations, unassociations = self._get_pulp_actions(current_modules_ft,
+                                                              current_rpms_ft,
                                                               current_srpms_ft,
                                                               current_debug_rpms_ft)
 
         if self.dry_run:
-            self.log_curent_content(current_modules_ft, current_rpms_ft, current_srpms_ft,
-                                    current_debug_rpms_ft)
-            self.log_pulp_actions(associate, unassociate)
+            self.log_curent_content(current_modules_ft, current_rpms_ft,
+                                    current_srpms_ft, current_debug_rpms_ft)
+            self.log_pulp_actions(associations, unassociations)
         else:
             fts = []
-            fts.extend(self._associate_modules(*associate[0]))
-            fts.extend(self._associate_packages(associate[1:]))
-
-            fts.extend(self._unassociate_modules(*unassociate[0]))
-            fts.extend(self._unassociate_packages(unassociate[1:]))
-
+            fts.extend(self._associate_units(associations))
+            fts.extend(self._unassociate_units(unassociations))
             # wait for associate/unassociate tasks
             for ft in as_completed(fts):
                 tasks = ft.result()
@@ -369,116 +373,83 @@ class UbiPopulateRunner(object):
 
         return self._changed_repos
 
+    def _associate_units(self, associate_action_list):
+        fts = []
+        for action in associate_action_list:
+            if action.units:
+                self._changed_repos.add(action.repo.repo_id)
+                fts.append(self._executor.submit(action.get_action(self.pulp)))
+
+        return fts
+
+    def _unassociate_units(self, unassociate_action_list):
+        fts = []
+        for action in unassociate_action_list:
+            fts.append(self._executor.submit(action.get_action(self.pulp)))
+
+        return fts
+
     def log_curent_content(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
                            current_debug_rpms_ft):
-        _LOG.info("Current modules in repo: %s", self.out_repo_set.out_repos.rpm.repo_id)
+        _LOG.info("Current modules in repo: %s", self.repos.out_repos.rpm.repo_id)
         for module in current_modules_ft.result():
             _LOG.info(module.nsvca)
-        _LOG.info(
-            "Current rpms in repo: %s", self.out_repo_set.out_repos.rpm.repo_id)
+        _LOG.info("Current rpms in repo: %s", self.repos.out_repos.rpm.repo_id)
         for rpm in current_rpms_ft.result():
             _LOG.info(rpm.filename)
 
-        _LOG.info(
-            "Current srpms in repo: %s", self.out_repo_set.out_repos.source.repo_id)
+        _LOG.info("Current srpms in repo: %s", self.repos.out_repos.source.repo_id)
         for rpm in current_srpms_ft.result():
             _LOG.info(rpm.filename)
 
-        if self.out_repo_set.out_repos.debug:
-            _LOG.info(
-                "Current rpms in repo: %s", self.out_repo_set.out_repos.debug.repo_id)
+        if self.repos.out_repos.debug:
+            _LOG.info("Current rpms in repo: %s", self.repos.out_repos.debug.repo_id)
             for rpm in current_debug_rpms_ft.result():
                 _LOG.info(rpm.filename)
 
-    def log_pulp_actions(self, associate, unassociate):
-        modules, src_repo, dst_repo = associate[0]
-        if not modules:
-            _LOG.info("No association expected for modules from %s to %s", src_repo.repo_id,
-                      dst_repo.repo_id)
-        for module in modules:
-            _LOG.info("Would associate %s from %s to %s", module.nsvca, src_repo.repo_id,
-                      dst_repo.repo_id)
+    def log_pulp_actions(self, associations, unassociations):
+        for item in associations:
+            if item.units:
+                for unit in item.units:
+                    _LOG.info("Would associate %s from %s to %s", unit, item.src_repo.repo_id,
+                              item.dst_repo.repo_id)
 
-        for units, src_repo, dst_repo in associate[1:]:
-            if units:
-                for unit in units:
-                    _LOG.info("Would associate %s from %s to %s", unit.filename, src_repo.repo_id,
-                              dst_repo.repo_id)
             else:
-                _LOG.info("No association expected for packages from %s to %s", src_repo.repo_id,
-                          dst_repo.repo_id)
+                _LOG.info("No association expected for %s from %s to %s", item.TYPE,
+                          item.src_repo.repo_id,
+                          item.dst_repo.repo_id)
 
-        modules, dst_repo = unassociate[0]
-
-        if not modules:
-            _LOG.info("No unassociation expected for modules from %s", dst_repo.repo_id)
-
-        for module in modules:
-            _LOG.info("Would unassociate %s from %s", module.nsvca, dst_repo.repo_id)
-
-        for units, dst_repo in unassociate[1:]:
-            if units:
-                for unit in units:
-                    _LOG.info("Would unassociate %s from %s", unit.filename, dst_repo.repo_id)
+        for item in unassociations:
+            if item.units:
+                for unit in item.units:
+                    _LOG.info("Would unassociate %s from %s", unit.filename, item.dst_repo.repo_id)
             else:
-                _LOG.info("No unassociation expected for packages from %s", dst_repo.repo_id)
+                _LOG.info("No unassociation expected for %s from %s", item.TYPE,
+                          item.dst_repo.repo_id)
 
     def _get_current_content(self):
         """
         Gather current content of output repos
         """
         current_modules_ft = self._executor.submit(self.pulp.search_modules,
-                                                   self.out_repo_set.out_repos.rpm)
+                                                   self.repos.out_repos.rpm)
         current_rpms_ft = self._executor.submit(self.pulp.search_rpms,
-                                                self.out_repo_set.out_repos.rpm)
+                                                self.repos.out_repos.rpm)
         current_srpms_ft = self._executor.submit(self.pulp.search_rpms,
-                                                 self.out_repo_set.out_repos.source)
-        if self.out_repo_set.out_repos.debug:
+                                                 self.repos.out_repos.source)
+        if self.repos.out_repos.debug:
             current_debug_rpms_ft = self._executor.submit(self.pulp.search_rpms,
-                                                          self.out_repo_set.out_repos.debug)
+                                                          self.repos.out_repos.debug)
         else:
             current_debug_rpms_ft = None
 
         return current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft
 
-    def _associate_modules(self, modules, src_repo, dst_repo):
-        if modules:
-            self._changed_repos.add(dst_repo.repo_id)
-            return [self._executor.submit(self.pulp.associate_modules, src_repo, dst_repo, modules)]
-        else:
-            return []
-
-    def _unassociate_modules(self, modules, repo):
-        if modules:
-            self._changed_repos.add(repo.repo_id)
-            return [self._executor.submit(self.pulp.unassociate_modules, modules, repo)]
-        else:
-            return []
-
-    def _associate_packages(self, associate_triple_list):
-        fts = []
-
-        for units, src_repo, dst_repo in associate_triple_list:
-            if not units:
-                continue
-            self._changed_repos.add(dst_repo.repo_id)
-            fts.append(self._executor.submit(self.pulp.associate_packages, units, src_repo, dst_repo))
-        return fts
-
-    def _unassociate_packages(self, unassociate_triple_list):
-        fts = []
-        for units, repo in unassociate_triple_list:
-            if not units:
-                continue
-            self._changed_repos.add(repo.repo_id)
-            fts.append(self._executor.submit(self.pulp.unassociate_packages, units, repo))
-        return fts
-
     def _publish_out_repos(self):
         fts = []
-        repos_to_publish = (self.out_repo_set.out_repos.rpm,
-                            self.out_repo_set.out_repos.debug,
-                            self.out_repo_set.out_repos.source)
+        repos_to_publish = (self.repos.out_repos.rpm,
+                            self.repos.out_repos.debug,
+                            self.repos.out_repos.source)
 
         for repo in repos_to_publish:
             if repo:
@@ -584,9 +555,9 @@ class UbiPopulateRunner(object):
         packages_to_keep = []
         for package in packages_to_delete:
             for module_name_stream, packages_ref_by_module in \
-                    self.out_repo_set.pkgs_from_modules.items():
+                    self.repos.pkgs_from_modules.items():
                 if package.filename in [pkg.filename for pkg in packages_ref_by_module] and\
-                                        module_name_stream in self.out_repo_set.modules:
+                                        module_name_stream in self.repos.modules:
                     packages_to_keep.append(package)
 
         packages[:] = packages[-n:] + packages_to_keep

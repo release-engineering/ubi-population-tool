@@ -28,3 +28,48 @@ def splitFilename(filename):
 
     name = filename[epochIndex + 1:verIndex]
     return name, ver, rel, epoch, arch
+
+
+class PulpAction(object):
+    def __init__(self, units,  dst_repo):
+        self.units = units
+        self.dst_repo = dst_repo
+
+    def get_action(self, *args):
+        raise NotImplemented
+
+
+class AssociateAction(PulpAction):
+    def __init__(self, units, dst_repo, src_repo):
+        super(AssociateAction, self).__init__(units, dst_repo)
+        self.src_repo = src_repo
+
+
+class AssociateActionModules(AssociateAction):
+    TYPE = "modules"
+
+    def get_action(self, pulp_client_inst):
+        return pulp_client_inst.associate_modules, self.units, self.src_repo.repo_id, \
+               self.dst_repo.repo_id
+
+
+class UnassociateActionModules(PulpAction):
+    TYPE = "modules"
+
+    def get_action(self, pulp_client_inst):
+        return pulp_client_inst.unassociate_modules, self.units, self.dst_repo.repo_id
+
+
+class AssociateActionRpms(AssociateAction):
+    TYPE = "packages"
+
+    def get_action(self, pulp_client_inst):
+        return pulp_client_inst.associate_packages, self.units, self.src_repo.repo_id, \
+               self.dst_repo.repo_id
+
+
+class UnassociateActionRpms(PulpAction):
+    TYPE = "packages"
+
+    def get_action(self, pulp_client_inst):
+        return pulp_client_inst.unassociate_packages, self.units, self.dst_repo.repo_id

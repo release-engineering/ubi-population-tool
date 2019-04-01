@@ -133,8 +133,8 @@ def test_match_packages(mock_ubipop_runner):
     mock_ubipop_runner.pulp.search_rpms.return_value = [get_test_pkg(name=package_name)]
     mock_ubipop_runner._match_packages()
 
-    assert len(mock_ubipop_runner.out_repo_set.packages) == 1
-    assert mock_ubipop_runner.out_repo_set.packages[package_name][0].name == package_name
+    assert len(mock_ubipop_runner.repos.packages) == 1
+    assert mock_ubipop_runner.repos.packages[package_name][0].name == package_name
 
 
 def test_match_modules(mock_ubipop_runner):
@@ -145,10 +145,10 @@ def test_match_modules(mock_ubipop_runner):
 
     mock_ubipop_runner._match_modules()
 
-    assert len(mock_ubipop_runner.out_repo_set.modules) == 1
-    assert len(mock_ubipop_runner.out_repo_set.modules["n1s1"]) == 1
-    assert mock_ubipop_runner.out_repo_set.modules["n1s1"][0].name == 'm1'
-    pkg = mock_ubipop_runner.out_repo_set.pkgs_from_modules["n1s1"][0]
+    assert len(mock_ubipop_runner.repos.modules) == 1
+    assert len(mock_ubipop_runner.repos.modules["n1s1"]) == 1
+    assert mock_ubipop_runner.repos.modules["n1s1"][0].name == 'm1'
+    pkg = mock_ubipop_runner.repos.pkgs_from_modules["n1s1"][0]
     assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
     assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
 
@@ -183,8 +183,8 @@ def test_keep_n_newest_packages_with_referenced_pkg_in_module(mock_ubipop_runner
         get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm"),
         get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.8-1.el8+1944+b6c8e16f.noarch.rpm")]
 
-    mock_ubipop_runner.out_repo_set.modules["ns"] = []
-    mock_ubipop_runner.out_repo_set.pkgs_from_modules["ns"] = \
+    mock_ubipop_runner.repos.modules["ns"] = []
+    mock_ubipop_runner.repos.pkgs_from_modules["ns"] = \
         [get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm")]
 
     mock_ubipop_runner.keep_n_newest_packages(packages)
@@ -246,7 +246,7 @@ def test_ubipopulate_load_all_ubiconfig(mocked_ubiconfig_load_all):
 
 def test_create_srpms_output_set(mock_ubipop_runner):
     expected_src_rpm_filename = "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.src.rpm"
-    mock_ubipop_runner.out_repo_set.packages['foo'] = \
+    mock_ubipop_runner.repos.packages['foo'] = \
         [get_test_pkg(name="tomcatjss",
                       filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
          get_test_pkg(name="kernel",
@@ -254,7 +254,7 @@ def test_create_srpms_output_set(mock_ubipop_runner):
          ]
 
     mock_ubipop_runner._create_srpms_output_set()
-    out_srpms = mock_ubipop_runner.out_repo_set.source_rpms
+    out_srpms = mock_ubipop_runner.repos.source_rpms
     assert len(out_srpms) == 1
     assert out_srpms[0].name == "tomcatjss"
     assert out_srpms[0].filename == expected_src_rpm_filename
@@ -262,7 +262,7 @@ def test_create_srpms_output_set(mock_ubipop_runner):
 
 def test_create_debug_output_set(mock_ubipop_runner):
     expected_debug_filename = "tomcatjss-debuginfo-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
-    mock_ubipop_runner.out_repo_set.packages['foo'] = \
+    mock_ubipop_runner.repos.packages['foo'] = \
         [get_test_pkg(name="tomcatjss",
                       filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
          get_test_pkg(name="kernel",
@@ -270,7 +270,7 @@ def test_create_debug_output_set(mock_ubipop_runner):
          ]
 
     mock_ubipop_runner._create_debuginfo_output_set()
-    out_debug_rpms = mock_ubipop_runner.out_repo_set.debug_rpms
+    out_debug_rpms = mock_ubipop_runner.repos.debug_rpms
     assert len(out_debug_rpms) == 1
     assert out_debug_rpms[0].name == "tomcatjss"
     assert out_debug_rpms[0].filename == expected_debug_filename
@@ -308,3 +308,84 @@ def test_create_output_file(mock_ubipop_runner, mock_get_repo_pairs, mocked_ubic
 
     finally:
         shutil.rmtree(path)
+
+
+@pytest.fixture()
+def mock_current_content_ft():
+    current_modules_ft = MagicMock()
+    current_rpms_ft = MagicMock()
+    current_srpms_ft = MagicMock()
+    current_debug_rpms_ft = MagicMock()
+
+    current_modules_ft.result.return_value = [get_test_mod(name="md_current")]
+    current_rpms_ft.result.return_value = [get_test_pkg(name="rpm_current",
+                                                        filename="rpm_current.rpm")]
+    current_srpms_ft.result.return_value = [get_test_pkg(name="srpm_current",
+                                                         filename="srpm_current.src.rpm")]
+    current_debug_rpms_ft.result.return_value = [get_test_pkg(name="debug_rpm_current",
+                                                              filename="debug_rpm_current.rpm")]
+
+    yield current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft
+
+
+def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
+    mock_ubipop_runner.repos.modules = {"test": [get_test_mod(name="test_md")]}
+    mock_ubipop_runner.repos.packages = {"test_rpm": [get_test_pkg(name="test_rpm",
+                                                                   filename="test_rpm.rpm")]}
+    mock_ubipop_runner.repos.debug_rpms = {"test_debug_pkg":
+                                           [get_test_pkg(name="test_debug_pkg",
+                                                         filename="test_debug_pkg.rpm")]}
+    mock_ubipop_runner.repos.source_rpms = [get_test_pkg(name="test_srpm",
+                                                         filename="test_srpm.src.rpm")]
+
+    associations, unassociations = \
+        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
+
+    # firstly, check correct associations, there should 1 unit of each type associated
+    modules, rpms, srpms, debug_rpms = associations
+    assert len(modules.units) == 1
+    assert modules.units[0].name == "test_md"
+    assert len(rpms.units) == 1
+    assert rpms.units[0].name == "test_rpm"
+    assert len(srpms.units) == 1
+    assert srpms.units[0].name == "test_srpm"
+    assert len(debug_rpms.units) == 1
+    assert debug_rpms.units[0].name == "test_debug_pkg"
+
+    # secondly, check correct unassociations, there should 1 unit of each type unassociated
+    modules, rpms, srpms, debug_rpms = unassociations
+    assert len(modules.units) == 1
+    assert modules.units[0].name == "md_current"
+    assert len(rpms.units) == 1
+    assert rpms.units[0].name == "rpm_current"
+    assert len(srpms.units) == 1
+    assert srpms.units[0].name == "srpm_current"
+    assert len(debug_rpms.units) == 1
+    assert debug_rpms.units[0].name == "debug_rpm_current"
+
+
+def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft):
+    mock_ubipop_runner.repos.modules = {"test": [get_test_mod(name="md_current")]}
+    mock_ubipop_runner.repos.packages = {"test_rpm": [get_test_pkg(name="rpm_current",
+                                                      filename="rpm_current.rpm")]}
+    mock_ubipop_runner.repos.debug_rpms = [get_test_pkg(name="debug_rpm_current",
+                                                         filename="debug_rpm_current.rpm")]
+    mock_ubipop_runner.repos.source_rpms = {"test_debug_pkg": [get_test_pkg(name="srpm_current",
+                                                              filename="srpm_current.src.rpm")]}
+
+    associations, unassociations = \
+        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
+
+    # firstly, check correct associations, there should 0 units associated
+    modules, rpms, srpms, debug_rpms = associations
+    assert len(modules.units) == 0
+    assert len(rpms.units) == 0
+    assert len(srpms.units) == 0
+    assert len(debug_rpms.units) == 0
+
+    # secondly, check correct unassociations, there should 0 units unassociated
+    modules, rpms, srpms, debug_rpms = unassociations
+    assert len(modules.units) == 0
+    assert len(rpms.units) == 0
+    assert len(srpms.units) == 0
+    assert len(debug_rpms.units) == 0
