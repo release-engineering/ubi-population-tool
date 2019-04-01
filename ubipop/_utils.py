@@ -35,7 +35,7 @@ class PulpAction(object):
         self.units = units
         self.dst_repo = dst_repo
 
-    def get_action(self, *args):
+    def get_action(self, pulp_client_inst):
         raise NotImplementedError
 
 
@@ -43,6 +43,9 @@ class AssociateAction(PulpAction):
     def __init__(self, units, dst_repo, src_repo):
         super(AssociateAction, self).__init__(units, dst_repo)
         self.src_repo = src_repo
+
+    def get_action(self, pulp_client_inst):
+        raise NotImplementedError
 
 
 class AssociateActionModules(AssociateAction):
