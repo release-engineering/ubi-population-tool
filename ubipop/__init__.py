@@ -359,8 +359,7 @@ class UbiPopulateRunner(object):
             self.log_pulp_actions(associations, unassociations)
         else:
             fts = []
-            fts.extend(self._associate_units(associations))
-            fts.extend(self._unassociate_units(unassociations))
+            fts.extend(self._associate_unassociate_units(associations + unassociations))
             # wait for associate/unassociate tasks
             for ft in as_completed(fts):
                 tasks = ft.result()
@@ -373,19 +372,12 @@ class UbiPopulateRunner(object):
 
         return self._changed_repos
 
-    def _associate_units(self, associate_action_list):
+    def _associate_unassociate_units(self, action_list):
         fts = []
-        for action in associate_action_list:
+        for action in action_list:
             if action.units:
-                self._changed_repos.add(action.repo.repo_id)
-                fts.append(self._executor.submit(action.get_action(self.pulp)))
-
-        return fts
-
-    def _unassociate_units(self, unassociate_action_list):
-        fts = []
-        for action in unassociate_action_list:
-            fts.append(self._executor.submit(action.get_action(self.pulp)))
+                self._changed_repos.add(action.dst_repo.repo_id)
+                fts.append(self._executor.submit(*action.get_action(self.pulp)))
 
         return fts
 

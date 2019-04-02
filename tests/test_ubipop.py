@@ -411,7 +411,7 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
     set_logging.addHandler(logging.StreamHandler(sys.stdout))
     src_repo = get_test_repo(repo_id='test_src')
     dst_repo = get_test_repo(repo_id='test_dst')
-    associations = [AssociateActionModules([get_test_mod(name="test_assoc")], src_repo, dst_repo)]
+    associations = [AssociateActionModules([get_test_mod(name="test_assoc")], dst_repo, src_repo)]
     unassociations = [UnassociateActionModules([get_test_mod(name="test_unassoc")], dst_repo)]
 
     mock_ubipop_runner.log_pulp_actions(associations, unassociations)
@@ -419,7 +419,7 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
     assoc_line, unassoc_line = out.split('\n', 1)
 
     assert err == ""
-    assert assoc_line.strip() == "Would associate test_assoc:::: from test_dst to test_src"
+    assert assoc_line.strip() == "Would associate test_assoc:::: from test_src to test_dst"
     assert unassoc_line.strip() == "Would unassociate test_unassoc:::: from test_dst"
 
 
@@ -427,7 +427,7 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     set_logging.addHandler(logging.StreamHandler(sys.stdout))
     src_repo = get_test_repo(repo_id='test_src')
     dst_repo = get_test_repo(repo_id='test_dst')
-    associations = [AssociateActionModules([], src_repo, dst_repo)]
+    associations = [AssociateActionModules([], dst_repo, src_repo)]
     unassociations = [UnassociateActionModules([], dst_repo)]
 
     mock_ubipop_runner.log_pulp_actions(associations, unassociations)
@@ -435,6 +435,18 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     assoc_line, unassoc_line = out.split('\n', 1)
 
     assert err == ""
-    assert assoc_line.strip() == "No association expected for modules from test_dst to test_src"
+    assert assoc_line.strip() == "No association expected for modules from test_src to test_dst"
     assert unassoc_line.strip() == "No unassociation expected for modules from test_dst"
 
+
+def test_associate_units(mock_ubipop_runner):
+    src_repo = get_test_repo(repo_id='test_src')
+    dst_repo = get_test_repo(repo_id='test_dst')
+    associations = [AssociateActionModules([get_test_mod(name="test_assoc")], dst_repo, src_repo)]
+
+    mock_ubipop_runner.pulp.associate_modules.return_value = ["task_id"]
+    ret = mock_ubipop_runner._associate_unassociate_units(associations)
+
+    assert len(ret) == 1
+    assert ret[0].result() == ["task_id"]
+    assert mock_ubipop_runner._changed_repos == set([dst_repo.repo_id])
