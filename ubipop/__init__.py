@@ -422,7 +422,7 @@ class UbiPopulateRunner(object):
         for item in unassociations:
             if item.units:
                 for unit in item.units:
-                    _LOG.info("Would unassociate %s from %s", unit.filename, item.dst_repo.repo_id)
+                    _LOG.info("Would unassociate %s from %s", unit, item.dst_repo.repo_id)
             else:
                 _LOG.info("No unassociation expected for %s from %s", item.TYPE,
                           item.dst_repo.repo_id)

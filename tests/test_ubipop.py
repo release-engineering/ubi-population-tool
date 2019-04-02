@@ -3,8 +3,11 @@ import ubiconfig
 import tempfile
 import os
 import shutil
+import logging
+import sys
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
-from ubipop._pulp_client import Module, Package
+from ubipop._pulp_client import Module, Package, Repo
+from ubipop._utils import AssociateActionModules, UnassociateActionModules
 from mock import MagicMock
 from mock import patch
 from more_executors import Executors
@@ -32,6 +35,11 @@ def executor():
 @pytest.fixture()
 def mock_ubipop_runner(ubi_repo_set, test_ubiconfig, executor):
     yield UbiPopulateRunner(MagicMock(), ubi_repo_set, test_ubiconfig, False, executor)
+
+
+def get_test_repo(**kwargs):
+    return Repo(kwargs.get('repo_id'), kwargs.get('arch'), kwargs.get('platform_full_version'),
+                kwargs.get('distributors_ids_type_ids'))
 
 
 def get_test_pkg(**kwargs):
@@ -389,3 +397,44 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
     assert len(rpms.units) == 0
     assert len(srpms.units) == 0
     assert len(debug_rpms.units) == 0
+
+
+@pytest.fixture()
+def set_logging():
+    _LOG = logging.getLogger("ubipop")
+    _LOG.setLevel(logging.DEBUG)
+    yield _LOG
+    _LOG.handlers = []
+
+
+def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
+    set_logging.addHandler(logging.StreamHandler(sys.stdout))
+    src_repo = get_test_repo(repo_id='test_src')
+    dst_repo = get_test_repo(repo_id='test_dst')
+    associations = [AssociateActionModules([get_test_mod(name="test_assoc")], src_repo, dst_repo)]
+    unassociations = [UnassociateActionModules([get_test_mod(name="test_unassoc")], dst_repo)]
+
+    mock_ubipop_runner.log_pulp_actions(associations, unassociations)
+    out, err = capsys.readouterr()
+    assoc_line, unassoc_line = out.split('\n', 1)
+
+    assert err == ""
+    assert assoc_line.strip() == "Would associate test_assoc:::: from test_dst to test_src"
+    assert unassoc_line.strip() == "Would unassociate test_unassoc:::: from test_dst"
+
+
+def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
+    set_logging.addHandler(logging.StreamHandler(sys.stdout))
+    src_repo = get_test_repo(repo_id='test_src')
+    dst_repo = get_test_repo(repo_id='test_dst')
+    associations = [AssociateActionModules([], src_repo, dst_repo)]
+    unassociations = [UnassociateActionModules([], dst_repo)]
+
+    mock_ubipop_runner.log_pulp_actions(associations, unassociations)
+    out, err = capsys.readouterr()
+    assoc_line, unassoc_line = out.split('\n', 1)
+
+    assert err == ""
+    assert assoc_line.strip() == "No association expected for modules from test_dst to test_src"
+    assert unassoc_line.strip() == "No unassociation expected for modules from test_dst"
+
