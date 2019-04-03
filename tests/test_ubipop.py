@@ -440,10 +440,10 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
 
 @pytest.fixture()
 def set_logging():
-    _LOG = logging.getLogger("ubipop")
-    _LOG.setLevel(logging.DEBUG)
-    yield _LOG
-    _LOG.handlers = []
+    logger = logging.getLogger("ubipop")
+    logger.setLevel(logging.DEBUG)
+    yield logger
+    logger.handlers = []
 
 
 def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
