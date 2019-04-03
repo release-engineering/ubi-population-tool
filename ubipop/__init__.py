@@ -33,6 +33,13 @@ class UbiRepoSet(object):
         self.debug_rpms = []
         self._ensure_repos_existence()
 
+    def get_output_repo_ids(self):
+        repos = set([self.out_repos.rpm.repo_id, self.out_repos.source.repo_id])
+        if self.out_repos.debug:
+            repos.add(self.out_repos.debug.repo_id)
+
+        return repos
+
     def _ensure_repos_existence(self):
         fatal = False
         if not self.in_repos.rpm:
@@ -64,13 +71,14 @@ class UbiRepoSet(object):
 class UbiPopulate(object):
     def __init__(self, pulp_hostname, pulp_auth, dry_run, ubiconfig_filename_list=None,
                  ubiconfig_dir_or_url=None, insecure=False, workers_count=4,
-                 output_changed_repos=None):
+                 output_changed_repos=None, output_all_repos=False):
 
         self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list,
                                                    ubiconfig_dir_or_url)
         self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
         self.dry_run = dry_run
         self.output_changed_repos = output_changed_repos
+        self.output_all_repos = output_all_repos
         self._executor = Executors.thread_pool(max_workers=workers_count).with_retry()
 
     def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url):
@@ -85,6 +93,8 @@ class UbiPopulate(object):
 
     def populate_ubi_repos(self):
         changed_repos = set()
+        output_repos = set()
+
         for config in self.ubiconfig_list:
             try:
                 output_repo_sets = self._get_input_and_output_repo_pairs(config)
@@ -96,10 +106,15 @@ class UbiPopulate(object):
                 repos = UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run,
                                           self._executor).run_ubi_population()
                 changed_repos.update(repos)
+                output_repos.update(repo_set.get_output_repo_ids())
 
         if self.output_changed_repos:
             with open(self.output_changed_repos, 'w') as f:
-                for repo in changed_repos:
+                if self.output_all_repos:
+                    out = output_repos
+                else:
+                    out = changed_repos
+                for repo in out:
                     f.write(repo.strip() + '\n')
 
     def _get_input_and_output_repo_pairs(self, ubiconfig_item):

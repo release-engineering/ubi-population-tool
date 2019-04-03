@@ -33,6 +33,8 @@ def parse_args(args):
     parser.add_argument('--output-changed-repos', action="store", required=False,
                         help="Path for output file. "
                              "If provided, file containing repo ids of changed repos is created.",)
+    parser.add_argument('--output-all-repos', action="store_true", required=False,
+                        help="If provided, write all output repos.",)
 
     parsed = parser.parse_args(args)
 
@@ -60,7 +62,7 @@ def main(args):
 
     ubipop.UbiPopulate(opts.pulp_hostname, auth, opts.dry_run, opts.input,
                        opts.conf_src, opts.insecure, opts.workers,
-                       opts.output_changed_repos)\
+                       opts.output_changed_repos, opts.output_all_repos)\
         .populate_ubi_repos()
 
 
