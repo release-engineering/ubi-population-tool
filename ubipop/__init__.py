@@ -279,10 +279,10 @@ class UbiPopulateRunner(object):
         to_unassociate = diff_f(current, expected)
         return to_associate, to_unassociate
 
-    def _gets_action_for_mds(self, modules, current):
+    def _get_pulp_actions_mds(self, modules, current):
         return self._determine_pulp_actions(modules, current, self._diff_modules_by_nsvca)
 
-    def _get_actions_pkgs(self, pkgs, current):
+    def _get_pulp_actions_pkgs(self, pkgs, current):
         return self._determine_pulp_actions(pkgs, current, self._diff_packages_by_filename)
 
     def _get_pulp_actions(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
@@ -295,18 +295,18 @@ class UbiPopulateRunner(object):
         Content that needs unassociation: unit is in current but not in expected
         No action: unit is in current and in expected
         """
-        modules_assoc, modules_unassoc = self._gets_action_for_mds(self.repos.modules,
-                                                                   current_modules_ft.result())
-        rpms_assoc, rpms_unassoc = self._get_actions_pkgs(self.repos.packages,
-                                                          current_rpms_ft.result())
-        srpms_assoc, srpms_unassoc = self._get_actions_pkgs(self.repos.source_rpms,
-                                                            current_srpms_ft.result())
+        modules_assoc, modules_unassoc = self._get_pulp_actions_mds(self.repos.modules,
+                                                                    current_modules_ft.result())
+        rpms_assoc, rpms_unassoc = self._get_pulp_actions_pkgs(self.repos.packages,
+                                                               current_rpms_ft.result())
+        srpms_assoc, srpms_unassoc = self._get_pulp_actions_pkgs(self.repos.source_rpms,
+                                                                 current_srpms_ft.result())
 
         debug_assoc = None
         debug_unassoc = None
         if current_debug_rpms_ft is not None:
-            debug_assoc, debug_unassoc = self._get_actions_pkgs(self.repos.debug_rpms,
-                                                                current_debug_rpms_ft.result())
+            debug_assoc, debug_unassoc = self._get_pulp_actions_pkgs(self.repos.debug_rpms,
+                                                                     current_debug_rpms_ft.result())
 
         associations = (AssociateActionModules(modules_assoc, self.repos.in_repos.rpm,
                                                self.repos.out_repos.rpm),
