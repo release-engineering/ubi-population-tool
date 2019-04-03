@@ -23,11 +23,12 @@ modules:
 
 packages:
   include:
-#  - tomcatjss
   - foo-pkg
+  - foo-pkg-debuginfo
 
   # Blacklist of packages to exclude
   exclude:
   - kernel*
   - linux-firmware
   - foo-pkg*
+  - foo-arch-test.x86_64

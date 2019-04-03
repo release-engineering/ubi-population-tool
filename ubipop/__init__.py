@@ -26,11 +26,12 @@ class UbiRepoSet(object):
         self.out_repos = output_repos
 
         self.packages = defaultdict(list)
+        self.debug_rpms = defaultdict(list)
         self.modules = defaultdict(list)
         self.pkgs_from_modules = defaultdict(list)
 
         self.source_rpms = []
-        self.debug_rpms = []
+
         self._ensure_repos_existence()
 
     def _ensure_repos_existence(self):
@@ -87,12 +88,12 @@ class UbiPopulate(object):
         changed_repos = set()
         for config in self.ubiconfig_list:
             try:
-                output_repo_sets = self._get_input_and_output_repo_pairs(config)
+                repo_pairs = self._get_input_and_output_repo_pairs(config)
             except RepoMissing:
                 _LOG.warning("Skipping current content triplet, some repos are missing")
                 continue
 
-            for repo_set in output_repo_sets:
+            for repo_set in repo_pairs:
                 repos = UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run,
                                           self._executor).run_ubi_population()
                 changed_repos.update(repos)
@@ -127,7 +128,7 @@ class UbiPopulate(object):
         out_source_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs, source_cs.output)
         out_debug_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs, debug_cs.output)
 
-        output_repo_sets = []
+        repo_pairs = []
         for input_repo in in_repos_ft.result():
             rpm = input_repo
             source = self._get_repo_counterpart(input_repo, in_source_repos_ft.result())
@@ -141,9 +142,9 @@ class UbiPopulate(object):
 
             ubi_repo_set = RepoSet(rpm, source, debug_info)
 
-            output_repo_sets.append(UbiRepoSet(rhel_repo_set, ubi_repo_set))
+            repo_pairs.append(UbiRepoSet(rhel_repo_set, ubi_repo_set))
 
-        return output_repo_sets
+        return repo_pairs
 
     def _get_repo_counterpart(self, input_repo, repos_to_match):
         for repo in repos_to_match:
@@ -190,21 +191,28 @@ class UbiPopulateRunner(object):
                     self.repos.pkgs_from_modules[name_stream].extend(module_packages)
                     self.repos.packages[package_name].extend(module_packages)
 
-    def _match_packages(self):
-        # Add matching packages from whitelist
-        # Globbing package name is not possible
-
+    def _match_packages(self, repo, packages_dict):
+        """
+        Add matching packages from whitelist
+        Globbing package name is not supported
+        """
         fts = {}
         for package_pattern in self.ubiconfig.packages.whitelist:
             name = package_pattern.name
             arch = None if package_pattern.arch in ('*', None) else package_pattern.arch
             fts[(self._executor.submit(self.pulp.search_rpms,
-                                       self.repos.in_repos.rpm, name, arch))] = name
+                                       repo, name, arch))] = name
 
         for ft in as_completed(fts):
             packages = ft.result()
             if packages:
-                self.repos.packages[fts[ft]].extend(packages)
+                packages_dict[fts[ft]].extend(packages)
+
+    def _match_binary_rpms(self):
+        self._match_packages(self.repos.in_repos.rpm, self.repos.packages)
+
+    def _match_debug_rpms(self):
+        self._match_packages(self.repos.in_repos.debug, self.repos.debug_rpms)
 
     def _parse_blacklist_config(self):
         packages_to_exclude = []
@@ -222,22 +230,37 @@ class UbiPopulateRunner(object):
         return packages_to_exclude
 
     def _exclude_blacklisted_packages(self):
-        blacklisted = self.get_blacklisted_packages(
-            chain.from_iterable(self.repos.packages.values()))
+        blacklisted_binary = self.get_blacklisted_packages(
+            list(chain.from_iterable(self.repos.packages.values())))
+        blacklisted_debug = self.get_blacklisted_packages(
+            list(chain.from_iterable(self.repos.debug_rpms.values())))
 
-        for pkg in blacklisted:
+        for pkg in blacklisted_binary:
             self.repos.packages.pop(pkg.name, None)
             self.repos.pkgs_from_modules.pop(pkg.name, None)
 
+        for pkg in blacklisted_debug:
+            self.repos.debug_rpms.pop(pkg.name, None)
+
     def _finalize_modules_output_set(self):
         for _, modules in self.repos.modules.items():
-            self.sort_modules(modules)
-            self.keep_n_latest_modules(modules)
+            self._finalize_output_units(modules, 'module')
 
     def _finalize_rpms_output_set(self):
         for _, packages in self.repos.packages.items():
-            self.sort_packages(packages)
-            self.keep_n_newest_packages(packages)  # with respect to packages referenced by modules
+            self._finalize_output_units(packages, 'rpm')
+
+    def _finalize_debug_output_set(self):
+        for _, packages in self.repos.debug_rpms.items():
+            self._finalize_output_units(packages, 'rpm')
+
+    def _finalize_output_units(self, units, type_id):
+        if type_id == 'rpm':
+            self.sort_packages(units)
+            self.keep_n_latest_packages(units)  # with respect to packages referenced by modules
+        else:
+            self.sort_modules(units)
+            self.keep_n_latest_modules(units)
 
     def _create_srpms_output_set(self):
         packages = chain.from_iterable(self.repos.packages.values())
@@ -252,23 +275,6 @@ class UbiPopulateRunner(object):
         blacklisted = self.get_blacklisted_packages(self.repos.source_rpms)
         self.repos.source_rpms = \
             self._diff_packages_by_filename(self.repos.source_rpms, blacklisted)
-
-    def _create_debuginfo_output_set(self):
-        """
-        Creates output set for debug repo. Content is based on current rpms output set.
-        """
-        packages = chain.from_iterable(self.repos.packages.values())
-        for package in packages:
-            name, ver, rel, _, arch = splitFilename(package.filename)
-            debug_pkg_filename = "{n}-debuginfo-{v}-{r}.{a}.rpm".format(n=name,
-                                                                        v=ver,
-                                                                        r=rel,
-                                                                        a=arch)
-            self.repos.debug_rpms.append(Package(name, debug_pkg_filename))
-
-        blacklisted = self.get_blacklisted_packages(self.repos.debug_rpms)
-        self.repos.debug_rpms = \
-            self._diff_packages_by_filename(self.repos.debug_rpms, blacklisted)
 
     def _determine_pulp_actions(self, units, current, diff_f):
         if isinstance(units, dict):
@@ -342,10 +348,13 @@ class UbiPopulateRunner(object):
             self._get_current_content()
 
         self._match_modules()
-        self._match_packages()
+        self._match_binary_rpms()
+        if self.repos.out_repos.debug:
+            self._match_debug_rpms()
         self._exclude_blacklisted_packages()
         self._finalize_modules_output_set()
         self._finalize_rpms_output_set()
+        self._finalize_debug_output_set()
         self._create_srpms_output_set()
 
         associations, unassociations = self._get_pulp_actions(current_modules_ft,
@@ -537,7 +546,7 @@ class UbiPopulateRunner(object):
 
         return rpms
 
-    def keep_n_newest_packages(self, packages, n=1):
+    def keep_n_latest_packages(self, packages, n=1):
         """
         Keep n latest packages,
         package is deleted from output set if it's not referenced by any remaining module
