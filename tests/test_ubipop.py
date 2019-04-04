@@ -71,13 +71,11 @@ def get_test_mod(**kwargs):
 
 def test_get_output_repo_ids(ubi_repo_set):
     repo_ids = ubi_repo_set.get_output_repo_ids()
-    assert len(repo_ids) == 3
     assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source", "ubi-foo-debug"])
 
 
 def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
     repo_ids = ubi_repo_set_no_debug.get_output_repo_ids()
-    assert len(repo_ids) == 2
     assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source"])
 
 
@@ -319,28 +317,7 @@ def mock_get_repo_pairs(ubi_repo_set):
 @pytest.fixture()
 def mock_run_ubi_population():
     with patch('ubipop.UbiPopulateRunner.run_ubi_population') as run_ubi_population:
-        run_ubi_population.return_value = set(['changed_repo_id_1', 'changed_repo_id_2'])
         yield run_ubi_population
-
-
-def test_create_output_file(mock_ubipop_runner, mock_get_repo_pairs, mocked_ubiconfig_load_all,
-                            mock_run_ubi_population):
-    path = tempfile.mkdtemp("ubipop")
-    try:
-        out_file_path = os.path.join(path, 'output.txt')
-        ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False,
-                             output_changed_repos=out_file_path)
-
-        ubipop.populate_ubi_repos()
-
-        with open(out_file_path) as f:
-            content = f.readlines()
-
-        assert len(content) == 2
-        assert sorted(content) == ['changed_repo_id_1\n', 'changed_repo_id_2\n']
-
-    finally:
-        shutil.rmtree(path)
 
 
 def test_create_output_file_all_repos(mock_ubipop_runner, mock_get_repo_pairs,
@@ -349,14 +326,13 @@ def test_create_output_file_all_repos(mock_ubipop_runner, mock_get_repo_pairs,
     try:
         out_file_path = os.path.join(path, 'output.txt')
         ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False,
-                             output_changed_repos=out_file_path, output_all_repos=True)
+                             output_repos=out_file_path)
 
         ubipop.populate_ubi_repos()
 
         with open(out_file_path) as f:
             content = f.readlines()
 
-        assert len(content) == 3
         assert sorted(content) == sorted(["ubi-foo-rpms\n", "ubi-foo-source\n", "ubi-foo-debug\n"])
     finally:
         shutil.rmtree(path)
@@ -493,4 +469,3 @@ def test_associate_units(mock_ubipop_runner):
 
     assert len(ret) == 1
     assert ret[0].result() == ["task_id"]
-    assert mock_ubipop_runner._changed_repos == set([dst_repo.repo_id])

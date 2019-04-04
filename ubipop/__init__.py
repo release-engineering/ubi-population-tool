@@ -71,14 +71,13 @@ class UbiRepoSet(object):
 class UbiPopulate(object):
     def __init__(self, pulp_hostname, pulp_auth, dry_run, ubiconfig_filename_list=None,
                  ubiconfig_dir_or_url=None, insecure=False, workers_count=4,
-                 output_changed_repos=None, output_all_repos=False):
+                 output_repos=None):
 
         self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list,
                                                    ubiconfig_dir_or_url)
         self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
         self.dry_run = dry_run
-        self.output_changed_repos = output_changed_repos
-        self.output_all_repos = output_all_repos
+        self.output_repos = output_repos
         self._executor = Executors.thread_pool(max_workers=workers_count).with_retry()
 
     def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url):
@@ -92,8 +91,7 @@ class UbiPopulate(object):
         return ubi_conf_list
 
     def populate_ubi_repos(self):
-        changed_repos = set()
-        output_repos = set()
+        out_repos = set()
 
         for config in self.ubiconfig_list:
             try:
@@ -103,18 +101,14 @@ class UbiPopulate(object):
                 continue
 
             for repo_set in output_repo_sets:
-                repos = UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run,
-                                          self._executor).run_ubi_population()
-                changed_repos.update(repos)
-                output_repos.update(repo_set.get_output_repo_ids())
+                UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run,
+                                  self._executor).run_ubi_population()
 
-        if self.output_changed_repos:
-            with open(self.output_changed_repos, 'w') as f:
-                if self.output_all_repos:
-                    out = output_repos
-                else:
-                    out = changed_repos
-                for repo in out:
+                out_repos.update(repo_set.get_output_repo_ids())
+
+        if self.output_repos:
+            with open(self.output_repos, 'w') as f:
+                for repo in out_repos:
                     f.write(repo.strip() + '\n')
 
     def _get_input_and_output_repo_pairs(self, ubiconfig_item):
@@ -173,7 +167,6 @@ class UbiPopulateRunner(object):
         self.repos = output_repo_set
         self.ubiconfig = ubiconfig_item
         self.dry_run = dry_run
-        self._changed_repos = set()
         self._executor = executor
 
     def _match_modules(self):
@@ -385,13 +378,10 @@ class UbiPopulateRunner(object):
             for ft in as_completed(self._publish_out_repos()):
                 self.pulp.wait_for_tasks(ft.result())
 
-        return self._changed_repos
-
     def _associate_unassociate_units(self, action_list):
         fts = []
         for action in action_list:
             if action.units:
-                self._changed_repos.add(action.dst_repo.repo_id)
                 fts.append(self._executor.submit(*action.get_action(self.pulp)))
 
         return fts
