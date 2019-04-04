@@ -171,7 +171,7 @@ def test_match_binary_rpms(mock_ubipop_runner):
     assert mock_ubipop_runner.repos.packages[package_name][0].name == package_name
 
 
-def test_match_debug_repms(mock_ubipop_runner):
+def test_match_debug_rpms(mock_ubipop_runner):
     package_name = 'foo-pkg-debuginfo'
     mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(package_name)
     mock_ubipop_runner._match_debug_rpms()
