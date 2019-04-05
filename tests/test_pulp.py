@@ -114,13 +114,13 @@ def test_publish_repo(mock_pulp, mock_publish, mock_repo):
 
 
 def test_associate_packages(mock_pulp, mock_associate, mock_repo, mock_package):
-    task_ids = mock_pulp.associate_packages([mock_package], mock_repo, mock_repo)
+    task_ids = mock_pulp.associate_packages(mock_repo, mock_repo, [mock_package])
     assert len(task_ids[0])
     assert task_ids[0] == "foo_task_id"
 
 
 def test_unassociate_packages(mock_pulp, mock_unassociate, mock_repo, mock_package):
-    task_ids = mock_pulp.unassociate_packages([mock_package], mock_repo)
+    task_ids = mock_pulp.unassociate_packages(mock_repo, [mock_package])
     assert len(task_ids[0])
     assert task_ids[0] == "foo_task_id"
 
