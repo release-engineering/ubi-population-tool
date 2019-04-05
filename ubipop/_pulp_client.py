@@ -193,13 +193,13 @@ class Pulp(object):
     def associate_modules(self, src_repo, dst_repo, modules):
         return self.associate_units(src_repo, dst_repo, modules, "modulemd")
 
-    def associate_packages(self, rpms, src_repo, dst_repo):
+    def associate_packages(self, src_repo, dst_repo, rpms):
         return self.associate_units(src_repo, dst_repo, rpms, ("rpm", "srpm"))
 
-    def unassociate_modules(self, modules, repo):
+    def unassociate_modules(self, repo, modules):
         return self.unassociate_units(repo, modules, ("modulemd", ))
 
-    def unassociate_packages(self, rpms, repo):
+    def unassociate_packages(self, repo, rpms):
         return self.unassociate_units(repo, rpms, ("rpm", "srpm"))
 
     def publish_repo(self, repo):
