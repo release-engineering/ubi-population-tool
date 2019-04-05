@@ -18,9 +18,22 @@ TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), './data')
 
 @pytest.fixture()
 def ubi_repo_set():
-    rhel_repo_set = RepoSet("foo-rpms", "foo-source", "foo-debug")
-    ubi_repo_set = RepoSet("ubi-foo-rpms", "ubi-foo-source", "ubi-foo-debug")
-    yield UbiRepoSet(rhel_repo_set, ubi_repo_set)
+    yield UbiRepoSet(RepoSet(get_test_repo(repo_id="foo-rpms"),
+                             get_test_repo(repo_id="foo-source"),
+                             get_test_repo(repo_id="foo-debug")),
+                     RepoSet(get_test_repo(repo_id="ubi-foo-rpms"),
+                             get_test_repo(repo_id="ubi-foo-source"),
+                             get_test_repo(repo_id="ubi-foo-debug")))
+
+
+@pytest.fixture()
+def ubi_repo_set_no_debug():
+    yield UbiRepoSet(RepoSet(get_test_repo(repo_id="foo-rpms"),
+                             get_test_repo(repo_id="foo-source"),
+                             None),
+                     RepoSet(get_test_repo(repo_id="ubi-foo-rpms"),
+                             get_test_repo(repo_id="ubi-foo-source"),
+                             None))
 
 
 @pytest.fixture()
@@ -55,6 +68,16 @@ def get_test_mod(**kwargs):
                   kwargs.get('arch', ''),
                   kwargs.get('packages', ''),
                   kwargs.get('profiles', ''))
+
+
+def test_get_output_repo_ids(ubi_repo_set):
+    repo_ids = ubi_repo_set.get_output_repo_ids()
+    assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source", "ubi-foo-debug"])
+
+
+def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
+    repo_ids = ubi_repo_set_no_debug.get_output_repo_ids()
+    assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source"])
 
 
 def test_get_packages_from_module(mock_ubipop_runner):
@@ -304,35 +327,32 @@ def test_create_srpms_output_set(mock_ubipop_runner):
 
 
 @pytest.fixture()
-def mock_get_repo_pairs():
+def mock_get_repo_pairs(ubi_repo_set):
     with patch('ubipop.UbiPopulate._get_input_and_output_repo_pairs') as get_repo_pairs:
         get_repo_pairs.return_value = [ubi_repo_set]
         yield get_repo_pairs
 
 
 @pytest.fixture()
-def mock_run_ubi_population(ubi_repo_set):
+def mock_run_ubi_population():
     with patch('ubipop.UbiPopulateRunner.run_ubi_population') as run_ubi_population:
-        run_ubi_population.return_value = set(['repo1', 'repo2'])
         yield run_ubi_population
 
 
-def test_create_output_file(mock_ubipop_runner, mock_get_repo_pairs, mocked_ubiconfig_load_all,
-                            mock_run_ubi_population):
+def test_create_output_file_all_repos(mock_ubipop_runner, mock_get_repo_pairs,
+                                      mocked_ubiconfig_load_all, mock_run_ubi_population):
     path = tempfile.mkdtemp("ubipop")
     try:
         out_file_path = os.path.join(path, 'output.txt')
         ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False,
-                             output_changed_repos=out_file_path)
+                             output_repos=out_file_path)
 
         ubipop.populate_ubi_repos()
 
         with open(out_file_path) as f:
             content = f.readlines()
 
-        assert len(content) == 2
-        assert sorted(content) == ['repo1\n', 'repo2\n']
-
+        assert sorted(content) == sorted(["ubi-foo-rpms\n", "ubi-foo-source\n", "ubi-foo-debug\n"])
     finally:
         shutil.rmtree(path)
 
@@ -468,7 +488,6 @@ def test_associate_units(mock_ubipop_runner):
 
     assert len(ret) == 1
     assert ret[0].result() == ["task_id"]
-    assert mock_ubipop_runner._changed_repos == set([dst_repo.repo_id])
 
 
 def test_finalize_rpms_output_set(mock_ubipop_runner):
