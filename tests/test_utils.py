@@ -30,12 +30,12 @@ def test_get_action_associate(klass, method):
     dst_repo = Repo("test_dst", "1", "2", None)
     src_repo = Repo("test_src", "1", "2", None)
     action = klass(units, dst_repo, src_repo)
-    associate_action, current_units, src_repo_id, dst_repo_id = action.get_action(MagicMock())
+    associate_action, current_units, src_repo_current, dst_repo_current = action.get_action(MagicMock())
 
     assert "mock." + method in str(associate_action)
     assert current_units == units
-    assert dst_repo_id == dst_repo.repo_id
-    assert src_repo_id == src_repo.repo_id
+    assert dst_repo_current.repo_id == dst_repo.repo_id
+    assert src_repo_current.repo_id == src_repo.repo_id
 
 
 @pytest.mark.parametrize("klass, method",
@@ -46,11 +46,11 @@ def test_get_action_unassociate(klass, method):
     units = ["unit1", "unit2"]
     dst_repo = Repo("test_dst", "1", "2", None)
     action = klass(units, dst_repo)
-    associate_action, current_units, dst_repo_id = action.get_action(MagicMock())
+    associate_action, current_units, dst_repo_current = action.get_action(MagicMock())
 
     assert "mock." + method in str(associate_action)
     assert current_units == units
-    assert dst_repo_id == dst_repo.repo_id
+    assert dst_repo_current.repo_id == dst_repo.repo_id
 
 
 
