@@ -116,7 +116,8 @@ def test_insecure(mock_ubipopulate):
 @mock.patch('ubipop.UbiPopulate')
 def test_output_file(mock_ubipopulate):
     args = ['--pulp-hostname', 'foo.pulp.com', '--user', 'foo', '--pass', 'foo',
-            '--output-changed-repos', '/foo/out/repos.txt']
+            '--output-repos', '/foo/out/repos.txt']
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [], None,
                                              False, 4, '/foo/out/repos.txt')
+
