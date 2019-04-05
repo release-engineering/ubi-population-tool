@@ -1,0 +1,22 @@
+content_sets:
+  rpm:
+    output: ubi-7-server-rpms
+    input: rhel-7-server-rpms
+  srpm:
+    output: ubi-7-server-source-rpms
+    input: rhel-7-server-source-rpms
+  debuginfo:
+    output: ubi-7-server-debug-rpms
+    input: rhel-7-server-debug-rpms
+
+arches:
+ - src
+ - x86_64
+
+modules:
+  include:
+  - name: httpd
+    stream: 2.4
+    profiles:
+    - minimal
+    - default
