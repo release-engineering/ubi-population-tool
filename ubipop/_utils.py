@@ -52,27 +52,25 @@ class AssociateActionModules(AssociateAction):
     TYPE = "modules"
 
     def get_action(self, pulp_client_inst):
-        return pulp_client_inst.associate_modules, self.units, self.src_repo.repo_id, \
-               self.dst_repo.repo_id
+        return pulp_client_inst.associate_modules, self.units, self.src_repo, self.dst_repo
 
 
 class UnassociateActionModules(PulpAction):
     TYPE = "modules"
 
     def get_action(self, pulp_client_inst):
-        return pulp_client_inst.unassociate_modules, self.units, self.dst_repo.repo_id
+        return pulp_client_inst.unassociate_modules, self.units, self.dst_repo
 
 
 class AssociateActionRpms(AssociateAction):
     TYPE = "packages"
 
     def get_action(self, pulp_client_inst):
-        return pulp_client_inst.associate_packages, self.units, self.src_repo.repo_id, \
-               self.dst_repo.repo_id
+        return pulp_client_inst.associate_packages, self.units, self.src_repo, self.dst_repo
 
 
 class UnassociateActionRpms(PulpAction):
     TYPE = "packages"
 
     def get_action(self, pulp_client_inst):
-        return pulp_client_inst.unassociate_packages, self.units, self.dst_repo.repo_id
+        return pulp_client_inst.unassociate_packages, self.units, self.dst_repo
