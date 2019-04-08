@@ -392,23 +392,41 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     modules, rpms, srpms, debug_rpms = associations
     assert len(modules.units) == 1
     assert modules.units[0].name == "test_md"
+    assert modules.dst_repo.repo_id == "ubi-foo-rpms"
+    assert modules.src_repo.repo_id == "foo-rpms"
+
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "test_rpm"
+    assert rpms.dst_repo.repo_id == "ubi-foo-rpms"
+    assert rpms.src_repo.repo_id == "foo-rpms"
+
     assert len(srpms.units) == 1
     assert srpms.units[0].name == "test_srpm"
+    assert srpms.dst_repo.repo_id == "ubi-foo-source"
+    assert srpms.src_repo.repo_id == "foo-source"
+
     assert len(debug_rpms.units) == 1
     assert debug_rpms.units[0].name == "test_debug_pkg"
+    assert debug_rpms.dst_repo.repo_id == "ubi-foo-debug"
+    assert debug_rpms.src_repo.repo_id == "foo-debug"
 
     # secondly, check correct unassociations, there should 1 unit of each type unassociated
     modules, rpms, srpms, debug_rpms = unassociations
     assert len(modules.units) == 1
     assert modules.units[0].name == "md_current"
+    assert modules.dst_repo.repo_id == "ubi-foo-rpms"
+
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "rpm_current"
+    assert rpms.dst_repo.repo_id == "ubi-foo-rpms"
+
     assert len(srpms.units) == 1
     assert srpms.units[0].name == "srpm_current"
+    assert srpms.dst_repo.repo_id == "ubi-foo-source"
+
     assert len(debug_rpms.units) == 1
     assert debug_rpms.units[0].name == "debug_rpm_current"
+    assert debug_rpms.dst_repo.repo_id == "ubi-foo-debug"
 
 
 def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft):

@@ -322,14 +322,18 @@ class UbiPopulateRunner(object):
             debug_assoc, debug_unassoc = self._get_pulp_actions_pkgs(self.repos.debug_rpms,
                                                                      current_debug_rpms_ft.result())
 
-        associations = (AssociateActionModules(modules_assoc, self.repos.in_repos.rpm,
-                                               self.repos.out_repos.rpm),
-                        AssociateActionRpms(rpms_assoc, self.repos.in_repos.rpm,
-                                            self.repos.out_repos.rpm),
-                        AssociateActionRpms(srpms_assoc, self.repos.in_repos.source,
-                                            self.repos.out_repos.source),
-                        AssociateActionRpms(debug_assoc, self.repos.in_repos.debug,
-                                            self.repos.out_repos.debug)
+        associations = (AssociateActionModules(modules_assoc,
+                                               self.repos.out_repos.rpm,
+                                               self.repos.in_repos.rpm),
+                        AssociateActionRpms(rpms_assoc,
+                                            self.repos.out_repos.rpm,
+                                            self.repos.in_repos.rpm),
+                        AssociateActionRpms(srpms_assoc,
+                                            self.repos.out_repos.source,
+                                            self.repos.in_repos.source),
+                        AssociateActionRpms(debug_assoc,
+                                            self.repos.out_repos.debug,
+                                            self.repos.in_repos.debug)
                         )
 
         unassociations = (UnassociateActionModules(modules_unassoc, self.repos.out_repos.rpm),
