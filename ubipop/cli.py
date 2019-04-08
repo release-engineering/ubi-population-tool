@@ -26,7 +26,7 @@ def parse_args(args):
                         help="pulp user")
     parser.add_argument('--password', action="store", required=False,
                         help="pulp password")
-    parser.add_argument('--cert',  action="store", required=False,
+    parser.add_argument('--cert', action="store", required=False,
                         help="path to to user cert")
     parser.add_argument('--workers', action="store", type=int, default=4,
                         help="Number of workers for parallel execution")

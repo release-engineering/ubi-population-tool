@@ -31,7 +31,7 @@ def splitFilename(filename):
 
 
 class PulpAction(object):
-    def __init__(self, units,  dst_repo):
+    def __init__(self, units, dst_repo):
         self.units = units
         self.dst_repo = dst_repo
 
@@ -59,14 +59,14 @@ class UnassociateActionModules(PulpAction):
     TYPE = "modules"
 
     def get_action(self, pulp_client_inst):
-        return pulp_client_inst.unassociate_modules, self.dst_repo,  self.units
+        return pulp_client_inst.unassociate_modules, self.dst_repo, self.units
 
 
 class AssociateActionRpms(AssociateAction):
     TYPE = "packages"
 
     def get_action(self, pulp_client_inst):
-        return pulp_client_inst.associate_packages, self.src_repo, self.dst_repo,  self.units
+        return pulp_client_inst.associate_packages, self.src_repo, self.dst_repo, self.units
 
 
 class UnassociateActionRpms(PulpAction):
