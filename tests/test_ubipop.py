@@ -329,6 +329,22 @@ def test_create_srpms_output_set(mock_ubipop_runner):
     assert out_srpms['tomcatjss'][0].filename == expected_src_rpm_filename
 
 
+def test_create_srpms_output_set_missings_srpm_reference(capsys, set_logging, mock_ubipop_runner):
+    set_logging.addHandler(logging.StreamHandler(sys.stdout))
+    mock_ubipop_runner.repos.packages['foo'] = \
+        [get_test_pkg(name="tomcatjss",
+                      filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm")]
+
+    mock_ubipop_runner._create_srpms_output_set()
+
+    out_srpms = mock_ubipop_runner.repos.source_rpms
+    assert len(out_srpms) == 0
+    out, err = capsys.readouterr()
+
+    assert err == ""
+    assert out.strip() == "Package tomcatjss doesn't reference its source rpm"
+
+
 @pytest.fixture()
 def mock_get_repo_pairs(ubi_repo_set):
     with patch('ubipop.UbiPopulate._get_input_and_output_repo_pairs') as get_repo_pairs:
