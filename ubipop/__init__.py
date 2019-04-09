@@ -270,14 +270,14 @@ class UbiPopulateRunner(object):
             self.keep_n_latest_modules(units)
 
     def _create_srpms_output_set(self):
-        rpms = list(chain.from_iterable(self.repos.packages.values()))
+        rpms = chain.from_iterable(self.repos.packages.values())
         for package in rpms:
             if package.sourcerpm_filename is None:
                 _LOG.warning("Package %s doesn't reference its source rpm", package.name)
                 continue
 
-            self.repos.source_rpms[package.name].extend([Package(package.name,
-                                                                 package.sourcerpm_filename)])
+            self.repos.source_rpms[package.name].append(Package(package.name,
+                                                                package.sourcerpm_filename))
 
         blacklisted_srpms = self.get_blacklisted_packages(
             list(chain.from_iterable(self.repos.source_rpms.values())))
