@@ -57,7 +57,7 @@ def get_test_repo(**kwargs):
 
 
 def get_test_pkg(**kwargs):
-    return Package(kwargs.get('name'), kwargs.get('filename'))
+    return Package(kwargs.get('name'), kwargs.get('filename'), kwargs.get('sourcerpm_filename'))
 
 
 def get_test_mod(**kwargs):
@@ -314,16 +314,35 @@ def test_create_srpms_output_set(mock_ubipop_runner):
     expected_src_rpm_filename = "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.src.rpm"
     mock_ubipop_runner.repos.packages['foo'] = \
         [get_test_pkg(name="tomcatjss",
-                      filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
+                      filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
+                      sourcerpm_filename=expected_src_rpm_filename),
          get_test_pkg(name="kernel",
-                      filename="kernel-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm")
+                      filename="kernel-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
+                      sourcerpm_filename="kernel.src.rpm")
          ]
 
     mock_ubipop_runner._create_srpms_output_set()
+
     out_srpms = mock_ubipop_runner.repos.source_rpms
     assert len(out_srpms) == 1
-    assert out_srpms[0].name == "tomcatjss"
-    assert out_srpms[0].filename == expected_src_rpm_filename
+    assert out_srpms['tomcatjss'][0].name == "tomcatjss"
+    assert out_srpms['tomcatjss'][0].filename == expected_src_rpm_filename
+
+
+def test_create_srpms_output_set_missings_srpm_reference(capsys, set_logging, mock_ubipop_runner):
+    set_logging.addHandler(logging.StreamHandler(sys.stdout))
+    mock_ubipop_runner.repos.packages['foo'] = \
+        [get_test_pkg(name="tomcatjss",
+                      filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm")]
+
+    mock_ubipop_runner._create_srpms_output_set()
+
+    out_srpms = mock_ubipop_runner.repos.source_rpms
+    assert len(out_srpms) == 0
+    out, err = capsys.readouterr()
+
+    assert err == ""
+    assert out.strip() == "Package tomcatjss doesn't reference its source rpm"
 
 
 @pytest.fixture()
@@ -382,8 +401,8 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     mock_ubipop_runner.repos.debug_rpms = {"test_debug_pkg":
                                            [get_test_pkg(name="test_debug_pkg",
                                                          filename="test_debug_pkg.rpm")]}
-    mock_ubipop_runner.repos.source_rpms = [get_test_pkg(name="test_srpm",
-                                                         filename="test_srpm.src.rpm")]
+    mock_ubipop_runner.repos.source_rpms = {"test_srpm": [get_test_pkg(name="test_srpm",
+                                                          filename="test_srpm.src.rpm")]}
 
     associations, unassociations = \
         mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
@@ -433,10 +452,12 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
     mock_ubipop_runner.repos.modules = {"test": [get_test_mod(name="md_current")]}
     mock_ubipop_runner.repos.packages = {"test_rpm": [get_test_pkg(name="rpm_current",
                                                       filename="rpm_current.rpm")]}
-    mock_ubipop_runner.repos.debug_rpms = [get_test_pkg(name="debug_rpm_current",
-                                                         filename="debug_rpm_current.rpm")]
-    mock_ubipop_runner.repos.source_rpms = {"test_debug_pkg": [get_test_pkg(name="srpm_current",
-                                                              filename="srpm_current.src.rpm")]}
+    mock_ubipop_runner.repos.debug_rpms = {"test_debug_pkg": [get_test_pkg(name="debug_rpm_current",
+                                                              filename="debug_rpm_current.rpm")]}
+
+    mock_ubipop_runner.repos.source_rpms = {"test_srpm": [get_test_pkg(name="srpm_current",
+                                                                       filename=
+                                                                       "srpm_current.src.rpm")]}
 
     associations, unassociations = \
         mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
