@@ -225,7 +225,7 @@ class UbiPopulateRunner(object):
         packages_to_exclude = []
         for package_pattern in self.ubiconfig.packages.blacklist:
             name_to_parse = package_pattern.name
-            globbing = True if '*' in name_to_parse else False
+            globbing = '*' in name_to_parse
             if globbing:
                 name = package_pattern.name[:-1]
             else:

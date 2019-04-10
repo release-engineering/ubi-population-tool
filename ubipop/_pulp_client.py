@@ -102,7 +102,7 @@ class Pulp(object):
                                   metadata['arch'], metadata['artifacts'], metadata['profiles']))
         return modules
 
-    def wait_for_tasks(self, task_id_list,  delay=5.0):
+    def wait_for_tasks(self, task_id_list, delay=5.0):
         results = {}
 
         _tasks = set(task_id_list)
@@ -161,15 +161,15 @@ class Pulp(object):
     def associate_units(self, src_repo, dest_repo, units, type_ids):
         url = "repositories/{dst_repo}/actions/associate/".format(dst_repo=dest_repo.repo_id)
         data = {
-          'source_repo_id': src_repo.repo_id,
-          'criteria': {
-            'type_ids': list(type_ids),
-            'filters': {
-              'unit': {
-                '$or':  self._get_query_list(type_ids, units)
-              }
-            }
-          },
+            'source_repo_id': src_repo.repo_id,
+            'criteria': {
+                'type_ids': list(type_ids),
+                'filters': {
+                    'unit': {
+                        '$or': self._get_query_list(type_ids, units),
+                    },
+                },
+            },
         }
         log_msg = "Associating %s from %s to %s"
         for unit in units:
