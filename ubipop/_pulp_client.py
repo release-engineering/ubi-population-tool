@@ -1,6 +1,5 @@
 import requests
 from requests.packages.urllib3.util.retry import Retry
-from requests.adapters import HTTPAdapter
 import os
 
 import time
@@ -31,8 +30,6 @@ class PulpRetryAdapter(requests.adapters.HTTPAdapter):
         )
         super(PulpRetryAdapter, self).__init__(*args, **kwargs)
 
-    def send(self, *args, **kwargs):
-        return super(PulpRetryAdapter, self).send(*args, **kwargs)
 
 class Pulp(object):
     PULP_API = "/pulp/api/v2/"

@@ -1,11 +1,15 @@
 import mock
-import os
+import six
 import sys
-import re
-import httplib
+
+try:
+    from http.client import HTTPMessage
+except ImportError:
+    from httplib import HTTPMessage
+
 from requests.exceptions import HTTPError
 
-from ubipop._pulp_client import Repo, Package, Pulp, PulpRetryAdapter, HTTP_TOTAL_RETRIES
+from ubipop._pulp_client import Repo, Package, Pulp, HTTP_TOTAL_RETRIES
 
 import pytest
 
@@ -189,30 +193,38 @@ def set_backoff_to_zero_fixture(mock_pulp):
 def make_mock_response(status, text=None):
     m = mock.MagicMock(name='MockResponse', status=status)
     m.isclosed.side_effect = [False, True]
-    m.msg = mock.MagicMock(spec=httplib.HTTPMessage, headers=[], status=status)
-    m.read.return_value = text
+    m.msg = mock.MagicMock(spec=HTTPMessage, headers=[], status=status)
+    m.read.return_value = six.b(text)
     return m
 
 
 @pytest.mark.parametrize(
     "should_retry,err_status_code,env_retries,retry_call,retry_args,ok_response,expected_retries",
     [
-        (True, 500, None, "search_repo_by_cs", (mock.MagicMock(),), '{}', HTTP_TOTAL_RETRIES),
-        (True, 500, None, "search_rpms", (mock.MagicMock(),), '[]', HTTP_TOTAL_RETRIES),
-        (True, 500, None, "search_modules", (mock.MagicMock(),), '[]', HTTP_TOTAL_RETRIES),
+        # test everything is retryable
+        (True, 500, None, "search_repo_by_cs", ("",), '{}', HTTP_TOTAL_RETRIES),
+        (True, 500, None, "search_rpms",
+         (mock.MagicMock(repo_id='fake_id'),), '[]', HTTP_TOTAL_RETRIES),
+        (True, 500, None, "search_modules",
+         (mock.MagicMock(repo_id='fake_id'),), '[]', HTTP_TOTAL_RETRIES),
         (True, 500, None, "wait_for_tasks", (['fake-tid'],),
          '{"state":"finished","task_id":"fake-tid"}', HTTP_TOTAL_RETRIES),
         (True, 500, None, "search_tasks", ([mock.MagicMock()],), '[]', HTTP_TOTAL_RETRIES),
         (True, 500, None, "unassociate_units", ((2 * (mock.MagicMock(), )) + (['rpm'], )),
          '{"spawned_tasks":[]}', HTTP_TOTAL_RETRIES),
-        (True, 500, None, "associate_units", ((3 * (mock.MagicMock(), )) + (['rpm'], )),
+        (True, 500, None, "associate_units", (mock.MagicMock(repo_id='fake_id'),
+                                              mock.MagicMock(repo_id='fake_id'),
+                                              mock.MagicMock(), ['rpm'], ),
          '{"spawned_tasks":[]}', HTTP_TOTAL_RETRIES),
         (True, 500, None, "publish_repo", (
             mock.MagicMock(distributors_ids_type_ids_tuples=[('a', 'b')]), ),
          '{"spawned_tasks":[]}', HTTP_TOTAL_RETRIES),
 
-        (True, 500, 3, "search_repo_by_cs", (mock.MagicMock(),), '{}', 3),
-        (False, 400, 3, "search_repo_by_cs", (mock.MagicMock(),), '{}', 3),
+        # test custom number of retries
+        (True, 500, 3, "search_repo_by_cs", ("",), '{}', 3),
+
+        # test 400 status is not retryable
+        (False, 400, 3, "search_repo_by_cs", ("",), '{}', 3),
     ]
 )
 def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp, should_retry, err_status_code,
@@ -221,7 +233,7 @@ def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp, sho
     if env_retries:
         HTTP_TOTAL_RETRIES = env_retries
 
-    retries = [make_mock_response(err_status_code, 'x')
+    retries = [make_mock_response(err_status_code, 'Fake Http error')
                for _ in range(HTTP_TOTAL_RETRIES)[:-1]] + [make_mock_response(200, ok_response)]
     mocked_getresponse.side_effect = retries
 
