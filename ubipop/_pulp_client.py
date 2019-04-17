@@ -12,8 +12,8 @@ except ImportError:
 
 _LOG = logging.getLogger("ubipop")
 
-HTTP_TOTAL_RETRIES = os.environ.get("UBIPOP_HTTP_TOTAL_RETRIES", 10)
-UBIPOP_HTTP_RETRY_BACKOFF = os.environ.get("UBIPOP_HTTP_RETRY_BACKOFF", 1)
+HTTP_TOTAL_RETRIES = int(os.environ.get("UBIPOP_HTTP_TOTAL_RETRIES", 10))
+HTTP_RETRY_BACKOFF = int(os.environ.get("UBIPOP_HTTP_RETRY_BACKOFF", 1))
 
 
 class UnsupportedTypeId(Exception):
@@ -26,7 +26,7 @@ class PulpRetryAdapter(requests.adapters.HTTPAdapter):
             total=kwargs.get('total_retries', HTTP_TOTAL_RETRIES),
             status_forcelist=[500, 502, 503, 504],
             method_whitelist=["HEAD", "TRACE", "GET", "POST", "PUT", "OPTIONS", "DELETE"],
-            backoff_factor=kwargs.get('backoff_factor', UBIPOP_HTTP_RETRY_BACKOFF)
+            backoff_factor=kwargs.get('backoff_factor', HTTP_RETRY_BACKOFF)
         )
         super(PulpRetryAdapter, self).__init__(*args, **kwargs)
 

@@ -1,6 +1,13 @@
+try:
+    from importlib import reload
+except ImportError:
+    pass
+
 import mock
+import os
 import six
 import sys
+
 
 try:
     from http.client import HTTPMessage
@@ -9,6 +16,7 @@ except ImportError:
 
 from requests.exceptions import HTTPError
 
+import ubipop._pulp_client
 from ubipop._pulp_client import Repo, Package, Pulp, HTTP_TOTAL_RETRIES
 
 import pytest
@@ -243,3 +251,11 @@ def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp, sho
     else:
         with pytest.raises(HTTPError):
             getattr(mock_pulp, retry_call)(*retry_args)
+
+def test_retry_env_vars(mock_pulp):
+    os.environ['UBIPOP_HTTP_TOTAL_RETRIES'] = '100'
+    os.environ['UBIPOP_HTTP_RETRY_BACKOFF'] = '99'
+    reload(ubipop._pulp_client)
+    mock_pulp._make_session()
+    assert mock_pulp.adapter.max_retries.backoff_factor == 99
+    assert mock_pulp.adapter.max_retries.total == 100
