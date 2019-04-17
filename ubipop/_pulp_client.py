@@ -191,7 +191,7 @@ class Pulp(object):
         return query_list
 
     def associate_modules(self, src_repo, dst_repo, modules):
-        return self.associate_units(src_repo, dst_repo, modules, "modulemd")
+        return self.associate_units(src_repo, dst_repo, modules, ("modulemd", ))
 
     def associate_packages(self, src_repo, dst_repo, rpms):
         return self.associate_units(src_repo, dst_repo, rpms, ("rpm", "srpm"))
