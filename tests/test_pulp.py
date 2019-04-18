@@ -251,11 +251,3 @@ def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp, sho
     else:
         with pytest.raises(HTTPError):
             getattr(mock_pulp, retry_call)(*retry_args)
-
-def test_retry_env_vars(mock_pulp):
-    os.environ['UBIPOP_HTTP_TOTAL_RETRIES'] = '100'
-    os.environ['UBIPOP_HTTP_RETRY_BACKOFF'] = '99'
-    reload(ubipop._pulp_client)
-    mock_pulp._make_session()
-    assert mock_pulp.adapter.max_retries.backoff_factor == 99
-    assert mock_pulp.adapter.max_retries.total == 100
