@@ -1,5 +1,6 @@
 import pytest
 from ubipop._utils import (PulpAction, AssociateAction, AssociateActionModules,
+                           AssociateActionModuleDefaults, UnassociateActionModuleDefaults,
                            AssociateActionRpms, UnassociateActionRpms,
                            UnassociateActionModules)
 from ubipop._pulp_client import Repo
@@ -23,6 +24,7 @@ def test_raise_not_implemented_associate_action():
 
 @pytest.mark.parametrize("klass, method",
                          [(AssociateActionModules, "associate_modules"),
+                          (AssociateActionModuleDefaults, "associate_module_defaults"),
                           (AssociateActionRpms, "associate_packages")]
                          )
 def test_get_action_associate(klass, method):
@@ -41,6 +43,7 @@ def test_get_action_associate(klass, method):
 
 @pytest.mark.parametrize("klass, method",
                          [(UnassociateActionModules, "unassociate_modules"),
+                          (UnassociateActionModuleDefaults, "unassociate_module_defaults"),
                           (UnassociateActionRpms, "unassociate_packages")]
                          )
 def test_get_action_unassociate(klass, method):
