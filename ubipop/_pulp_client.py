@@ -81,7 +81,8 @@ class Pulp(object):
         ret.raise_for_status()
         for item in ret.json():
             metadata = item['metadata']
-            rpms.append(Package(metadata['name'], metadata['filename'], metadata.get('sourcerpm')))
+            rpms.append(Package(metadata['name'], metadata['filename'], metadata.get('sourcerpm'),
+                                metadata.get('is_modular', False)))
         return rpms
 
     def search_modules(self, repo, name=None, stream=None):
@@ -225,10 +226,11 @@ class Repo(object):
 
 
 class Package(object):
-    def __init__(self, name, filename, sourcerpm_filename=None):
+    def __init__(self, name, filename, sourcerpm_filename=None, is_modular=False):
         self.name = name
         self.filename = filename
         self.sourcerpm_filename = sourcerpm_filename
+        self.is_modular = is_modular
 
     def __lt__(self, other):
         return vercmp(self.filename, other.filename) < 0

@@ -45,7 +45,7 @@ def mock_response_for_async_req():
 @pytest.fixture()
 def search_rpms_response():
     yield [{"metadata": {"name": "foo-pkg", "filename": "foo-pkg.rpm",
-                         "sourcerpm": "foo-pkg.src.rpm"}}]
+                         "sourcerpm": "foo-pkg.src.rpm", "is_modular": False}}]
 
 
 @pytest.fixture()
@@ -131,6 +131,7 @@ def test_search_rpms(mock_pulp, mock_search_rpms, mock_repo):
     assert found_rpms[0].name == "foo-pkg"
     assert found_rpms[0].filename == "foo-pkg.rpm"
     assert found_rpms[0].sourcerpm_filename == "foo-pkg.src.rpm"
+    assert found_rpms[0].is_modular is False
 
 
 def test_search_modules(mock_pulp, mock_search_modules, mock_repo):

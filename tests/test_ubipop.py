@@ -57,7 +57,8 @@ def get_test_repo(**kwargs):
 
 
 def get_test_pkg(**kwargs):
-    return Package(kwargs.get('name'), kwargs.get('filename'), kwargs.get('sourcerpm_filename'))
+    return Package(kwargs.get('name'), kwargs.get('filename'), kwargs.get('sourcerpm_filename'),
+                   kwargs.get('is_modular', False))
 
 
 def get_test_mod(**kwargs):
@@ -245,19 +246,22 @@ def test_keep_n_newest_packages(mock_ubipop_runner):
 
 def test_keep_n_newest_packages_with_referenced_pkg_in_module(mock_ubipop_runner):
     packages = [
-        get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
-        get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm"),
-        get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.8-1.el8+1944+b6c8e16f.noarch.rpm")]
+        get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
+                     is_modular=True),
+        get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
+                     is_modular=True),
+        get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.8-1.el8+1944+b6c8e16f.noarch.rpm",
+                     is_modular=True)]
 
     mock_ubipop_runner.repos.modules["ns"] = []
     mock_ubipop_runner.repos.pkgs_from_modules["ns"] = \
-        [get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm")]
+        [get_test_pkg(name="tomcatjss", filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
+                      is_modular=True)]
 
     mock_ubipop_runner.keep_n_latest_packages(packages)
 
-    assert len(packages) == 2
-    assert "7.3.8" in packages[0].filename
-    assert "7.3.7" in packages[1].filename
+    assert len(packages) == 1
+    assert "7.3.7" in packages[0].filename
 
 
 @pytest.mark.parametrize("rhel_repo_set, ubi_repo_set, fail",
@@ -585,5 +589,6 @@ def test_exclude_blacklisted_packages(mock_ubipop_runner):
     mock_ubipop_runner._exclude_blacklisted_packages()
 
     assert len(mock_ubipop_runner.repos.packages) == 0
-    assert len(mock_ubipop_runner.repos.pkgs_from_modules) == 0
+    # no blacklisting from pkgs from mds
+    assert len(mock_ubipop_runner.repos.pkgs_from_modules) == 1
     assert len(mock_ubipop_runner.repos.debug_rpms) == 0
