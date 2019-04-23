@@ -568,8 +568,8 @@ class UbiPopulateRunner(object):
 
     def keep_n_latest_packages(self, packages, n=1):
         """
-        Keep n latest packages non-modular,
-        modular packages are kept only if they are referenced by any remaining module,
+        Keep n latest non-modular packages,
+        modular packages are kept only if they are referenced by some of remaining modules
         """
         packages_to_keep = []
         non_modular_pkgs = []
