@@ -62,6 +62,19 @@ class UnassociateActionModules(PulpAction):
         return pulp_client_inst.unassociate_modules, self.dst_repo, self.units
 
 
+class AssociateActionModuleDefaults(AssociateAction):
+    TYPE = "module_defaults"
+
+    def get_action(self, pulp_client_inst):
+        return pulp_client_inst.associate_module_defaults, self.src_repo, self.dst_repo, self.units
+
+
+class UnassociateActionModuleDefaults(PulpAction):
+    TYPE = "module_defaults"
+
+    def get_action(self, pulp_client_inst):
+        return pulp_client_inst.unassociate_module_defaults, self.dst_repo, self.units
+
 class AssociateActionRpms(AssociateAction):
     TYPE = "packages"
 

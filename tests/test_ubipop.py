@@ -6,7 +6,7 @@ import shutil
 import logging
 import sys
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
-from ubipop._pulp_client import Module, Package, Repo
+from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
 from ubipop._utils import AssociateActionModules, UnassociateActionModules
 from mock import MagicMock
 from mock import patch
@@ -68,6 +68,10 @@ def get_test_mod(**kwargs):
                   kwargs.get('arch', ''),
                   kwargs.get('packages', ''),
                   kwargs.get('profiles', ''))
+
+
+def get_test_mod_defaults(**kwargs):
+  return ModuleDefaults(kwargs['name'], kwargs['stream'], kwargs['profiles'])
 
 
 def test_get_output_repo_ids(ubi_repo_set):
@@ -218,6 +222,21 @@ def test_match_modules(mock_ubipop_runner):
     assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
     assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
 
+def test_match_module_defaults(mock_ubipop_runner):
+    mock_ubipop_runner.repos.modules['n1s1'] = [get_test_mod(name="virt",
+                                                             profiles={'2.5': ["common"]},
+                                                             stream='rhel')]
+    mock_ubipop_runner.pulp.search_module_defaults.return_value = \
+        [get_test_mod_defaults(name='virt',
+                               stream='rhel',
+                               profiles={'2.5': ["common"]})]
+    mock_ubipop_runner._match_module_defaults()
+
+    assert len(mock_ubipop_runner.repos.module_defaults) == 1
+    md_d = mock_ubipop_runner.repos.module_defaults['virtrhel']
+    assert len(md_d) == 1
+    assert md_d[0].name == 'virt'
+    assert md_d[0].name_profiles == 'virt:[2.5:common]'
 
 def test_diff_modules(mock_ubipop_runner):
     curr = [get_test_mod(name='1'), get_test_mod(name='2'), get_test_mod(name='3')]
@@ -382,8 +401,13 @@ def mock_current_content_ft():
     current_rpms_ft = MagicMock()
     current_srpms_ft = MagicMock()
     current_debug_rpms_ft = MagicMock()
+    current_module_default_ft = MagicMock()
 
     current_modules_ft.result.return_value = [get_test_mod(name="md_current")]
+    current_module_default_ft.result.return_value = \
+        [get_test_mod_defaults(name='mdd_current',
+                               stream='rhel',
+                               profiles={'2.5': 'common'})]
     current_rpms_ft.result.return_value = [get_test_pkg(name="rpm_current",
                                                         filename="rpm_current.rpm")]
     current_srpms_ft.result.return_value = [get_test_pkg(name="srpm_current",
@@ -391,11 +415,16 @@ def mock_current_content_ft():
     current_debug_rpms_ft.result.return_value = [get_test_pkg(name="debug_rpm_current",
                                                               filename="debug_rpm_current.rpm")]
 
-    yield current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft
+    yield current_modules_ft, current_module_default_ft, current_rpms_ft, \
+        current_srpms_ft, current_debug_rpms_ft
 
 
 def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     mock_ubipop_runner.repos.modules = {"test": [get_test_mod(name="test_md")]}
+    mock_ubipop_runner.repos.module_defaults = \
+        {'test': [get_test_mod_defaults(name='test_mdd',
+                                        stream='rhel',
+                                        profiles={'2.5': 'uncommon'})]}
     mock_ubipop_runner.repos.packages = {"test_rpm": [get_test_pkg(name="test_rpm",
                                                                    filename="test_rpm.rpm")]}
     mock_ubipop_runner.repos.debug_rpms = {"test_debug_pkg":
@@ -408,11 +437,15 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
         mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
 
     # firstly, check correct associations, there should 1 unit of each type associated
-    modules, rpms, srpms, debug_rpms = associations
+    modules, module_defaults, rpms, srpms, debug_rpms = associations
     assert len(modules.units) == 1
     assert modules.units[0].name == "test_md"
     assert modules.dst_repo.repo_id == "ubi-foo-rpms"
     assert modules.src_repo.repo_id == "foo-rpms"
+
+    assert len(module_defaults.units) == 1
+    assert module_defaults.dst_repo.repo_id == 'ubi-foo-rpms'
+    assert module_defaults.src_repo.repo_id == 'foo-rpms'
 
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "test_rpm"
@@ -430,10 +463,14 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     assert debug_rpms.src_repo.repo_id == "foo-debug"
 
     # secondly, check correct unassociations, there should 1 unit of each type unassociated
-    modules, rpms, srpms, debug_rpms = unassociations
+    modules, module_defaults, rpms, srpms, debug_rpms = unassociations
     assert len(modules.units) == 1
     assert modules.units[0].name == "md_current"
     assert modules.dst_repo.repo_id == "ubi-foo-rpms"
+
+    assert len(module_defaults.units) == 1
+    assert module_defaults.units[0].name == 'mdd_current'
+    assert module_defaults.dst_repo.repo_id == 'ubi-foo-rpms'
 
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "rpm_current"
@@ -450,6 +487,10 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
 
 def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft):
     mock_ubipop_runner.repos.modules = {"test": [get_test_mod(name="md_current")]}
+    mock_ubipop_runner.repos.module_defaults = \
+        {"test": [get_test_mod_defaults(name='mdd_current',
+                                        stream='rhel',
+                                        profiles={'2.5': 'common'})]}
     mock_ubipop_runner.repos.packages = {"test_rpm": [get_test_pkg(name="rpm_current",
                                                       filename="rpm_current.rpm")]}
     mock_ubipop_runner.repos.debug_rpms = {"test_debug_pkg": [get_test_pkg(name="debug_rpm_current",
@@ -463,15 +504,17 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
         mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
 
     # firstly, check correct associations, there should 0 units associated
-    modules, rpms, srpms, debug_rpms = associations
+    modules, module_defaults, rpms, srpms, debug_rpms = associations
     assert len(modules.units) == 0
+    assert len(module_defaults.units) == 0
     assert len(rpms.units) == 0
     assert len(srpms.units) == 0
     assert len(debug_rpms.units) == 0
 
     # secondly, check correct unassociations, there should 0 units unassociated
-    modules, rpms, srpms, debug_rpms = unassociations
+    modules, module_defaults, rpms, srpms, debug_rpms = unassociations
     assert len(modules.units) == 0
+    assert len(module_defaults.units) == 0
     assert len(rpms.units) == 0
     assert len(srpms.units) == 0
     assert len(debug_rpms.units) == 0
