@@ -262,11 +262,24 @@ class UbiPopulateRunner(object):
             list(chain.from_iterable(self.repos.debug_rpms.values())))
 
         for pkg in blacklisted_binary:
-            self.repos.packages.pop(pkg.name, None)
-            self.repos.pkgs_from_modules.pop(pkg.name, None)
+            # blacklist only non-modular pkgs
+            self.repos.packages[pkg.name][:] = [_pkg for _pkg in
+                                                self.repos.packages.get(pkg.name, [])
+                                                if _pkg.is_modular]
+
+            # if there is nothing left, remove whole entry for package
+            if not self.repos.packages[pkg.name]:
+                self.repos.packages.pop(pkg.name, None)
 
         for pkg in blacklisted_debug:
-            self.repos.debug_rpms.pop(pkg.name, None)
+            # blacklist only non-modular debug pkgs
+            self.repos.debug_rpms[pkg.name][:] = [_pkg for _pkg in
+                                                  self.repos.debug_rpms.get(pkg.name, [])
+                                                  if _pkg.is_modular]
+
+            # if there is nothing left, remove whole entry for debug package
+            if not self.repos.debug_rpms[pkg.name]:
+                self.repos.debug_rpms.pop(pkg.name, None)
 
     def _finalize_modules_output_set(self):
         for _, modules in self.repos.modules.items():
@@ -594,23 +607,27 @@ class UbiPopulateRunner(object):
                 if arch == 'src':
                     continue
                 if name == package_name:
-                    rpms.append(Package(name, rpm_without_epoch + '.rpm'))
+                    rpms.append(Package(name, rpm_without_epoch + '.rpm', is_modular=True))
 
         return rpms
 
     def keep_n_latest_packages(self, packages, n=1):
         """
-        Keep n latest packages,
-        package is deleted from output set if it's not referenced by any remaining module
+        Keep n latest non-modular packages,
+        modular packages are kept only if they are referenced by some of remaining modules
         """
-        packages_to_delete = packages[:-n]
-
         packages_to_keep = []
-        for package in packages_to_delete:
-            for module_name_stream, packages_ref_by_module in \
-                    self.repos.pkgs_from_modules.items():
-                if package.filename in [pkg.filename for pkg in packages_ref_by_module] and\
-                                        module_name_stream in self.repos.modules:
-                    packages_to_keep.append(package)
+        non_modular_pkgs = []
+        for package in packages:
+            if package.is_modular:
+                for module_name_stream, packages_ref_by_module in \
+                        self.repos.pkgs_from_modules.items():
+                    pkgs_filenames_from_modules = [pkg.filename for pkg in packages_ref_by_module]
+                    if package.filename in pkgs_filenames_from_modules \
+                            and module_name_stream in self.repos.modules:
+                        # this skips modular pkgs that are not referenced by module
+                        packages_to_keep.append(package)
+            else:
+                non_modular_pkgs.append(package)
 
-        packages[:] = packages[-n:] + packages_to_keep
+        packages[:] = non_modular_pkgs[-n:] + packages_to_keep
