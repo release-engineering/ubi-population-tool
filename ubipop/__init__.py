@@ -5,8 +5,11 @@ from more_executors import Executors
 from concurrent.futures import as_completed
 from collections import namedtuple, defaultdict
 from ubipop._pulp_client import Pulp, Package
-from ubipop._utils import (splitFilename, AssociateActionModules, AssociateActionRpms,
+from ubipop._utils import (splitFilename, AssociateActionModules,
+                           AssociateActionModuleDefaults,
+                           AssociateActionRpms,
                            UnassociateActionModules,
+                           UnassociateActionModuleDefaults,
                            UnassociateActionRpms)
 from itertools import chain
 
@@ -28,6 +31,7 @@ class UbiRepoSet(object):
         self.packages = defaultdict(list)
         self.debug_rpms = defaultdict(list)
         self.modules = defaultdict(list)
+        self.module_defaults = defaultdict(list)
         self.pkgs_from_modules = defaultdict(list)
         self.source_rpms = defaultdict(list)
 
@@ -198,6 +202,21 @@ class UbiPopulateRunner(object):
                     self.repos.pkgs_from_modules[name_stream].extend(module_packages)
                     self.repos.packages[package_name].extend(module_packages)
 
+    def _match_module_defaults(self):
+        """Try to find modulemd_defaults units in the same repo with the same
+        name/stream of a modulemd.
+        """
+        fts = {}
+        for _, modules in self.repos.modules.items():
+            for md in modules:
+                fts[self._executor.submit(self.pulp.search_module_defaults,
+                                          self.repos.in_repos.rpm, md.name,
+                                          str(md.stream))] = md.name + str(md.stream)
+        for ft in as_completed(fts):
+            module_defaults = ft.result()
+            if module_defaults:
+                self.repos.module_defaults[fts[ft]].extend(module_defaults)
+
     def _match_packages(self, repo, packages_dict):
         """
         Add matching packages from whitelist
@@ -294,11 +313,15 @@ class UbiPopulateRunner(object):
     def _get_pulp_actions_mds(self, modules, current):
         return self._determine_pulp_actions(modules, current, self._diff_modules_by_nsvca)
 
+    def _get_pulp_actions_md_defaults(self, module_defaults, current):
+        return self._determine_pulp_actions(module_defaults, current,
+            self._diff_md_defaults_by_profiles)
+
     def _get_pulp_actions_pkgs(self, pkgs, current):
         return self._determine_pulp_actions(pkgs, current, self._diff_packages_by_filename)
 
-    def _get_pulp_actions(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
-                          current_debug_rpms_ft):
+    def _get_pulp_actions(self, current_modules_ft, current_module_defaults_ft, current_rpms_ft,
+                          current_srpms_ft, current_debug_rpms_ft):
         """
         Determines expected pulp actions by comparing current content of output repos and
         expected content.
@@ -309,6 +332,10 @@ class UbiPopulateRunner(object):
         """
         modules_assoc, modules_unassoc = self._get_pulp_actions_mds(self.repos.modules,
                                                                     current_modules_ft.result())
+        md_defaults_assoc, md_defaults_unassoc = \
+            self._get_pulp_actions_md_defaults(self.repos.module_defaults,
+                                               current_module_defaults_ft.result())
+
         rpms_assoc, rpms_unassoc = self._get_pulp_actions_pkgs(self.repos.packages,
                                                                current_rpms_ft.result())
         srpms_assoc, srpms_unassoc = self._get_pulp_actions_pkgs(self.repos.source_rpms,
@@ -323,6 +350,9 @@ class UbiPopulateRunner(object):
         associations = (AssociateActionModules(modules_assoc,
                                                self.repos.out_repos.rpm,
                                                self.repos.in_repos.rpm),
+                        AssociateActionModuleDefaults(md_defaults_assoc,
+                                                      self.repos.out_repos.rpm,
+                                                      self.repos.in_repos.rpm),
                         AssociateActionRpms(rpms_assoc,
                                             self.repos.out_repos.rpm,
                                             self.repos.in_repos.rpm),
@@ -335,6 +365,8 @@ class UbiPopulateRunner(object):
                         )
 
         unassociations = (UnassociateActionModules(modules_unassoc, self.repos.out_repos.rpm),
+                          UnassociateActionModuleDefaults(md_defaults_unassoc,
+                                                          self.repos.out_repos.rpm),
                           UnassociateActionRpms(rpms_unassoc, self.repos.out_repos.rpm),
                           UnassociateActionRpms(srpms_unassoc, self.repos.out_repos.source),
                           UnassociateActionRpms(debug_unassoc, self.repos.out_repos.debug))
@@ -343,6 +375,9 @@ class UbiPopulateRunner(object):
 
     def _diff_modules_by_nsvca(self, modules_1, modules_2):
         return self._diff_lists_by_attr(modules_1, modules_2, 'nsvca')
+
+    def _diff_md_defaults_by_profiles(self, module_defaults_1, module_defaults_2):
+        return self._diff_lists_by_attr(module_defaults_1, module_defaults_2, 'name_profiles')
 
     def _diff_packages_by_filename(self, packages_1, packages_2):
         return self._diff_lists_by_attr(packages_1, packages_2, 'filename')
@@ -354,8 +389,8 @@ class UbiPopulateRunner(object):
         return diff
 
     def run_ubi_population(self):
-        current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft = \
-            self._get_current_content()
+        current_modules_ft, current_module_defaults_ft, current_rpms_ft, \
+            current_srpms_ft, current_debug_rpms_ft = self._get_current_content()
 
         self._match_modules()
         self._match_binary_rpms()
@@ -365,16 +400,18 @@ class UbiPopulateRunner(object):
         self._finalize_modules_output_set()
         self._finalize_rpms_output_set()
         self._finalize_debug_output_set()
+        self._match_module_defaults()
         self._create_srpms_output_set()
 
         associations, unassociations = self._get_pulp_actions(current_modules_ft,
+                                                              current_module_defaults_ft,
                                                               current_rpms_ft,
                                                               current_srpms_ft,
                                                               current_debug_rpms_ft)
 
         if self.dry_run:
-            self.log_curent_content(current_modules_ft, current_rpms_ft,
-                                    current_srpms_ft, current_debug_rpms_ft)
+            self.log_curent_content(current_modules_ft, current_module_defaults_ft,
+                                    current_rpms_ft, current_srpms_ft, current_debug_rpms_ft)
             self.log_pulp_actions(associations, unassociations)
         else:
             fts = []
@@ -397,11 +434,16 @@ class UbiPopulateRunner(object):
 
         return fts
 
-    def log_curent_content(self, current_modules_ft, current_rpms_ft, current_srpms_ft,
-                           current_debug_rpms_ft):
+    def log_curent_content(self, current_modules_ft, current_module_defaults_ft,
+                           current_rpms_ft, current_srpms_ft, current_debug_rpms_ft):
         _LOG.info("Current modules in repo: %s", self.repos.out_repos.rpm.repo_id)
         for module in current_modules_ft.result():
             _LOG.info(module.nsvca)
+
+        _LOG.info("Current module_defaults in repo: %s", self.repos.out_repos.rpm.repo_id)
+        for md_d in current_module_defaults_ft.result():
+            _LOG.info("module_defaults: %s, profiles: %s", md_d.name, md_d.profiles)
+
         _LOG.info("Current rpms in repo: %s", self.repos.out_repos.rpm.repo_id)
         for rpm in current_rpms_ft.result():
             _LOG.info(rpm.filename)
@@ -441,6 +483,8 @@ class UbiPopulateRunner(object):
         """
         current_modules_ft = self._executor.submit(self.pulp.search_modules,
                                                    self.repos.out_repos.rpm)
+        current_module_defaults_ft = self._executor.submit(self.pulp.search_module_defaults,
+                                                           self.repos.out_repos.rpm)
         current_rpms_ft = self._executor.submit(self.pulp.search_rpms,
                                                 self.repos.out_repos.rpm)
         current_srpms_ft = self._executor.submit(self.pulp.search_rpms,
@@ -451,7 +495,8 @@ class UbiPopulateRunner(object):
         else:
             current_debug_rpms_ft = None
 
-        return current_modules_ft, current_rpms_ft, current_srpms_ft, current_debug_rpms_ft
+        return current_modules_ft, current_module_defaults_ft, current_rpms_ft, \
+            current_srpms_ft, current_debug_rpms_ft
 
     def _publish_out_repos(self):
         fts = []

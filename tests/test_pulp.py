@@ -1,4 +1,4 @@
-from ubipop._pulp_client import Repo, Package, Pulp
+from ubipop._pulp_client import Repo, Package, ModuleDefaults, Pulp
 import pytest
 import sys
 
@@ -38,6 +38,11 @@ def mock_package():
 
 
 @pytest.fixture()
+def mock_mdd():
+    yield ModuleDefaults("virt", "rhel", {"2.6": ["common"]})
+
+
+@pytest.fixture()
 def mock_response_for_async_req():
     yield {"spawned_tasks": [{"task_id": "foo_task_id"}]}
 
@@ -57,6 +62,11 @@ def search_modules_response():
 
 
 @pytest.fixture()
+def search_module_defaults_response():
+    yield [{"metadata": {"name": "virt", "stream": "rhel",
+                         "profiles": {"rhel": ["default", "common"]}}}]
+
+@pytest.fixture()
 def mock_search_rpms(requests_mock, mock_repo, search_rpms_response):
     url = "/pulp/api/v2/repositories/{REPO_ID}/search/units/".format(REPO_ID=mock_repo.repo_id)
     requests_mock.register_uri('POST', url, json=search_rpms_response)
@@ -66,6 +76,12 @@ def mock_search_rpms(requests_mock, mock_repo, search_rpms_response):
 def mock_search_modules(requests_mock, mock_repo, search_modules_response):
     url = "/pulp/api/v2/repositories/{REPO_ID}/search/units/".format(REPO_ID=mock_repo.repo_id)
     requests_mock.register_uri('POST', url, json=search_modules_response)
+
+
+@pytest.fixture()
+def mock_search_module_defaults(requests_mock, mock_repo, search_module_defaults_response):
+    url = "/pulp/api/v2/repositories/{REPO_ID}/search/units/".format(REPO_ID=mock_repo.repo_id)
+    requests_mock.register_uri('POST', url, json=search_module_defaults_response)
 
 
 @pytest.fixture()
@@ -125,6 +141,18 @@ def test_unassociate_packages(mock_pulp, mock_unassociate, mock_repo, mock_packa
     assert task_ids[0] == "foo_task_id"
 
 
+def test_associate_module_defaults(mock_pulp, mock_associate, mock_repo, mock_mdd):
+    task_ids = mock_pulp.associate_module_defaults(mock_repo, mock_repo, [mock_mdd])
+    assert task_ids
+    assert task_ids[0] == 'foo_task_id'
+
+
+def test_unassociate_module_defaults(mock_pulp, mock_unassociate, mock_repo, mock_mdd):
+    task_ids = mock_pulp.unassociate_module_defaults(mock_repo, [mock_mdd])
+    assert task_ids
+    assert task_ids[0] == 'foo_task_id'
+
+
 def test_search_rpms(mock_pulp, mock_search_rpms, mock_repo):
     found_rpms = mock_pulp.search_rpms(mock_repo)
     assert len(found_rpms) == 1
@@ -140,6 +168,14 @@ def test_search_modules(mock_pulp, mock_search_modules, mock_repo):
     assert found_modules[0].nsvca == "foo-module:9.6:1111:foo-context:x86_64"
     assert found_modules[0].packages == ["foo-pkg"]
     assert found_modules[0].profiles == {"foo-prof": ["pkg-name"]}
+
+
+def test_search_module_defaults(mock_pulp, mock_search_module_defaults, mock_repo):
+    found_module_defaults = mock_pulp.search_module_defaults(mock_repo, name='virt', stream='rhel')
+    assert len(found_module_defaults) == 1
+    assert found_module_defaults[0].name == 'virt'
+    assert found_module_defaults[0].stream == 'rhel'
+    assert found_module_defaults[0].name_profiles == 'virt:[rhel:common,default]'
 
 
 @pytest.fixture()
