@@ -124,6 +124,22 @@ class Pulp(object):
                                   metadata['arch'], metadata['artifacts'], metadata['profiles']))
         return modules
 
+    def search_module_defaults(self, repo, name, stream):
+        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
+        criteria = {
+            "type_ids": ["modulemd_defaults"],
+            "filters": {"unit": {"name": name, "stream": stream}}
+        }
+        payload = {"criteria": criteria}
+        ret = self.do_request("post", url, payload)
+        ret.raise_for_status()
+        module_defaults = []
+        for item in ret.json():
+            metadata = item['metadata']
+            module_defaults.append(ModuleDefaults(metadata['name'], metadata['stream'],
+                                                  metadata['profiles']))
+        return module_defaults
+
     def wait_for_tasks(self, task_id_list, delay=5.0):
         results = {}
 
@@ -156,6 +172,16 @@ class Pulp(object):
                                         {'arch': module.arch}
                                         ]})
 
+        return query_list
+
+    def _module_defaults_query(self, module_defaults):
+        query_list = []
+        for md_d in module_defaults:
+            query_list.append({'$and': [
+                                    {'name': md_d.name},
+                                    {'stream': md_d.stream},
+                                    {'profiles': md_d.profiles}
+                                ]})
         return query_list
 
     def _rpms_query(self, rpms):
@@ -204,7 +230,8 @@ class Pulp(object):
     def _get_query_list(self, type_ids, units):
         if "modulemd" in type_ids:
             query_list = self._modules_query(units)
-
+        elif "modulemd_defaults" in type_ids:
+            query_list = self._module_defaults_query(units)
         elif "rpm" in type_ids or "srpm" in type_ids:
             query_list = self._rpms_query(units)
         else:
@@ -213,13 +240,19 @@ class Pulp(object):
         return query_list
 
     def associate_modules(self, src_repo, dst_repo, modules):
-        return self.associate_units(src_repo, dst_repo, modules, "modulemd")
+        return self.associate_units(src_repo, dst_repo, modules, ("modulemd", ))
+
+    def associate_module_defaults(self, src_repo, dst_repo, module_defaults):
+        return self.associate_units(src_repo, dst_repo, module_defaults, ("modulemd_defaults", ))
 
     def associate_packages(self, src_repo, dst_repo, rpms):
         return self.associate_units(src_repo, dst_repo, rpms, ("rpm", "srpm"))
 
     def unassociate_modules(self, repo, modules):
         return self.unassociate_units(repo, modules, ("modulemd", ))
+
+    def unassociate_module_defaults(self, repo, module_defaults):
+        return self.unassociate_units(repo, module_defaults, ("modulemd_defaults", ))
 
     def unassociate_packages(self, repo, rpms):
         return self.unassociate_units(repo, rpms, ("rpm", "srpm"))
@@ -290,3 +323,40 @@ class Module(object):
 
     def __str__(self):
         return self.nsvca
+
+
+class ModuleDefaults(object):
+    """
+    module_defaults unit, defines which profiles are enabled by default when activating
+    a module. For example:
+    {...,
+     "name": "ruby",
+     "profiles": {
+        "2.5": [
+            "common"]
+        },
+    ...
+    }
+    if someone asks to enable 'ruby:2.5' for some repo without specifing profiles, will
+    get 'common' profile by defualt
+    """
+    def __init__(self, name, stream, profiles):
+        self.name = name
+        self.stream = stream
+        self.profiles = profiles  # a dict such as {'4.046':['common']}
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def name_profiles(self):
+        """
+        flatten the profles and prepend name
+        format: name:[key:profile,profile]:[key:profile]
+        'ruby:[2.5:common,unique]'
+        """
+        result = self.name
+        for key in sorted(self.profiles):
+            result += ':[%s:%s]' % (key, ','.join(sorted(self.profiles[key])))
+        return result
+
