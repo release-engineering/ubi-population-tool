@@ -103,13 +103,13 @@ class Pulp(object):
                                   metadata['arch'], metadata['artifacts'], metadata['profiles']))
         return modules
 
-    def search_module_defaults(self, repo, name, stream):
+    def search_module_defaults(self, repo, name=None, stream=None):
         url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
-        criteria = {
-            "type_ids": ["modulemd_defaults"],
-            "filters": {"unit": {"name": name, "stream": stream}}
-        }
+        criteria = {"type_ids": ["modulemd_defaults"]}
+        if name and stream:
+            criteria.update({"filters": {"unit": {"name": name, "stream": stream}}})
         payload = {"criteria": criteria}
+
         ret = self.do_request("post", url, payload)
         ret.raise_for_status()
         module_defaults = []
