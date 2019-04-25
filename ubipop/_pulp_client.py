@@ -13,7 +13,7 @@ except ImportError:
 _LOG = logging.getLogger("ubipop")
 
 HTTP_TOTAL_RETRIES = int(os.environ.get("UBIPOP_HTTP_TOTAL_RETRIES", 10))
-HTTP_RETRY_BACKOFF = int(os.environ.get("UBIPOP_HTTP_RETRY_BACKOFF", 1))
+HTTP_RETRY_BACKOFF = float(os.environ.get("UBIPOP_HTTP_RETRY_BACKOFF", 1))
 
 
 class UnsupportedTypeId(Exception):

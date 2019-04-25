@@ -23,6 +23,8 @@ import pytest
 
 import requests_mock
 
+ORIG_HTTP_TOTAL_RETRIES = HTTP_TOTAL_RETRIES
+
 if sys.version_info <= (2, 7,):
     import requests_mock as rm
 
@@ -238,16 +240,20 @@ def make_mock_response(status, text=None):
 def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp, should_retry, err_status_code,
                  env_retries, retry_call, retry_args, ok_response, expected_retries):
     global HTTP_TOTAL_RETRIES
-    if env_retries:
-        HTTP_TOTAL_RETRIES = env_retries
+    try:
+        if env_retries:
+            HTTP_TOTAL_RETRIES = env_retries
 
-    retries = [make_mock_response(err_status_code, 'Fake Http error')
-               for _ in range(HTTP_TOTAL_RETRIES)[:-1]] + [make_mock_response(200, ok_response)]
-    mocked_getresponse.side_effect = retries
+        retries = [make_mock_response(err_status_code, 'Fake Http error')
+                   for _ in range(HTTP_TOTAL_RETRIES)[:-1]]
+        retries.extend([make_mock_response(200, ok_response)])
+        mocked_getresponse.side_effect = retries
 
-    if should_retry:
-        getattr(mock_pulp, retry_call)(*retry_args)
-        assert len(mocked_getresponse.mock_calls) == expected_retries
-    else:
-        with pytest.raises(HTTPError):
+        if should_retry:
             getattr(mock_pulp, retry_call)(*retry_args)
+            assert len(mocked_getresponse.mock_calls) == expected_retries
+        else:
+            with pytest.raises(HTTPError):
+                getattr(mock_pulp, retry_call)(*retry_args)
+    finally:
+        HTTP_TOTAL_RETRIES = ORIG_HTTP_TOTAL_RETRIES
