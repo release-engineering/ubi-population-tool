@@ -149,7 +149,7 @@ class Pulp(object):
                                         {'version': module.version},
                                         {'stream': module.stream},
                                         {'arch': module.arch}
-                                        ]})
+                                       ]})
 
         return query_list
 
@@ -157,10 +157,9 @@ class Pulp(object):
         query_list = []
         for md_d in module_defaults:
             query_list.append({'$and': [
-                                    {'name': md_d.name},
-                                    {'stream': md_d.stream},
-                                    {'profiles': md_d.profiles}
-                                ]})
+                {'name': md_d.name},
+                {'stream': md_d.stream}
+            ]})
         return query_list
 
     def _rpms_query(self, rpms):
@@ -339,4 +338,3 @@ class ModuleDefaults(object):
         for key in sorted(self.profiles):
             result += ':[%s:%s]' % (key, ','.join(sorted(self.profiles[key])))
         return result
-
