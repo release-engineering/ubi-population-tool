@@ -124,15 +124,15 @@ def test_packages_names_by_profiles_all_profiles(mock_ubipop_runner):
 
 def test_sort_packages(mock_ubipop_runner):
     packages = [
-        get_test_pkg(filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
-        get_test_pkg(filename="tomcatjss-5.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
-        get_test_pkg(filename="tomcatjss-9.3.6-1.el8+1944+b6c8e16f.noarch.rpm")]
+        get_test_pkg(filename="rubygems-2.0.14.1-34.el7_6.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.14-25.el7_1.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.13.1-34.el7_6.noarch.rpm")]
 
     mock_ubipop_runner.sort_packages(packages)
 
-    assert "5.3.6" in packages[0].filename
-    assert "7.3.6" in packages[1].filename
-    assert "9.3.6" in packages[2].filename
+    assert "2.0.13.1-34" in packages[0].filename
+    assert "2.0.14-25" in packages[1].filename
+    assert "2.0.14.1-34" in packages[2].filename
 
 
 def test_keep_n_latest_modules(mock_ubipop_runner):

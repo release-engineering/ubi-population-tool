@@ -1,7 +1,7 @@
 import requests
 import time
 import logging
-from rpm_vercmp import vercmp
+from cmp_version import cmp_version
 try:
     from urllib.parse import urljoin
 except ImportError:
@@ -266,22 +266,22 @@ class Package(object):
         self.is_modular = is_modular
 
     def __lt__(self, other):
-        return vercmp(self.filename, other.filename) < 0
+        return cmp_version(self.filename, other.filename) < 0
 
     def __gt__(self, other):
-        return vercmp(self.filename, other.filename) > 0
+        return cmp_version(self.filename, other.filename) > 0
 
     def __eq__(self, other):
-        return vercmp(self.filename, other.filename) == 0
+        return cmp_version(self.filename, other.filename) == 0
 
     def __le__(self, other):
-        return vercmp(self.filename, other.filename) <= 0
+        return cmp_version(self.filename, other.filename) <= 0
 
     def __ge__(self, other):
-        return vercmp(self.filename, other.filename) >= 0
+        return cmp_version(self.filename, other.filename) >= 0
 
     def __ne__(self, other):
-        return vercmp(self.filename, other.filename) != 0
+        return cmp_version(self.filename, other.filename) != 0
 
     def __str__(self):
         return self.filename
