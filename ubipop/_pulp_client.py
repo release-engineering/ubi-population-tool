@@ -1,4 +1,7 @@
 import requests
+from urllib3.util.retry import Retry
+import os
+
 import time
 import logging
 from cmp_version import cmp_version
@@ -9,9 +12,23 @@ except ImportError:
 
 _LOG = logging.getLogger("ubipop")
 
+HTTP_TOTAL_RETRIES = int(os.environ.get("UBIPOP_HTTP_TOTAL_RETRIES", 10))
+HTTP_RETRY_BACKOFF = float(os.environ.get("UBIPOP_HTTP_RETRY_BACKOFF", 1))
+
 
 class UnsupportedTypeId(Exception):
     pass
+
+
+class PulpRetryAdapter(requests.adapters.HTTPAdapter):
+    def __init__(self, *args, **kwargs):
+        kwargs['max_retries'] = Retry(
+            total=kwargs.get('total_retries', HTTP_TOTAL_RETRIES),
+            status_forcelist=[500, 502, 503, 504],
+            method_whitelist=["HEAD", "TRACE", "GET", "POST", "PUT", "OPTIONS", "DELETE"],
+            backoff_factor=kwargs.get('backoff_factor', HTTP_RETRY_BACKOFF)
+        )
+        super(PulpRetryAdapter, self).__init__(*args, **kwargs)
 
 
 class Pulp(object):
@@ -23,16 +40,22 @@ class Pulp(object):
         self.scheme = "https://"
         self.base_url = urljoin(self.scheme + hostname, self.PULP_API)
         self.session = None
+        self.adapter = None
         self.insecure = insecure
+
+    def _make_session(self):
+        self.session = requests.Session()
+        self.adapter = PulpRetryAdapter()
+        self.session.mount('http://', self.adapter)
+        self.session.mount('https://', self.adapter)
+        if len(self.auth) == 1:
+            self.session.cert = self.auth[0]
+        else:
+            self.session.auth = self.auth
 
     def do_request(self, req_type, url, data=None):
         if self.session is None:
-            self.session = requests.Session()
-
-            if len(self.auth) == 1:
-                self.session.cert = self.auth[0]
-            else:
-                self.session.auth = self.auth
+            self._make_session()
 
         req_url = urljoin(self.base_url, url)
         ret = None
@@ -40,7 +63,6 @@ class Pulp(object):
             ret = self.session.post(req_url, json=data, verify=not self.insecure)
         elif req_type == "get":
             ret = self.session.get(req_url, verify=not self.insecure)
-
         return ret
 
     def search_repo_by_cs(self, content_set):
