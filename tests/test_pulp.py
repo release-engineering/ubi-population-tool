@@ -1,8 +1,3 @@
-try:
-    from importlib import reload
-except ImportError:
-    pass
-
 import mock
 import os
 import six
@@ -281,7 +276,7 @@ def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp, sho
             HTTP_TOTAL_RETRIES = env_retries
 
         retries = [make_mock_response(err_status_code, 'Fake Http error')
-                   for _ in range(HTTP_TOTAL_RETRIES)[:-1]]
+                   for _ in range(HTTP_TOTAL_RETRIES-1)]
         retries.extend([make_mock_response(200, ok_response)])
         mocked_getresponse.side_effect = retries
 
