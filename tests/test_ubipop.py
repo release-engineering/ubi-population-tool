@@ -7,7 +7,7 @@ import logging
 import sys
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
-from ubipop._utils import AssociateActionModules, UnassociateActionModules
+from ubipop._utils import AssociateActionModules, UnassociateActionModules, splitFilename
 from mock import MagicMock
 from mock import patch
 from more_executors import Executors
@@ -259,14 +259,37 @@ def test_keep_n_newest_packages(mock_ubipop_runner):
     packages = [get_test_pkg(name="tomcatjss",
                              filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
                 get_test_pkg(name="tomcatjss",
-                             filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm"),
+                             filename="tomcatjss-7.3.8-1.el8+1944+b6c8e16f.noarch.rpm"),
                 get_test_pkg(name="tomcatjss",
-                             filename="tomcatjss-7.3.8-1.el8+1944+b6c8e16f.noarch.rpm")]
-
+                             filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm")]
+    packages.sort()
     mock_ubipop_runner.keep_n_latest_packages(packages)
 
     assert len(packages) == 1
     assert "7.3.8" in packages[0].filename
+
+
+def test_keep_n_newest_packages_multi_arch(mock_ubipop_runner):
+    packages = [get_test_pkg(name="tomcatjss",
+                             filename="tomcatjss-7.3.6-1.noarch.rpm"),
+                get_test_pkg(name="tomcatjss",
+                             filename="tomcatjss-7.3.6-1.x86_64.rpm"),
+                get_test_pkg(name="tomcatjss",
+                             filename="tomcatjss-7.3.6-1.i686.rpm"),
+                get_test_pkg(name="tomcatjss",
+                             filename="tomcatjss-7.3.5-1.i686.rpm"),
+                ]
+
+    packages.sort()
+    mock_ubipop_runner.keep_n_latest_packages(packages)
+
+    assert len(packages) == 3
+    arches_expected = ['noarch', 'x86_64', 'i686']
+    arches_current = []
+    for pkg in packages:
+        _, _, _, _, arch = splitFilename(pkg.filename)
+        arches_current.append(arch)
+    assert sorted(arches_current) == sorted(arches_expected)
 
 
 def test_keep_n_newest_packages_with_referenced_pkg_in_module(mock_ubipop_runner):
