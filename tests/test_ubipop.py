@@ -7,9 +7,11 @@ import logging
 import sys
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
-from ubipop._utils import AssociateActionModules, UnassociateActionModules, splitFilename
-from mock import MagicMock
-from mock import patch
+
+from ubipop._utils import (AssociateActionModules, UnassociateActionModules,
+                           AssociateActionModuleDefaults, UnassociateActionModuleDefaults,
+                           splitFilename)
+from mock import MagicMock, patch, call
 from more_executors import Executors
 from copy import deepcopy
 
@@ -466,19 +468,15 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     mock_ubipop_runner.repos.source_rpms = {"test_srpm": [get_test_pkg(name="test_srpm",
                                                           filename="test_srpm.src.rpm")]}
 
-    associations, unassociations = \
+    associations, unassociations, mdd_assocition, mdd_unassociation = \
         mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
 
     # firstly, check correct associations, there should 1 unit of each type associated
-    modules, module_defaults, rpms, srpms, debug_rpms = associations
+    modules, rpms, srpms, debug_rpms = associations
     assert len(modules.units) == 1
     assert modules.units[0].name == "test_md"
     assert modules.dst_repo.repo_id == "ubi-foo-rpms"
     assert modules.src_repo.repo_id == "foo-rpms"
-
-    assert len(module_defaults.units) == 1
-    assert module_defaults.dst_repo.repo_id == 'ubi-foo-rpms'
-    assert module_defaults.src_repo.repo_id == 'foo-rpms'
 
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "test_rpm"
@@ -496,14 +494,10 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     assert debug_rpms.src_repo.repo_id == "foo-debug"
 
     # secondly, check correct unassociations, there should 1 unit of each type unassociated
-    modules, module_defaults, rpms, srpms, debug_rpms = unassociations
+    modules, rpms, srpms, debug_rpms = unassociations
     assert len(modules.units) == 1
     assert modules.units[0].name == "md_current"
     assert modules.dst_repo.repo_id == "ubi-foo-rpms"
-
-    assert len(module_defaults.units) == 1
-    assert module_defaults.units[0].name == 'mdd_current'
-    assert module_defaults.dst_repo.repo_id == 'ubi-foo-rpms'
 
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "rpm_current"
@@ -516,6 +510,15 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     assert len(debug_rpms.units) == 1
     assert debug_rpms.units[0].name == "debug_rpm_current"
     assert debug_rpms.dst_repo.repo_id == "ubi-foo-debug"
+
+    assert len(mdd_assocition.units) == 1
+    assert mdd_assocition.dst_repo.repo_id == 'ubi-foo-rpms'
+    assert mdd_assocition.src_repo.repo_id == 'foo-rpms'
+
+    assert len(mdd_unassociation.units) == 1
+    assert mdd_unassociation.units[0].name == 'mdd_current'
+    assert mdd_unassociation.dst_repo.repo_id == 'ubi-foo-rpms'
+
 
 
 def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft):
@@ -533,21 +536,21 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
                                                                        filename=
                                                                        "srpm_current.src.rpm")]}
 
-    associations, unassociations = \
+    associations, unassociations, mdd_assocition, mdd_unassociation = \
         mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
 
     # firstly, check correct associations, there should 0 units associated
-    modules, module_defaults, rpms, srpms, debug_rpms = associations
+    modules, rpms, srpms, debug_rpms = associations
     assert len(modules.units) == 0
-    assert len(module_defaults.units) == 0
+    assert len(mdd_assocition.units) == 0
     assert len(rpms.units) == 0
     assert len(srpms.units) == 0
     assert len(debug_rpms.units) == 0
 
     # secondly, check correct unassociations, there should 0 units unassociated
-    modules, module_defaults, rpms, srpms, debug_rpms = unassociations
+    modules, rpms, srpms, debug_rpms = unassociations
     assert len(modules.units) == 0
-    assert len(module_defaults.units) == 0
+    assert len(mdd_unassociation.units) == 0
     assert len(rpms.units) == 0
     assert len(srpms.units) == 0
     assert len(debug_rpms.units) == 0
@@ -603,6 +606,27 @@ def test_associate_units(mock_ubipop_runner):
 
     assert len(ret) == 1
     assert ret[0].result() == ["task_id"]
+
+
+def test_associate_unassociate_md_defaults(mock_ubipop_runner):
+    src_repo = get_test_repo(repo_id='test_src')
+    dst_repo = get_test_repo(repo_id='tets_dst')
+    associations = [AssociateActionModuleDefaults(
+        [get_test_mod_defaults(name='virt',
+                               stream='rhel',
+                               profiles={'2.5': ["common"]})], dst_repo, src_repo)]
+    unassociations = [UnassociateActionModuleDefaults(
+        [get_test_mod_defaults(name='virt',
+                               stream='rhel',
+                               profiles={'2.5': ["unique"]})], dst_repo)]
+    mock_ubipop_runner.pulp.unassociate_module_defaults.return_value = ['task_id_0']
+    mock_ubipop_runner.pulp.associate_module_defaults.return_value = ['task_id_1']
+
+    mock_ubipop_runner._associate_unassociate_md_defaults(associations, unassociations)
+
+    # the calls has to be in order
+    calls = [call(['task_id_0']), call(['task_id_1'])]
+    mock_ubipop_runner.pulp.wait_for_tasks.assert_has_calls(calls)
 
 
 def test_finalize_rpms_output_set(mock_ubipop_runner):

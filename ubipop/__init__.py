@@ -363,9 +363,6 @@ class UbiPopulateRunner(object):
         associations = (AssociateActionModules(modules_assoc,
                                                self.repos.out_repos.rpm,
                                                self.repos.in_repos.rpm),
-                        AssociateActionModuleDefaults(md_defaults_assoc,
-                                                      self.repos.out_repos.rpm,
-                                                      self.repos.in_repos.rpm),
                         AssociateActionRpms(rpms_assoc,
                                             self.repos.out_repos.rpm,
                                             self.repos.in_repos.rpm),
@@ -375,16 +372,21 @@ class UbiPopulateRunner(object):
                         AssociateActionRpms(debug_assoc,
                                             self.repos.out_repos.debug,
                                             self.repos.in_repos.debug)
-                        )
+                       )
 
         unassociations = (UnassociateActionModules(modules_unassoc, self.repos.out_repos.rpm),
-                          UnassociateActionModuleDefaults(md_defaults_unassoc,
-                                                          self.repos.out_repos.rpm),
                           UnassociateActionRpms(rpms_unassoc, self.repos.out_repos.rpm),
                           UnassociateActionRpms(srpms_unassoc, self.repos.out_repos.source),
                           UnassociateActionRpms(debug_unassoc, self.repos.out_repos.debug))
 
-        return associations, unassociations
+        mdd_association = AssociateActionModuleDefaults(md_defaults_assoc,
+                                                        self.repos.out_repos.rpm,
+                                                        self.repos.in_repos.rpm)
+
+        mdd_unassociation = UnassociateActionModuleDefaults(md_defaults_unassoc,
+                                                            self.repos.out_repos.rpm)
+
+        return associations, unassociations, mdd_association, mdd_unassociation
 
     def _diff_modules_by_nsvca(self, modules_1, modules_2):
         return self._diff_lists_by_attr(modules_1, modules_2, 'nsvca')
@@ -416,28 +418,28 @@ class UbiPopulateRunner(object):
         self._match_module_defaults()
         self._create_srpms_output_set()
 
-        associations, unassociations = self._get_pulp_actions(current_modules_ft,
-                                                              current_module_defaults_ft,
-                                                              current_rpms_ft,
-                                                              current_srpms_ft,
-                                                              current_debug_rpms_ft)
+        associations, unassociations, mdd_association, mdd_unassociation = \
+            self._get_pulp_actions(current_modules_ft,
+                                   current_module_defaults_ft,
+                                   current_rpms_ft,
+                                   current_srpms_ft,
+                                   current_debug_rpms_ft)
 
         if self.dry_run:
             self.log_curent_content(current_modules_ft, current_module_defaults_ft,
                                     current_rpms_ft, current_srpms_ft, current_debug_rpms_ft)
-            self.log_pulp_actions(associations, unassociations)
+            self.log_pulp_actions(associations+mdd_association,
+                                  unassociations+mdd_unassociation)
         else:
             fts = []
             fts.extend(self._associate_unassociate_units(associations + unassociations))
             # wait for associate/unassociate tasks
-            for ft in as_completed(fts):
-                tasks = ft.result()
-                if tasks:
-                    self.pulp.wait_for_tasks(tasks)
+            self._wait_pulp(fts)
+
+            self._associate_unassociate_md_defaults(mdd_association, mdd_unassociation)
 
             # wait repo publication
-            for ft in as_completed(self._publish_out_repos()):
-                self.pulp.wait_for_tasks(ft.result())
+            self._wait_pulp(self._publish_out_repos())
 
     def _associate_unassociate_units(self, action_list):
         fts = []
@@ -446,6 +448,24 @@ class UbiPopulateRunner(object):
                 fts.append(self._executor.submit(*action.get_action(self.pulp)))
 
         return fts
+
+    def _associate_unassociate_md_defaults(self, action_md_ass, action_md_unass):
+        """
+        Unassociate old module defaults units first, wait until done and
+        then start new units association
+        """
+        fts_unass = self._associate_unassociate_units(action_md_unass)
+        self._wait_pulp(fts_unass)
+
+        fts_ass = self._associate_unassociate_units(action_md_ass)
+        self._wait_pulp(fts_ass)
+
+    def _wait_pulp(self, futures):
+        # wait for pulp tasks from futures
+        for ft in as_completed(futures):
+            tasks = ft.result()
+            if tasks:
+                self.pulp.wait_for_tasks(tasks)
 
     def log_curent_content(self, current_modules_ft, current_module_defaults_ft,
                            current_rpms_ft, current_srpms_ft, current_debug_rpms_ft):
