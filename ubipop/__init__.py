@@ -436,7 +436,7 @@ class UbiPopulateRunner(object):
             # wait for associate/unassociate tasks
             self._wait_pulp(fts)
 
-            self._associate_unassociate_md_defaults(mdd_association, mdd_unassociation)
+            self._associate_unassociate_md_defaults((mdd_association,), (mdd_unassociation,))
 
             # wait repo publication
             self._wait_pulp(self._publish_out_repos())
