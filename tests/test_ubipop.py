@@ -7,8 +7,10 @@ import logging
 import sys
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
+
 from ubipop._utils import (AssociateActionModules, UnassociateActionModules,
-                           AssociateActionModuleDefaults, UnassociateActionModuleDefaults)
+                           AssociateActionModuleDefaults, UnassociateActionModuleDefaults,
+                           splitFilename)
 from mock import MagicMock, patch, call
 from more_executors import Executors
 from copy import deepcopy
@@ -124,15 +126,21 @@ def test_packages_names_by_profiles_all_profiles(mock_ubipop_runner):
 
 def test_sort_packages(mock_ubipop_runner):
     packages = [
-        get_test_pkg(filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
-        get_test_pkg(filename="tomcatjss-5.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
-        get_test_pkg(filename="tomcatjss-9.3.6-1.el8+1944+b6c8e16f.noarch.rpm")]
+        get_test_pkg(filename="rubygems-2.0.14-26.el7_1.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.14-25.el7_1.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.14.1-33.el7_6.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.14.1-34.el7_6.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.13.1-34.el7_6.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.13.2-34.el7_6.noarch.rpm")]
 
     mock_ubipop_runner.sort_packages(packages)
 
-    assert "5.3.6" in packages[0].filename
-    assert "7.3.6" in packages[1].filename
-    assert "9.3.6" in packages[2].filename
+    assert "2.0.13.1-34" in packages[0].filename
+    assert "2.0.13.2-34" in packages[1].filename
+    assert "2.0.14-25" in packages[2].filename
+    assert "2.0.14-26" in packages[3].filename
+    assert "2.0.14.1-33" in packages[4].filename
+    assert "2.0.14.1-34" in packages[5].filename
 
 
 def test_keep_n_latest_modules(mock_ubipop_runner):
@@ -253,14 +261,37 @@ def test_keep_n_newest_packages(mock_ubipop_runner):
     packages = [get_test_pkg(name="tomcatjss",
                              filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"),
                 get_test_pkg(name="tomcatjss",
-                             filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm"),
+                             filename="tomcatjss-7.3.8-1.el8+1944+b6c8e16f.noarch.rpm"),
                 get_test_pkg(name="tomcatjss",
-                             filename="tomcatjss-7.3.8-1.el8+1944+b6c8e16f.noarch.rpm")]
-
+                             filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm")]
+    packages.sort()
     mock_ubipop_runner.keep_n_latest_packages(packages)
 
     assert len(packages) == 1
     assert "7.3.8" in packages[0].filename
+
+
+def test_keep_n_newest_packages_multi_arch(mock_ubipop_runner):
+    packages = [get_test_pkg(name="tomcatjss",
+                             filename="tomcatjss-7.3.6-1.noarch.rpm"),
+                get_test_pkg(name="tomcatjss",
+                             filename="tomcatjss-7.3.6-1.x86_64.rpm"),
+                get_test_pkg(name="tomcatjss",
+                             filename="tomcatjss-7.3.6-1.i686.rpm"),
+                get_test_pkg(name="tomcatjss",
+                             filename="tomcatjss-7.3.5-1.i686.rpm"),
+                ]
+
+    packages.sort()
+    mock_ubipop_runner.keep_n_latest_packages(packages)
+
+    assert len(packages) == 3
+    arches_expected = ['noarch', 'x86_64', 'i686']
+    arches_current = []
+    for pkg in packages:
+        _, _, _, _, arch = splitFilename(pkg.filename)
+        arches_current.append(arch)
+    assert sorted(arches_current) == sorted(arches_expected)
 
 
 def test_keep_n_newest_packages_with_referenced_pkg_in_module(mock_ubipop_runner):

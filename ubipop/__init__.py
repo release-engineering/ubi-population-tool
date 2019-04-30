@@ -635,6 +635,7 @@ class UbiPopulateRunner(object):
         """
         Keep n latest non-modular packages,
         modular packages are kept only if they are referenced by some of remaining modules
+        Parameter packages: sorted list of Packages objects, oldest goes first
         """
         packages_to_keep = []
         non_modular_pkgs = []
@@ -650,4 +651,15 @@ class UbiPopulateRunner(object):
             else:
                 non_modular_pkgs.append(package)
 
-        packages[:] = non_modular_pkgs[-n:] + packages_to_keep
+        # filter non-modular pkgs per arches, there can be rpms with different arches
+        # for package in one repository
+        pkgs_per_arch = defaultdict(list)
+        for pkg in non_modular_pkgs:
+            _, _, _, _, arch = splitFilename(pkg.filename)
+            pkgs_per_arch[arch].append(pkg)
+
+        latest_pkgs_per_arch = []
+        for pkgs in pkgs_per_arch.values():
+            latest_pkgs_per_arch += pkgs[-n:]
+
+        packages[:] = latest_pkgs_per_arch + packages_to_keep
