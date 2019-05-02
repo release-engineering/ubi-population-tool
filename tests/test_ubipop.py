@@ -611,18 +611,18 @@ def test_associate_units(mock_ubipop_runner):
 def test_associate_unassociate_md_defaults(mock_ubipop_runner):
     src_repo = get_test_repo(repo_id='test_src')
     dst_repo = get_test_repo(repo_id='tets_dst')
-    associations = [AssociateActionModuleDefaults(
+    associations = AssociateActionModuleDefaults(
         [get_test_mod_defaults(name='virt',
                                stream='rhel',
-                               profiles={'2.5': ["common"]})], dst_repo, src_repo)]
-    unassociations = [UnassociateActionModuleDefaults(
+                               profiles={'2.5': ["common"]})], dst_repo, src_repo)
+    unassociations = UnassociateActionModuleDefaults(
         [get_test_mod_defaults(name='virt',
                                stream='rhel',
-                               profiles={'2.5': ["unique"]})], dst_repo)]
+                               profiles={'2.5': ["unique"]})], dst_repo)
     mock_ubipop_runner.pulp.unassociate_module_defaults.return_value = ['task_id_0']
     mock_ubipop_runner.pulp.associate_module_defaults.return_value = ['task_id_1']
 
-    mock_ubipop_runner._associate_unassociate_md_defaults(associations, unassociations)
+    mock_ubipop_runner._associate_unassociate_md_defaults((associations,), (unassociations,))
 
     # the calls has to be in order
     calls = [call(['task_id_0']), call(['task_id_1'])]

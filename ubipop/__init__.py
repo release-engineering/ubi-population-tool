@@ -426,17 +426,24 @@ class UbiPopulateRunner(object):
                                    current_debug_rpms_ft)
 
         if self.dry_run:
-            self.log_curent_content(current_modules_ft, current_module_defaults_ft,
-                                    current_rpms_ft, current_srpms_ft, current_debug_rpms_ft)
-            self.log_pulp_actions(associations+mdd_association,
-                                  unassociations+mdd_unassociation)
+            self.log_curent_content(
+                current_modules_ft,
+                current_module_defaults_ft,
+                current_rpms_ft,
+                current_srpms_ft,
+                current_debug_rpms_ft,
+            )
+            self.log_pulp_actions(
+                associations + (mdd_association,),
+                unassociations + (mdd_unassociation,),
+            )
         else:
             fts = []
             fts.extend(self._associate_unassociate_units(associations + unassociations))
             # wait for associate/unassociate tasks
             self._wait_pulp(fts)
 
-            self._associate_unassociate_md_defaults(mdd_association, mdd_unassociation)
+            self._associate_unassociate_md_defaults((mdd_association,), (mdd_unassociation,))
 
             # wait repo publication
             self._wait_pulp(self._publish_out_repos())
