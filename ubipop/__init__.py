@@ -192,15 +192,21 @@ class UbiPopulateRunner(object):
                 profiles = fts[ft][1]
                 self.repos.modules[name_stream].extend(input_modules)
 
-                # Add packages from module profiles
-                packages_names = self.get_packages_names_by_profiles(profiles, input_modules)
-
-                for package_name in packages_names:
-                    module_packages = self.get_packages_from_module(package_name, input_modules)
-
-                    # for reference which pkgs are from modules
+                if profiles:
+                    # Include packages from module profiles only.
+                    packages_names = self.get_packages_names_by_profiles(profiles, input_modules)
+                    for package_name in packages_names:
+                        module_packages = self.get_packages_from_module(input_modules,
+                                                                        package_name)
+                        # for reference which pkgs are from modules
+                        self.repos.pkgs_from_modules[name_stream].extend(module_packages)
+                        self.repos.packages[package_name].extend(module_packages)
+                else:
+                    # Include every package from module artifacts.
+                    module_packages = self.get_packages_from_module(input_modules)
                     self.repos.pkgs_from_modules[name_stream].extend(module_packages)
-                    self.repos.packages[package_name].extend(module_packages)
+                    for package in module_packages:
+                        self.repos.packages[package.name].append(package)
 
     def _match_module_defaults(self):
         """Try to find modulemd_defaults units in the same repo with the same
@@ -619,9 +625,9 @@ class UbiPopulateRunner(object):
 
         return packages_names
 
-    def get_packages_from_module(self, package_name, input_modules):
+    def get_packages_from_module(self, input_modules, package_name=None):
         """
-        Gathers packages from modules by package name
+        Gathers packages from module.
         """
         rpms = []
         regex = r'\d+:'
@@ -633,8 +639,10 @@ class UbiPopulateRunner(object):
                 # skip source package, they are calculated in later stage
                 if arch == 'src':
                     continue
-                if name == package_name:
-                    rpms.append(Package(name, rpm_without_epoch + '.rpm', is_modular=True))
+                if package_name and name != package_name:
+                    continue
+
+                rpms.append(Package(name, rpm_without_epoch + '.rpm', is_modular=True))
 
         return rpms
 
