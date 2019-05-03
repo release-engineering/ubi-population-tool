@@ -1,0 +1,52 @@
+content_sets:
+  rpm:
+    output: ubi-8-for-x86_64-appstream-rpms
+    input: rhel-8-for-x86_64-appstream-rpms
+  srpm:
+    output: ubi-8-for-x86_64-appstream-source-rpms
+    input: rhel-8-for-x86_64-appstream-source-rpms
+  debuginfo:
+    output: ubi-8-for-x86_64-appstream-debug-rpms
+    input: rhel-8-for-x86_64-appstream-debug-rpms
+
+arches:
+  - src
+  - x86_64
+
+packages:
+  include:
+  - go-srpm-macros.*
+  - go-toolset.*
+  - golang.*
+  - golang-bin.*
+  - golang-docs.*
+  - golang-misc.*
+  - golang-race.*
+  - golang-src.*
+  - golang-tests.*
+  exclude:
+  - python36
+  - kernel
+  - kernel-doc
+  - kmod-kvdo
+  - kernel.src
+  - kernel-debug-debuginfo
+  - kernel-debuginfo
+  - kernel-debuginfo-common-aarch64
+  - kernel-debuginfo-common-ppc64le
+  - kernel-debuginfo-common-s390x
+  - kernel-debuginfo-common-x86_64
+  - kernel-tools-debuginfo
+  - linux-firmware
+  - grub2
+  - grub2-common
+  - grub2-tools
+  - grub2-tools-minimal
+  - grubby
+  - redhat-release-eula
+  - s390utils-base
+
+modules:
+  include:
+  - name: go-toolset
+    stream: rhel8

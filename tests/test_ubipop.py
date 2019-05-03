@@ -245,6 +245,32 @@ def test_match_modules(mock_ubipop_runner):
     assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
     assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
 
+
+def test_match_modules_without_profile(ubi_repo_set, executor):
+    test_ubiconf = ubiconfig.get_loader(TEST_DATA_DIR).load('ubiconf_golang.yaml')
+    mocked_ubipop_runner = UbiPopulateRunner(MagicMock(), ubi_repo_set, test_ubiconf, False, executor)
+    mocked_ubipop_runner.pulp.search_modules.return_value = \
+        [get_test_mod(name="go-toolset",
+                      profiles={"common": ["go-toolset"]},
+                      packages=[
+                          "go-toolset-0:1.11.5-1.module+el8+2774+11afa8b5.x86_64",
+                          "golang-0:1.11.5-1.module+el8+2774+11afa8b5.x86_64",
+                          "golang-bin-0:1.11.5-1.module+el8+2774+11afa8b5.x86_64",
+                          "golang-docs-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
+                          "golang-misc-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
+                          "golang-race-0:1.11.5-1.module+el8+2774+11afa8b5.x86_64",
+                          "golang-src-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
+                          "golang-tests-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
+                      ])]
+
+    mocked_ubipop_runner._match_modules()
+
+    assert len(mocked_ubipop_runner.repos.modules) == 1
+    assert len(mocked_ubipop_runner.repos.modules['go-toolsetrhel8']) == 1
+    assert mocked_ubipop_runner.repos.modules['go-toolsetrhel8'][0].name == 'go-toolset'
+    assert len(mocked_ubipop_runner.repos.pkgs_from_modules['go-toolsetrhel8']) == 8
+
+
 def test_match_module_defaults(mock_ubipop_runner):
     mock_ubipop_runner.repos.modules['n1s1'] = [get_test_mod(name="virt",
                                                              profiles={'2.5': ["common"]},
