@@ -1,10 +1,17 @@
 import pytest
-from ubipop._utils import (PulpAction, AssociateAction, AssociateActionModules,
-                           AssociateActionModuleDefaults, UnassociateActionModuleDefaults,
-                           AssociateActionRpms, UnassociateActionRpms,
-                           UnassociateActionModules)
-from ubipop._pulp_client import Repo
+
 from mock import MagicMock
+from ubipop._utils import (
+    AssociateAction,
+    AssociateActionModuleDefaults,
+    AssociateActionModules,
+    AssociateActionRpms,
+    PulpAction,
+    UnassociateActionModuleDefaults,
+    UnassociateActionModules,
+    UnassociateActionRpms,
+)
+from ubipop._pulp_client import Repo
 
 
 def test_raise_not_implemented_pulp_action():
@@ -22,11 +29,11 @@ def test_raise_not_implemented_associate_action():
     pytest.raises(NotImplementedError, action.get_action, None)
 
 
-@pytest.mark.parametrize("klass, method",
-                         [(AssociateActionModules, "associate_modules"),
-                          (AssociateActionModuleDefaults, "associate_module_defaults"),
-                          (AssociateActionRpms, "associate_packages")]
-                         )
+@pytest.mark.parametrize("klass, method", [
+    (AssociateActionModules, "associate_modules"),
+    (AssociateActionModuleDefaults, "associate_module_defaults"),
+    (AssociateActionRpms, "associate_packages"),
+])
 def test_get_action_associate(klass, method):
     units = ["unit1", "unit2"]
     dst_repo = Repo("test_dst", "1", "2", None)
@@ -41,11 +48,11 @@ def test_get_action_associate(klass, method):
     assert src_repo_current.repo_id == src_repo.repo_id
 
 
-@pytest.mark.parametrize("klass, method",
-                         [(UnassociateActionModules, "unassociate_modules"),
-                          (UnassociateActionModuleDefaults, "unassociate_module_defaults"),
-                          (UnassociateActionRpms, "unassociate_packages")]
-                         )
+@pytest.mark.parametrize("klass, method", [
+    (UnassociateActionModules, "unassociate_modules"),
+    (UnassociateActionModuleDefaults, "unassociate_module_defaults"),
+    (UnassociateActionRpms, "unassociate_packages"),
+])
 def test_get_action_unassociate(klass, method):
     units = ["unit1", "unit2"]
     dst_repo = Repo("test_dst", "1", "2", None)

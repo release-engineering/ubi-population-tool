@@ -9,7 +9,7 @@ import ubiconfig
 import ubipop
 
 from ubipop._pulp_client import Pulp
-from ubipop._utils import splitFilename as split_filename
+from ubipop._utils import split_filename
 
 
 PULP_HOSTNAME = os.getenv('TEST_PULP_HOSTNAME')

@@ -1,17 +1,23 @@
-import re
 import logging
-import ubiconfig
-from more_executors import Executors
-from concurrent.futures import as_completed
+import re
+
 from collections import namedtuple, defaultdict
-from ubipop._pulp_client import Pulp, Package
-from ubipop._utils import (splitFilename, AssociateActionModules,
-                           AssociateActionModuleDefaults,
-                           AssociateActionRpms,
-                           UnassociateActionModules,
-                           UnassociateActionModuleDefaults,
-                           UnassociateActionRpms)
+from concurrent.futures import as_completed
 from itertools import chain
+
+import ubiconfig
+
+from more_executors import Executors
+from ubipop._pulp_client import Pulp, Package
+from ubipop._utils import (
+    split_filename,
+    AssociateActionModules,
+    AssociateActionModuleDefaults,
+    AssociateActionRpms,
+    UnassociateActionModules,
+    UnassociateActionModuleDefaults,
+    UnassociateActionRpms,
+)
 
 _LOG = logging.getLogger("ubipop")
 
@@ -339,8 +345,11 @@ class UbiPopulateRunner(object):
         return self._determine_pulp_actions(modules, current, self._diff_modules_by_nsvca)
 
     def _get_pulp_actions_md_defaults(self, module_defaults, current):
-        return self._determine_pulp_actions(module_defaults, current,
-            self._diff_md_defaults_by_profiles)
+        return self._determine_pulp_actions(
+            module_defaults,
+            current,
+            self._diff_md_defaults_by_profiles,
+        )
 
     def _get_pulp_actions_pkgs(self, pkgs, current):
         return self._determine_pulp_actions(pkgs, current, self._diff_packages_by_filename)
@@ -568,7 +577,7 @@ class UbiPopulateRunner(object):
         blacklisted_pkgs = []
         for pattern_name, globbing, pattern_arch in self._parse_blacklist_config():
             for package in package_list:
-                name, _, _, _, arch = splitFilename(package.filename)
+                name, _, _, _, arch = split_filename(package.filename)
                 blacklisted = False
                 if globbing:
                     if name.startswith(pattern_name):
@@ -643,7 +652,7 @@ class UbiPopulateRunner(object):
         for module in input_modules:
             for rpm_nevra in module.packages:
                 rpm_without_epoch = reg.sub('', rpm_nevra)
-                name, _, _, _, arch = splitFilename(rpm_without_epoch)
+                name, _, _, _, arch = split_filename(rpm_without_epoch)
                 # skip source package, they are taken from pkgs metadata
                 if arch == 'src':
                     continue
@@ -653,12 +662,16 @@ class UbiPopulateRunner(object):
 
                 # Check existence of rpm in binary rpm repo
                 rpms = self.pulp.search_rpms(self.repos.in_repos.rpm, filename=rpm_filename)
+
                 if rpms:
                     ret_rpms.append(rpms[0])
                 else:
                     # Check existence of rpm in debug repo
-                    debug_rpms = self.pulp.search_rpms(self.repos.in_repos.debug,
-                                                      filename=rpm_filename)
+                    debug_rpms = self.pulp.search_rpms(
+                        self.repos.in_repos.debug,
+                        filename=rpm_filename,
+                    )
+
                     if debug_rpms:
                         ret_debug_rpms.append(debug_rpms[0])
                     else:
@@ -692,7 +705,7 @@ class UbiPopulateRunner(object):
         # for package in one repository
         pkgs_per_arch = defaultdict(list)
         for pkg in non_modular_pkgs:
-            _, _, _, _, arch = splitFilename(pkg.filename)
+            _, _, _, _, arch = split_filename(pkg.filename)
             pkgs_per_arch[arch].append(pkg)
 
         latest_pkgs_per_arch = []

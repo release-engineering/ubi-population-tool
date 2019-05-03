@@ -1,14 +1,17 @@
-import requests
-from urllib3.util.retry import Retry
-import os
-
-import time
 import logging
-from cmp_version import cmp_version
+import os
+import time
+
+from urllib3.util.retry import Retry
+
 try:
     from urllib.parse import urljoin
 except ImportError:
     from urlparse import urljoin
+
+import requests
+
+from cmp_version import cmp_version
 
 _LOG = logging.getLogger("ubipop")
 

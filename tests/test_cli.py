@@ -1,7 +1,9 @@
-from ubipop.cli import main
-import pytest
-import mock
 import sys
+
+import mock
+import pytest
+
+from ubipop.cli import main
 
 
 @pytest.fixture()
@@ -120,4 +122,3 @@ def test_output_file(mock_ubipopulate):
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [], None,
                                              False, 4, '/foo/out/repos.txt')
-
