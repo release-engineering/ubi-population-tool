@@ -87,7 +87,7 @@ def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
     assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source"])
 
 
-def test_get_packages_from_module(mock_ubipop_runner):
+def test_get_packages_from_module_by_name(mock_ubipop_runner):
     package_name = "postgresql"
     input_modules = \
         [get_test_mod(
@@ -97,12 +97,26 @@ def test_get_packages_from_module(mock_ubipop_runner):
                       "postgresql-contrib-debuginfo-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
                       )]
 
-    pkgs_from_modules = mock_ubipop_runner.get_packages_from_module(package_name, input_modules)
+    pkgs_from_modules = mock_ubipop_runner.get_packages_from_module(input_modules, package_name)
     assert len(pkgs_from_modules) == 1
     pkg = pkgs_from_modules[0]
     assert pkg.name == "postgresql"
     # filename is without  epoch
     assert pkg.filename == "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"
+
+
+def test_get_packages_from_module(mock_ubipop_runner):
+    input_modules = \
+        [get_test_mod(
+            packages=["postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
+                      "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
+                      "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
+                      "postgresql-contrib-debuginfo-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
+                      )]
+
+    pkgs_from_modules = mock_ubipop_runner.get_packages_from_module(input_modules)
+    assert len(pkgs_from_modules) == 3
+    pkg = pkgs_from_modules[0]
 
 
 def test_packages_names_by_profiles(mock_ubipop_runner):
