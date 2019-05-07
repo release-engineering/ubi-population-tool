@@ -191,22 +191,27 @@ class UbiPopulateRunner(object):
                 name_stream = fts[ft][0]
                 profiles = fts[ft][1]
                 self.repos.modules[name_stream].extend(input_modules)
-
                 if profiles:
                     # Include packages from module profiles only.
                     packages_names = self.get_packages_names_by_profiles(profiles, input_modules)
                     for package_name in packages_names:
                         module_packages = self.get_packages_from_module(input_modules,
                                                                         package_name)
+
+                        rpms, debug_rpms = module_packages
                         # for reference which pkgs are from modules
-                        self.repos.pkgs_from_modules[name_stream].extend(module_packages)
-                        self.repos.packages[package_name].extend(module_packages)
+                        self.repos.pkgs_from_modules[name_stream].extend(rpms + debug_rpms)
+                        self.repos.packages[package_name].extend(rpms)
+                        self.repos.debug_rpms[package_name].extend(debug_rpms)
                 else:
                     # Include every package from module artifacts.
                     module_packages = self.get_packages_from_module(input_modules)
-                    self.repos.pkgs_from_modules[name_stream].extend(module_packages)
-                    for package in module_packages:
+                    rpms, debug_rpms = module_packages
+                    self.repos.pkgs_from_modules[name_stream].extend(rpms + debug_rpms)
+                    for package in rpms:
                         self.repos.packages[package.name].append(package)
+                    for package in debug_rpms:
+                        self.repos.debug_rpms[package.name].append(package)
 
     def _match_module_defaults(self):
         """Try to find modulemd_defaults units in the same repo with the same
@@ -610,7 +615,7 @@ class UbiPopulateRunner(object):
                 modules to process
 
         Returns:
-            list of str:
+            set of str:
                 names of packages within matching modules & profiles
         """
         packages_names = []
@@ -623,28 +628,44 @@ class UbiPopulateRunner(object):
                 for packages in module.profiles.values():
                     packages_names.extend(packages)
 
-        return packages_names
+        return list(set(packages_names))
 
     def get_packages_from_module(self, input_modules, package_name=None):
         """
         Gathers packages from module.
         """
-        rpms = []
+        ret_rpms = []
+        ret_debug_rpms = []
+
         regex = r'\d+:'
         reg = re.compile(regex)
         for module in input_modules:
             for rpm_nevra in module.packages:
                 rpm_without_epoch = reg.sub('', rpm_nevra)
                 name, _, _, _, arch = splitFilename(rpm_without_epoch)
-                # skip source package, they are calculated in later stage
+                # skip source package, they are taken from pkgs metadata
                 if arch == 'src':
                     continue
                 if package_name and name != package_name:
                     continue
+                rpm_filename = rpm_without_epoch + '.rpm'
 
-                rpms.append(Package(name, rpm_without_epoch + '.rpm', is_modular=True))
-
-        return rpms
+                # Check existence of rpm in binary rpm repo
+                rpms = self.pulp.search_rpms(self.repos.in_repos.rpm, filename=rpm_filename)
+                if rpms:
+                    ret_rpms.append(rpms[0])
+                else:
+                    # Check existence of rpm in debug repo
+                    debug_rpms = self.pulp.search_rpms(self.repos.in_repos.debug,
+                                                      filename=rpm_filename)
+                    if debug_rpms:
+                        ret_debug_rpms.append(debug_rpms[0])
+                    else:
+                        _LOG.warning("RPM %s is unavailable in input repos %s %s, skipping",
+                                     rpm_filename, self.repos.in_repos.rpm.repo_id,
+                                     self.repos.in_repos.debug.repo_id
+                                     )
+        return ret_rpms, ret_debug_rpms
 
     def keep_n_latest_packages(self, packages, n=1):
         """

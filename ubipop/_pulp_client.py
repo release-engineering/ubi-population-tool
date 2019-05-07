@@ -81,7 +81,7 @@ class Pulp(object):
 
         return repos
 
-    def search_rpms(self, repo, name=None, arch=None, name_globbing=False):
+    def search_rpms(self, repo, name=None, arch=None, name_globbing=False, filename=None):
         url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
         criteria = {"type_ids": ["rpm", "srpm"]}
 
@@ -92,11 +92,13 @@ class Pulp(object):
             else:
                 filters["filters"]["unit"]["name"] = name
 
-            criteria.update(filters)
         if arch:
             filters["filters"]["unit"]["arch"] = arch
-            criteria.update(filters)
 
+        if filename:
+            filters["filters"]["unit"]["filename"] = filename
+
+        criteria.update(filters)
         payload = {"criteria": criteria}
         ret = self.do_request("post", url, payload)
         rpms = []
@@ -105,6 +107,7 @@ class Pulp(object):
             metadata = item['metadata']
             rpms.append(Package(metadata['name'], metadata['filename'], metadata.get('sourcerpm'),
                                 metadata.get('is_modular', False)))
+
         return rpms
 
     def search_modules(self, repo, name=None, stream=None):

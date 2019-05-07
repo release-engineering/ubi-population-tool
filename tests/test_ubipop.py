@@ -93,14 +93,18 @@ def test_get_packages_from_module_by_name(mock_ubipop_runner):
         [get_test_mod(
             packages=["postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
                       "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-                      "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-                      "postgresql-contrib-debuginfo-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
+                      "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
                       )]
 
-    pkgs_from_modules = mock_ubipop_runner.get_packages_from_module(input_modules, package_name)
-    assert len(pkgs_from_modules) == 1
-    pkg = pkgs_from_modules[0]
-    assert pkg.name == "postgresql"
+    packages_fnames = ["postgresql-9.6.10-1.module+el8+2470+d1bafa0e.src.rpm",
+                       "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
+                       "postgresql-contrib-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"]
+
+    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(packages_fnames)
+    rpms, debug_rpms = mock_ubipop_runner.get_packages_from_module(input_modules, package_name)
+    assert len(rpms) == 1
+    assert len(debug_rpms) == 0
+    pkg = rpms[0]
     # filename is without  epoch
     assert pkg.filename == "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"
 
@@ -110,23 +114,49 @@ def test_get_packages_from_module(mock_ubipop_runner):
         [get_test_mod(
             packages=["postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
                       "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-                      "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-                      "postgresql-contrib-debuginfo-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
+                      "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
                       )]
 
-    pkgs_from_modules = mock_ubipop_runner.get_packages_from_module(input_modules)
-    assert len(pkgs_from_modules) == 3
-    pkg = pkgs_from_modules[0]
+    packages_fnames = ["postgresql-9.6.10-1.module+el8+2470+d1bafa0e.src.rpm",
+                       "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
+                       "postgresql-contrib-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"]
+
+    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(packages_fnames)
+
+    rpms, debug_rpms = mock_ubipop_runner.get_packages_from_module(input_modules)
+    assert len(rpms) == 2 # srpm is not included
+    assert len(debug_rpms) == 0  # no debug rpm in this testcase
+
+
+def test_get_packages_from_module_debuginfo(mock_ubipop_runner):
+    input_modules = \
+        [get_test_mod(
+            packages=["postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
+                      "postgresql-contrib-debuginfo-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64"]
+        )]
+
+    packages_fnames = ["postgresql-9.6.10-1.module+el8+2470+d1bafa0e.src.rpm",
+                       "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
+                       "postgresql-contrib-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
+                       "postgresql-contrib-debuginfo-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"]
+
+    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(packages_fnames,
+                                                                                   debug_only=True)
+
+    rpms, debug_rpms = mock_ubipop_runner.get_packages_from_module(input_modules)
+    assert len(rpms) == 0  # no srpm or binary rpm are included
+    assert len(debug_rpms) == 1  # one debug rpm in this testcase
+    assert debug_rpms[0].filename == \
+           "postgresql-contrib-debuginfo-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"
 
 
 def test_packages_names_by_profiles(mock_ubipop_runner):
     profiles_from_ubiconfig = ["prof2", "prof3"]
-    profiles = {"prof1": ["pkg1", "pkg2"], 'prof2': ["pkg3"]}
+    profiles = {"prof1": ["pkg1", "pkg2"], 'prof2': ["pkg3"], 'prof3': ["pkg3", "pkg4"]}
     modules = [get_test_mod(profiles=profiles)]
     pkg_names = mock_ubipop_runner.get_packages_names_by_profiles(profiles_from_ubiconfig, modules)
 
-    assert len(pkg_names) == 1
-    assert pkg_names[0] == "pkg3"
+    assert sorted(pkg_names) == ["pkg3", "pkg4"]
 
 
 def test_packages_names_by_profiles_all_profiles(mock_ubipop_runner):
@@ -204,10 +234,22 @@ def test_get_blacklisted_packages_match_arch(mock_ubipop_runner):
     assert "x86_64" in blacklist[0].filename
 
 
-def _get_search_rpms_side_effect(package_name):
-    def _f(*args):
-        if args[1] == package_name:
-            return [get_test_pkg(name=package_name)]
+def _get_search_rpms_side_effect(package_name_or_filename_or_list, debug_only=False):
+    def _f(*args, **kwargs):
+        if debug_only and "debug" not in args[0].repo_id:
+            return
+
+        if len(args) > 1 and args[1] == package_name_or_filename_or_list:
+            return [get_test_pkg(name=args[1])]
+
+        if isinstance(package_name_or_filename_or_list, list):
+            if kwargs['filename'] in package_name_or_filename_or_list:
+                return [get_test_pkg(name=splitFilename(kwargs['filename'])[0],
+                                     filename=kwargs['filename'])]
+
+        if 'filename' in kwargs and package_name_or_filename_or_list == kwargs['filename']:
+            return [get_test_pkg(name=splitFilename(kwargs['filename'])[0],
+                                 filename=kwargs['filename'])]
 
     return _f
 
@@ -235,7 +277,8 @@ def test_match_modules(mock_ubipop_runner):
         [get_test_mod(name="m1",
                       profiles={'prof1': ["tomcatjss"]},
                       packages=["tomcatjss-0:7.3.6-1.el8+1944+b6c8e16f.noarch"])]
-
+    pkg_filename = "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
+    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(pkg_filename)
     mock_ubipop_runner._match_modules()
 
     assert len(mock_ubipop_runner.repos.modules) == 1
@@ -263,12 +306,26 @@ def test_match_modules_without_profile(ubi_repo_set, executor):
                           "golang-tests-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
                       ])]
 
+    packages_fnames = [
+                          "go-toolset-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm",
+                          "golang-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm",
+                          "golang-bin-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm",
+                          "golang-docs-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
+                          "golang-misc-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
+                          "golang-race-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm",
+                          "golang-src-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
+                          "golang-tests-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
+                      ]
+
+    mocked_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(packages_fnames)
     mocked_ubipop_runner._match_modules()
 
     assert len(mocked_ubipop_runner.repos.modules) == 1
     assert len(mocked_ubipop_runner.repos.modules['go-toolsetrhel8']) == 1
     assert mocked_ubipop_runner.repos.modules['go-toolsetrhel8'][0].name == 'go-toolset'
     assert len(mocked_ubipop_runner.repos.pkgs_from_modules['go-toolsetrhel8']) == 8
+    assert len(mocked_ubipop_runner.repos.packages) == 8
+    assert len(mocked_ubipop_runner.repos.debug_rpms) == 0
 
 
 def test_match_module_defaults(mock_ubipop_runner):
