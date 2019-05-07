@@ -615,7 +615,7 @@ class UbiPopulateRunner(object):
                 modules to process
 
         Returns:
-            set of str:
+            list of str:
                 names of packages within matching modules & profiles
         """
         packages_names = []
