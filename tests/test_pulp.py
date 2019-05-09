@@ -65,9 +65,14 @@ def mock_response_for_async_req():
 
 
 @pytest.fixture()
-def search_rpms_response():
+def search_rpms_response(request):
+    try:
+        pkg_number = request.param
+    except AttributeError:
+        pkg_number = 1
     yield [{"metadata": {"name": "foo-pkg", "filename": "foo-pkg.rpm",
-                         "sourcerpm": "foo-pkg.src.rpm", "is_modular": False}}]
+                         "sourcerpm": "foo-pkg.src.rpm", "is_modular": False}}
+           for _ in range(pkg_number)]
 
 
 @pytest.fixture()
@@ -82,6 +87,7 @@ def search_modules_response():
 def search_module_defaults_response():
     yield [{"metadata": {"name": "virt", "stream": "rhel",
                          "profiles": {"rhel": ["default", "common"]}}}]
+
 
 @pytest.fixture()
 def mock_search_rpms(requests_mock, mock_repo, search_rpms_response):
@@ -177,6 +183,12 @@ def test_search_rpms(mock_pulp, mock_search_rpms, mock_repo):
     assert found_rpms[0].filename == "foo-pkg.rpm"
     assert found_rpms[0].sourcerpm_filename == "foo-pkg.src.rpm"
     assert found_rpms[0].is_modular is False
+
+
+@pytest.mark.parametrize('search_rpms_response', [0, 1, 2], indirect=True)
+def test_search_rpms_by_filename(mock_pulp, mock_search_rpms, mock_repo, search_rpms_response):
+    found_rpms = mock_pulp.search_rpms(mock_repo, filename="foo-pkg.rpm")
+    assert len(search_rpms_response) == len(found_rpms)
 
 
 def test_search_modules(mock_pulp, mock_search_modules, mock_repo):
