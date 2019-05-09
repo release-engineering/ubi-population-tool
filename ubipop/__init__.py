@@ -319,8 +319,9 @@ class UbiPopulateRunner(object):
                 _LOG.warning("Package %s doesn't reference its source rpm", package.name)
                 continue
 
-            self.repos.source_rpms[package.name].append(Package(package.name,
-                                                                package.sourcerpm_filename))
+            self.repos.source_rpms[package.name].append(
+                Package(package.name, package.sourcerpm_filename)
+            )
 
         blacklisted_srpms = self.get_blacklisted_packages(
             list(chain.from_iterable(self.repos.source_rpms.values())))

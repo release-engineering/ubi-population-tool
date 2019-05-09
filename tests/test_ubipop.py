@@ -59,8 +59,9 @@ def get_test_repo(**kwargs):
 
 
 def get_test_pkg(**kwargs):
-    return Package(kwargs.get('name'), kwargs.get('filename'), kwargs.get('sourcerpm_filename'),
-                   kwargs.get('is_modular', False))
+    return Package(kwargs.get('name'), kwargs.get('filename'),
+                   sourcerpm_filename=kwargs.get('sourcerpm_filename'),
+                   is_modular=kwargs.get('is_modular', False))
 
 
 def get_test_mod(**kwargs):
