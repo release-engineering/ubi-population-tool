@@ -1,5 +1,5 @@
 # borrowed from https://github.com/rpm-software-management/yum
-def splitFilename(filename):
+def split_filename(filename):
     """
     Pass in a standard style rpm fullname
 
@@ -11,22 +11,24 @@ def splitFilename(filename):
     if filename[-4:] == '.rpm':
         filename = filename[:-4]
 
-    archIndex = filename.rfind('.')
-    arch = filename[archIndex + 1:]
+    arch_index = filename.rfind('.')
+    arch = filename[arch_index + 1:]
 
-    relIndex = filename[:archIndex].rfind('-')
-    rel = filename[relIndex + 1:archIndex]
+    rel_index = filename[:arch_index].rfind('-')
+    rel = filename[rel_index + 1:arch_index]
 
-    verIndex = filename[:relIndex].rfind('-')
-    ver = filename[verIndex + 1:relIndex]
+    ver_index = filename[:rel_index].rfind('-')
+    ver = filename[ver_index + 1:rel_index]
 
-    epochIndex = filename.find(':')
-    if epochIndex == -1:
+    epoch_index = filename.find(':')
+
+    if epoch_index == -1:
         epoch = ''
     else:
-        epoch = filename[:epochIndex]
+        epoch = filename[:epoch_index]
 
-    name = filename[epochIndex + 1:verIndex]
+    name = filename[epoch_index + 1:ver_index]
+
     return name, ver, rel, epoch, arch
 
 
@@ -74,6 +76,7 @@ class UnassociateActionModuleDefaults(PulpAction):
 
     def get_action(self, pulp_client_inst):
         return pulp_client_inst.unassociate_module_defaults, self.dst_repo, self.units
+
 
 class AssociateActionRpms(AssociateAction):
     TYPE = "packages"

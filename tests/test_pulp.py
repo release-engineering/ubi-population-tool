@@ -1,22 +1,16 @@
-import mock
-import os
-import six
-from ubipop._pulp_client import Repo, Package, ModuleDefaults, Pulp, HTTP_TOTAL_RETRIES
-import pytest
 import sys
-
 
 try:
     from http.client import HTTPMessage
 except ImportError:
     from httplib import HTTPMessage
 
+import pytest
+import six
+
+from mock import MagicMock, patch
 from requests.exceptions import HTTPError
-
-import ubipop._pulp_client
-
-
-import requests_mock
+from ubipop._pulp_client import Repo, Package, ModuleDefaults, Pulp, HTTP_TOTAL_RETRIES
 
 ORIG_HTTP_TOTAL_RETRIES = HTTP_TOTAL_RETRIES
 
@@ -27,6 +21,8 @@ if sys.version_info <= (2, 7,):
     def requests_mock():
         with rm.Mocker() as m:
             yield m
+else:
+    import requests_mock
 
 
 @pytest.fixture()
@@ -36,17 +32,27 @@ def mock_pulp():
 
 @pytest.fixture()
 def search_repo_response():
-    yield [{"id": "test_repo",
-            "notes":
-                {"arch": "x86_64",
-                 "platform_full_version": "7"},
-            "distributors": [{"id": "dist_id", "distributor_type_id": "d_type_id"}]}]
+    yield [{
+        "id": "test_repo",
+        "notes": {
+            "arch": "x86_64",
+            "platform_full_version": "7",
+        },
+        "distributors": [{
+            "id": "dist_id",
+            "distributor_type_id": "d_type_id",
+        }],
+    }]
 
 
 @pytest.fixture()
 def mock_repo():
-    yield Repo("test_repo", "x86_64", "7", [("dist_id_1", "dist_type_id_1"),
-                                            ("dist_id_2", "dist_type_id_2")])
+    yield Repo(
+        "test_repo", "x86_64", "7", [
+            ("dist_id_1", "dist_type_id_1"),
+            ("dist_id_2", "dist_type_id_2"),
+        ],
+    )
 
 
 @pytest.fixture()
@@ -70,23 +76,45 @@ def search_rpms_response(request):
         pkg_number = request.param
     except AttributeError:
         pkg_number = 1
-    yield [{"metadata": {"name": "foo-pkg", "filename": "foo-pkg.rpm",
-                         "sourcerpm": "foo-pkg.src.rpm", "is_modular": False}}
-           for _ in range(pkg_number)]
+
+    yield [{
+        "metadata": {
+            "name": "foo-pkg",
+            "filename": "foo-pkg.rpm",
+            "sourcerpm": "foo-pkg.src.rpm",
+            "is_modular": False,
+        }
+    } for _ in range(pkg_number)]
 
 
 @pytest.fixture()
 def search_modules_response():
-    yield [{"metadata": {"name": "foo-module", "stream": "9.6", "version": 1111,
-                         "context": "foo-context",
-                         "arch": "x86_64",  'artifacts': ["foo-pkg"],
-                         'profiles': {"foo-prof": ["pkg-name"]}}}]
+    yield [{
+        "metadata": {
+            "name": "foo-module",
+            "stream": "9.6",
+            "version": 1111,
+            "context": "foo-context",
+            "arch": "x86_64",
+            'artifacts': ["foo-pkg"],
+            'profiles': {
+                "foo-prof": ["pkg-name"]
+            },
+        },
+    }]
 
 
 @pytest.fixture()
 def search_module_defaults_response():
-    yield [{"metadata": {"name": "virt", "stream": "rhel",
-                         "profiles": {"rhel": ["default", "common"]}}}]
+    yield [{
+        "metadata": {
+            "name": "virt",
+            "stream": "rhel",
+            "profiles": {
+                "rhel": ["default", "common"]
+            },
+        },
+    }]
 
 
 @pytest.fixture()
@@ -227,13 +255,13 @@ def test_wait_for_tasks(mock_pulp, mock_search_task):
 
 @pytest.fixture()
 def mocked_getresponse():
-    with mock.patch("urllib3.connectionpool.HTTPConnectionPool._get_conn") as mocked_get_conn:
+    with patch("urllib3.connectionpool.HTTPConnectionPool._get_conn") as mocked_get_conn:
         yield mocked_get_conn.return_value.getresponse
 
 
 @pytest.fixture()
 def set_backoff_to_zero_fixture(mock_pulp):
-    patcher = mock.patch("ubipop._pulp_client.Pulp._make_session")
+    patcher = patch("ubipop._pulp_client.Pulp._make_session")
     orig = mock_pulp._make_session
     patched = patcher.start()
     patched.side_effect = lambda: [
@@ -245,9 +273,9 @@ def set_backoff_to_zero_fixture(mock_pulp):
 
 
 def make_mock_response(status, text=None):
-    m = mock.MagicMock(name='MockResponse', status=status)
+    m = MagicMock(name='MockResponse', status=status)
     m.isclosed.side_effect = [False, True]
-    m.msg = mock.MagicMock(spec=HTTPMessage, headers=[], status=status)
+    m.msg = MagicMock(spec=HTTPMessage, headers=[], status=status)
     m.read.return_value = six.b(text)
     return m
 
@@ -258,20 +286,20 @@ def make_mock_response(status, text=None):
         # test everything is retryable
         (True, 500, None, "search_repo_by_cs", ("",), '{}', HTTP_TOTAL_RETRIES),
         (True, 500, None, "search_rpms",
-         (mock.MagicMock(repo_id='fake_id'),), '[]', HTTP_TOTAL_RETRIES),
+         (MagicMock(repo_id='fake_id'),), '[]', HTTP_TOTAL_RETRIES),
         (True, 500, None, "search_modules",
-         (mock.MagicMock(repo_id='fake_id'),), '[]', HTTP_TOTAL_RETRIES),
+         (MagicMock(repo_id='fake_id'),), '[]', HTTP_TOTAL_RETRIES),
         (True, 500, None, "wait_for_tasks", (['fake-tid'],),
          '{"state":"finished","task_id":"fake-tid"}', HTTP_TOTAL_RETRIES),
-        (True, 500, None, "search_tasks", ([mock.MagicMock()],), '[]', HTTP_TOTAL_RETRIES),
-        (True, 500, None, "unassociate_units", ((2 * (mock.MagicMock(), )) + (['rpm'], )),
+        (True, 500, None, "search_tasks", ([MagicMock()],), '[]', HTTP_TOTAL_RETRIES),
+        (True, 500, None, "unassociate_units", ((2 * (MagicMock(), )) + (['rpm'], )),
          '{"spawned_tasks":[]}', HTTP_TOTAL_RETRIES),
-        (True, 500, None, "associate_units", (mock.MagicMock(repo_id='fake_id'),
-                                              mock.MagicMock(repo_id='fake_id'),
-                                              mock.MagicMock(), ['rpm'], ),
+        (True, 500, None, "associate_units", (MagicMock(repo_id='fake_id'),
+                                              MagicMock(repo_id='fake_id'),
+                                              MagicMock(), ['rpm'], ),
          '{"spawned_tasks":[]}', HTTP_TOTAL_RETRIES),
         (True, 500, None, "publish_repo", (
-            mock.MagicMock(distributors_ids_type_ids_tuples=[('a', 'b')]), ),
+            MagicMock(distributors_ids_type_ids_tuples=[('a', 'b')]), ),
          '{"spawned_tasks":[]}', HTTP_TOTAL_RETRIES),
 
         # test custom number of retries
@@ -281,8 +309,9 @@ def make_mock_response(status, text=None):
         (False, 400, 3, "search_repo_by_cs", ("",), '{}', 3),
     ]
 )
-def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp, should_retry, err_status_code,
-                 env_retries, retry_call, retry_args, ok_response, expected_retries):
+def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp,
+                 should_retry, err_status_code, env_retries, retry_call,
+                 retry_args, ok_response, expected_retries):
     global HTTP_TOTAL_RETRIES
     try:
         if env_retries:

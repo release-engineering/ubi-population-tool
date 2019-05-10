@@ -1,7 +1,8 @@
-import ubipop
-import sys
 import argparse
 import logging
+import sys
+
+import ubipop
 
 DEFAULT_LOG_FMT = "%(asctime)s [%(levelname)-8s] %(message)s"
 DEFAULT_DATE_FMT = "%Y-%m-%d %H:%M:%S %z"
