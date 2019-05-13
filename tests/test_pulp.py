@@ -269,8 +269,8 @@ def fixture_mocked_getresponse():
         yield mocked_get_conn.return_value.getresponse
 
 
-@pytest.fixture(name='set_backoff_to_zero_fixture')
-def fixture_set_backoff_to_zero_fixture(mock_pulp):
+@pytest.fixture(name='set_backoff_to_zero')
+def fixture_set_backoff_to_zero(mock_pulp):
     patcher = patch("ubipop._pulp_client.Pulp._make_session")
     orig = mock_pulp._make_session # pylint: disable=protected-access
     patched = patcher.start()
@@ -319,7 +319,7 @@ def make_mock_response(status, text=None):
         (False, 400, 3, "search_repo_by_cs", ("",), '{}', 3),
     ]
 )
-def test_retries(set_backoff_to_zero_fixture, mocked_getresponse, mock_pulp,
+def test_retries(set_backoff_to_zero, mocked_getresponse, mock_pulp,
                  should_retry, err_status_code, env_retries, retry_call,
                  retry_args, ok_response, expected_retries):
     # pylint: disable=unused-argument
