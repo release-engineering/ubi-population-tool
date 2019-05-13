@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 import time
 
 from urllib3.util.retry import Retry
@@ -42,30 +43,34 @@ class Pulp(object):
         self.auth = auth
         self.scheme = "https://"
         self.base_url = urljoin(self.scheme + hostname, self.PULP_API)
-        self.session = None
-        self.adapter = None
         self.insecure = insecure
+        self.local = threading.local()
 
     def _make_session(self):
-        self.session = requests.Session()
-        self.adapter = PulpRetryAdapter()
-        self.session.mount('http://', self.adapter)
-        self.session.mount('https://', self.adapter)
+        adapter = PulpRetryAdapter()
+
+        self.local.session = requests.Session()
+        self.local.session.mount('http://', adapter)
+        self.local.session.mount('https://', adapter)
+
         if len(self.auth) == 1:
-            self.session.cert = self.auth[0]
+            self.local.session.cert = self.auth[0]
         else:
-            self.session.auth = self.auth
+            self.local.session.auth = self.auth
 
     def do_request(self, req_type, url, data=None):
-        if self.session is None:
+        if not hasattr(self.local, 'session'):
             self._make_session()
 
         req_url = urljoin(self.base_url, url)
-        ret = None
+
         if req_type == "post":
-            ret = self.session.post(req_url, json=data, verify=not self.insecure)
+            ret = self.local.session.post(req_url, json=data, verify=not self.insecure)
         elif req_type == "get":
-            ret = self.session.get(req_url, verify=not self.insecure)
+            ret = self.local.session.get(req_url, verify=not self.insecure)
+        else:
+            ret = None
+
         return ret
 
     def search_repo_by_cs(self, content_set):
