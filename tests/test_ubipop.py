@@ -24,8 +24,8 @@ from ubipop._utils import (
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), './data')
 
 
-@pytest.fixture()
-def ubi_repo_set():
+@pytest.fixture(name='ubi_repo_set')
+def fixture_ubi_repo_set():
     yield UbiRepoSet(RepoSet(get_test_repo(repo_id="foo-rpms"),
                              get_test_repo(repo_id="foo-source"),
                              get_test_repo(repo_id="foo-debug")),
@@ -34,8 +34,8 @@ def ubi_repo_set():
                              get_test_repo(repo_id="ubi-foo-debug")))
 
 
-@pytest.fixture()
-def ubi_repo_set_no_debug():
+@pytest.fixture(name='ubi_repo_set_no_debug')
+def fixture_ubi_repo_set_no_debug():
     yield UbiRepoSet(RepoSet(get_test_repo(repo_id="foo-rpms"),
                              get_test_repo(repo_id="foo-source"),
                              None),
@@ -44,18 +44,18 @@ def ubi_repo_set_no_debug():
                              None))
 
 
-@pytest.fixture()
-def test_ubiconfig():
+@pytest.fixture(name='test_ubiconfig')
+def fixture_test_ubiconfig():
     yield ubiconfig.get_loader(TEST_DATA_DIR).load("conf.yaml")
 
 
-@pytest.fixture()
-def executor():
+@pytest.fixture(name='executor')
+def fixture_executor():
     yield Executors.thread_pool(max_workers=1).with_retry()
 
 
-@pytest.fixture()
-def mock_ubipop_runner(ubi_repo_set, test_ubiconfig, executor):
+@pytest.fixture(name='mock_ubipop_runner')
+def fixture_mock_ubipop_runner(ubi_repo_set, test_ubiconfig, executor):
     yield UbiPopulateRunner(MagicMock(), ubi_repo_set, test_ubiconfig, False, executor)
 
 
@@ -313,7 +313,7 @@ def _get_search_rpms_side_effect(package_name_or_filename_or_list, debug_only=Fa
 def test_match_binary_rpms(mock_ubipop_runner):
     package_name = 'foo-pkg'
     mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(package_name)
-    mock_ubipop_runner._match_binary_rpms()
+    mock_ubipop_runner._match_binary_rpms() # pylint: disable=protected-access
 
     assert len(mock_ubipop_runner.repos.packages) == 1
     assert mock_ubipop_runner.repos.packages[package_name][0].name == package_name
@@ -322,7 +322,7 @@ def test_match_binary_rpms(mock_ubipop_runner):
 def test_match_debug_rpms(mock_ubipop_runner):
     package_name = 'foo-pkg-debuginfo'
     mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(package_name)
-    mock_ubipop_runner._match_debug_rpms()
+    mock_ubipop_runner._match_debug_rpms() # pylint: disable=protected-access
 
     assert len(mock_ubipop_runner.repos.debug_rpms) == 1
     assert mock_ubipop_runner.repos.debug_rpms[package_name][0].name == package_name
@@ -335,7 +335,7 @@ def test_match_modules(mock_ubipop_runner):
                       packages=["tomcatjss-0:7.3.6-1.el8+1944+b6c8e16f.noarch"])]
     pkg_filename = "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
     mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(pkg_filename)
-    mock_ubipop_runner._match_modules()
+    mock_ubipop_runner._match_modules() # pylint: disable=protected-access
 
     assert len(mock_ubipop_runner.repos.modules) == 1
     assert len(mock_ubipop_runner.repos.modules["n1s1"]) == 1
@@ -383,8 +383,11 @@ def test_match_modules_without_profile(ubi_repo_set, executor):
         "golang-tests-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
     ]
 
-    mocked_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(packages_fnames)
-    mocked_ubipop_runner._match_modules()
+    mocked_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(
+        packages_fnames,
+    ) # pylint: disable=protected-access
+
+    mocked_ubipop_runner._match_modules() # pylint: disable=protected-access
 
     assert len(mocked_ubipop_runner.repos.modules) == 1
     assert len(mocked_ubipop_runner.repos.modules['go-toolsetrhel8']) == 1
@@ -402,7 +405,7 @@ def test_match_module_defaults(mock_ubipop_runner):
         get_test_mod_defaults(name='virt', stream='rhel', profiles={'2.5': ["common"]}),
     ]
 
-    mock_ubipop_runner._match_module_defaults()
+    mock_ubipop_runner._match_module_defaults() # pylint: disable=protected-access
 
     assert len(mock_ubipop_runner.repos.module_defaults) == 1
     md_d = mock_ubipop_runner.repos.module_defaults['virtrhel']
@@ -422,7 +425,7 @@ def test_diff_modules(mock_ubipop_runner):
         get_test_mod(name='4'),
     ]
 
-    diff = mock_ubipop_runner._diff_modules_by_nsvca(curr, expected)
+    diff = mock_ubipop_runner._diff_modules_by_nsvca(curr, expected) # pylint: disable=protected-access
 
     assert len(diff) == 1
     assert diff[0].name == '1'
@@ -548,27 +551,29 @@ def test_ubi_repo_set(rhel_repo_set, ubi_repo_set, fail, caplog):
         assert 'ERROR' not in caplog.text
 
 
-@pytest.fixture()
-def mocked_ubiconfig_load():
+@pytest.fixture(name='mocked_ubiconfig_load')
+def fixture_mocked_ubiconfig_load():
     with patch('ubiconfig.get_loader') as get_loader:
         get_loader.return_value.load.return_value = "test"
         yield get_loader
 
 
 def test_ubipopulate_load_ubiconfig(mocked_ubiconfig_load):
+    # pylint: disable=unused-argument
     ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False, ['cfg.yaml'])
     assert len(ubipop.ubiconfig_list) == 1
     assert ubipop.ubiconfig_list[0] == "test"
 
 
-@pytest.fixture()
-def mocked_ubiconfig_load_all():
+@pytest.fixture(name='mocked_ubiconfig_load_all')
+def fixture_mocked_ubiconfig_load_all():
     with patch('ubiconfig.get_loader') as get_loader:
         get_loader.return_value.load_all.return_value = ["test"]
         yield get_loader
 
 
 def test_ubipopulate_load_all_ubiconfig(mocked_ubiconfig_load_all):
+    # pylint: disable=unused-argument
     ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False)
     assert len(ubipop.ubiconfig_list) == 1
     assert ubipop.ubiconfig_list[0] == "test"
@@ -589,7 +594,7 @@ def test_create_srpms_output_set(mock_ubipop_runner):
         ),
     ]
 
-    mock_ubipop_runner._create_srpms_output_set()
+    mock_ubipop_runner._create_srpms_output_set() # pylint: disable=protected-access
 
     out_srpms = mock_ubipop_runner.repos.source_rpms
     assert len(out_srpms) == 1
@@ -606,7 +611,7 @@ def test_create_srpms_output_set_missings_srpm_reference(capsys, set_logging, mo
         ),
     ]
 
-    mock_ubipop_runner._create_srpms_output_set()
+    mock_ubipop_runner._create_srpms_output_set() # pylint: disable=protected-access
 
     out_srpms = mock_ubipop_runner.repos.source_rpms
     assert len(out_srpms) == 0
@@ -616,21 +621,22 @@ def test_create_srpms_output_set_missings_srpm_reference(capsys, set_logging, mo
     assert out.strip() == "Package tomcatjss doesn't reference its source rpm"
 
 
-@pytest.fixture()
-def mock_get_repo_pairs(ubi_repo_set):
+@pytest.fixture(name='mock_get_repo_pairs')
+def fixture_mock_get_repo_pairs(ubi_repo_set):
     with patch('ubipop.UbiPopulate._get_input_and_output_repo_pairs') as get_repo_pairs:
         get_repo_pairs.return_value = [ubi_repo_set]
         yield get_repo_pairs
 
 
-@pytest.fixture()
-def mock_run_ubi_population():
+@pytest.fixture(name='mock_run_ubi_population')
+def fixture_mock_run_ubi_population():
     with patch('ubipop.UbiPopulateRunner.run_ubi_population') as run_ubi_population:
         yield run_ubi_population
 
 
 def test_create_output_file_all_repos(mock_ubipop_runner, mock_get_repo_pairs,
                                       mocked_ubiconfig_load_all, mock_run_ubi_population):
+    # pylint: disable=unused-argument
     path = tempfile.mkdtemp("ubipop")
     try:
         out_file_path = os.path.join(path, 'output.txt')
@@ -646,8 +652,8 @@ def test_create_output_file_all_repos(mock_ubipop_runner, mock_get_repo_pairs,
         shutil.rmtree(path)
 
 
-@pytest.fixture()
-def mock_current_content_ft():
+@pytest.fixture(name='mock_current_content_ft')
+def fixture_mock_current_content_ft():
     current_modules_ft = MagicMock()
     current_rpms_ft = MagicMock()
     current_srpms_ft = MagicMock()
@@ -702,7 +708,7 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     }
 
     associations, unassociations, mdd_association, mdd_unassociation = \
-        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
+        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=protected-access
 
     # firstly, check correct associations, there should 1 unit of each type associated
     modules, rpms, srpms, debug_rpms = associations
@@ -782,7 +788,7 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
     }
 
     associations, unassociations, mdd_association, mdd_unassociation = \
-        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
+        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=protected-access
 
     # firstly, check correct associations, there should 0 units associated
     modules, rpms, srpms, debug_rpms = associations
@@ -801,8 +807,8 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
     assert len(debug_rpms.units) == 0
 
 
-@pytest.fixture()
-def set_logging():
+@pytest.fixture(name='set_logging')
+def fixture_set_logging():
     logger = logging.getLogger("ubipop")
     logger.setLevel(logging.DEBUG)
     yield logger
@@ -850,7 +856,7 @@ def test_associate_units(mock_ubipop_runner):
     ]
 
     mock_ubipop_runner.pulp.associate_modules.return_value = ["task_id"]
-    ret = mock_ubipop_runner._associate_unassociate_units(associations)
+    ret = mock_ubipop_runner._associate_unassociate_units(associations) # pylint: disable=protected-access
 
     assert len(ret) == 1
     assert ret[0].result() == ["task_id"]
@@ -879,7 +885,11 @@ def test_associate_unassociate_md_defaults(mock_ubipop_runner):
     mock_ubipop_runner.pulp.unassociate_module_defaults.return_value = ['task_id_0']
     mock_ubipop_runner.pulp.associate_module_defaults.return_value = ['task_id_1']
 
-    mock_ubipop_runner._associate_unassociate_md_defaults((associations,), (unassociations,))
+    # pylint: disable=protected-access
+    mock_ubipop_runner._associate_unassociate_md_defaults(
+        (associations,),
+        (unassociations,),
+    )
 
     # the calls has to be in order
     calls = [call(['task_id_0']), call(['task_id_1'])]
@@ -899,7 +909,7 @@ def test_finalize_rpms_output_set(mock_ubipop_runner):
         ),
     ]
 
-    mock_ubipop_runner._finalize_rpms_output_set()
+    mock_ubipop_runner._finalize_rpms_output_set() # pylint: disable=protected-access
 
     out_packages = mock_ubipop_runner.repos.packages['tomcatjss']
     assert len(out_packages) == 1
@@ -919,7 +929,7 @@ def test_finalize_debug_output_set(mock_ubipop_runner):
         ),
     ]
 
-    mock_ubipop_runner._finalize_debug_output_set()
+    mock_ubipop_runner._finalize_debug_output_set() # pylint: disable=protected-access
     out_packages = mock_ubipop_runner.repos.debug_rpms['tomcatjss-debuginfo']
     assert len(out_packages) == 1
     assert out_packages[0].filename == expected_filename
@@ -932,7 +942,7 @@ def test_finalize_finalize_modules_output_set(mock_ubipop_runner):
         get_test_mod(version=3),
     ]
 
-    mock_ubipop_runner._finalize_modules_output_set()
+    mock_ubipop_runner._finalize_modules_output_set() # pylint: disable=protected-access
 
     out_modules = mock_ubipop_runner.repos.modules['test:module']
     assert len(out_modules) == 1
@@ -956,7 +966,7 @@ def test_exclude_blacklisted_packages(mock_ubipop_runner):
         ),
     ]
 
-    mock_ubipop_runner._exclude_blacklisted_packages()
+    mock_ubipop_runner._exclude_blacklisted_packages() # pylint: disable=protected-access
 
     assert len(mock_ubipop_runner.repos.packages) == 0
     # no blacklisting from pkgs from mds
