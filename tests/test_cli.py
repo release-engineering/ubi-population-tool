@@ -6,8 +6,8 @@ import pytest
 from ubipop.cli import main
 
 
-@pytest.fixture()
-def mock_ubipopulate():
+@pytest.fixture(name='mock_ubipopulate')
+def fixture_mock_ubipopulate():
     with mock.patch('ubipop.UbiPopulate') as mocked_ubipopulate:
         yield mocked_ubipopulate
 
