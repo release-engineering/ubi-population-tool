@@ -48,15 +48,16 @@ class Pulp(object):
 
     def _make_session(self):
         adapter = PulpRetryAdapter()
-
-        self.local.session = requests.Session()
-        self.local.session.mount('http://', adapter)
-        self.local.session.mount('https://', adapter)
+        session = requests.Session()
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
 
         if len(self.auth) == 1:
-            self.local.session.cert = self.auth[0]
+            session.cert = self.auth[0]
         else:
-            self.local.session.auth = self.auth
+            session.auth = self.auth
+
+        self.local.session = session
 
     def do_request(self, req_type, url, data=None):
         if not hasattr(self.local, 'session'):

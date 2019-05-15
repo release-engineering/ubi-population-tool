@@ -1,4 +1,5 @@
 import sys
+import threading
 
 try:
     from http.client import HTTPMessage
@@ -370,3 +371,35 @@ def test_make_session(mock_pulp, auth):
     assert isinstance(session, requests.Session)
     assert isinstance(session.get_adapter('http://'), PulpRetryAdapter)
     assert isinstance(session.get_adapter('https://'), PulpRetryAdapter)
+
+
+@pytest.mark.parametrize('count', [
+    (2),
+    (5),
+    (10),
+])
+def test_session_is_not_shared(mock_pulp, count):
+    def make_session(sessions):
+        mock_pulp._make_session() # pylint: disable=protected-access
+        sessions.append(mock_pulp.local.session)
+
+    threads = []
+    sessions = []
+
+    for _ in range(count):
+        t = threading.Thread(target=make_session, args=(sessions,))
+        threads.append(t)
+
+    for t in threads:
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    assert len(sessions) == len(threads) == count
+    assert len(set(sessions)) == len(threads)
+
+    for session in sessions:
+        assert isinstance(session, requests.Session)
+        assert isinstance(session.get_adapter('http://'), PulpRetryAdapter)
+        assert isinstance(session.get_adapter('https://'), PulpRetryAdapter)
