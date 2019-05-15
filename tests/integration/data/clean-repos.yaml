@@ -12,3 +12,7 @@ content_sets:
 arches:
  - src
  - x86_64
+
+packages:
+  include: []
+  exclude: []

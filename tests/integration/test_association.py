@@ -435,7 +435,7 @@ def test_ubipop_can_associate_modules():
             profiles = [md.profiles for md in cfg.modules.whitelist if md.name == md_name][0]
 
             for profile in profiles:
-                pkgs_profile = module['profiles'][profile]
+                pkgs_profile = module['profiles'].get(profile, [])
 
                 for pkg in pkgs_profile:
                     assert pkg in pkgs_found, '"{}" not in the repository.'.format(pkg)
@@ -449,7 +449,7 @@ def test_ubipop_can_associate_modules():
             profiles = [md.profiles for md in cfg.modules.whitelist if md.name == md_name][0]
 
             for profile in profiles:
-                pkgs_profile = module['profiles'][profile]
+                pkgs_profile = module['profiles'].get(profile, [])
 
                 for pkg in pkgs_profile:
                     assert pkg in pkgs_found, '"{}" not in the repository.'.format(pkg)
