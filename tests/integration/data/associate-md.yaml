@@ -13,6 +13,10 @@ arches:
  - src
  - x86_64
 
+packages:
+  include: []
+  exclude: []
+
 modules:
   include:
   - name: httpd
