@@ -1,4 +1,5 @@
 import sys
+import threading
 
 try:
     from http.client import HTTPMessage
@@ -6,14 +7,17 @@ except ImportError:
     from httplib import HTTPMessage
 
 import pytest
+import requests
 import six
 
 from mock import MagicMock, patch
 from requests.exceptions import HTTPError
+
 from ubipop import _pulp_client as pulp_client
-from ubipop._pulp_client import Repo, Package, ModuleDefaults, Pulp
+from ubipop._pulp_client import Repo, Package, ModuleDefaults, Pulp, PulpRetryAdapter
 
 ORIG_HTTP_TOTAL_RETRIES = pulp_client.HTTP_TOTAL_RETRIES
+ORIG_HTTP_RETRY_BACKOFF = pulp_client.HTTP_RETRY_BACKOFF
 
 if sys.version_info <= (2, 7,):
     import requests_mock as rm
@@ -269,19 +273,6 @@ def fixture_mocked_getresponse():
         yield mocked_get_conn.return_value.getresponse
 
 
-@pytest.fixture(name='set_backoff_to_zero')
-def fixture_set_backoff_to_zero(mock_pulp):
-    patcher = patch("ubipop._pulp_client.Pulp._make_session")
-    orig = mock_pulp._make_session # pylint: disable=protected-access
-    patched = patcher.start()
-    patched.side_effect = lambda: [
-        orig(),
-        setattr(mock_pulp.adapter.max_retries, "backoff_factor", 0)
-    ]
-    yield patched
-    patcher.stop()
-
-
 def make_mock_response(status, text=None):
     m = MagicMock(name='MockResponse', status=status)
     m.isclosed.side_effect = [False, True]
@@ -319,10 +310,11 @@ def make_mock_response(status, text=None):
         (False, 400, 3, "search_repo_by_cs", ("",), '{}', 3),
     ]
 )
-def test_retries(set_backoff_to_zero, mocked_getresponse, mock_pulp,
-                 should_retry, err_status_code, env_retries, retry_call,
+def test_retries(mocked_getresponse, mock_pulp, should_retry,
+                 err_status_code, env_retries, retry_call,
                  retry_args, ok_response, expected_retries):
-    # pylint: disable=unused-argument
+    pulp_client.HTTP_RETRY_BACKOFF = 0
+
     try:
         if env_retries:
             pulp_client.HTTP_TOTAL_RETRIES = env_retries
@@ -340,3 +332,74 @@ def test_retries(set_backoff_to_zero, mocked_getresponse, mock_pulp,
                 getattr(mock_pulp, retry_call)(*retry_args)
     finally:
         pulp_client.HTTP_TOTAL_RETRIES = ORIG_HTTP_TOTAL_RETRIES
+        pulp_client.HTTP_RETRY_BACKOFF = ORIG_HTTP_RETRY_BACKOFF
+
+
+@pytest.mark.parametrize('method,called', [
+    ('get', True),
+    ('post', True),
+    ('put', False),
+    ('delete', False),
+])
+def test_do_request(mock_pulp, method, called):
+    mock_pulp.local.session = MagicMock()
+
+    response = mock_pulp.do_request(method, '/foo/bar')
+
+    handler = getattr(mock_pulp.local.session, method)
+
+    if called:
+        handler.assert_called_once()
+        assert response is not None
+    else:
+        handler.assert_not_called()
+        assert response is None
+
+
+@pytest.mark.parametrize('auth', [
+    (['/path/file.crt']),
+    (['user', 'pwd']),
+])
+def test_make_session(mock_pulp, auth):
+    mock_pulp.auth = auth
+    mock_pulp._make_session() # pylint: disable=protected-access
+
+    assert hasattr(mock_pulp.local, 'session')
+
+    session = mock_pulp.local.session
+
+    assert isinstance(session, requests.Session)
+    assert isinstance(session.get_adapter('http://'), PulpRetryAdapter)
+    assert isinstance(session.get_adapter('https://'), PulpRetryAdapter)
+
+
+@pytest.mark.parametrize('count', [
+    (2),
+    (5),
+    (10),
+])
+def test_session_is_not_shared(mock_pulp, count):
+    def make_session(sessions):
+        mock_pulp._make_session() # pylint: disable=protected-access
+        sessions.append(mock_pulp.local.session)
+
+    threads = []
+    sessions = []
+
+    for _ in range(count):
+        t = threading.Thread(target=make_session, args=(sessions,))
+        threads.append(t)
+
+    for t in threads:
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    assert len(sessions) == len(threads) == count
+    assert len(set(sessions)) == len(threads)
+
+    for session in sessions:
+        assert isinstance(session, requests.Session)
+        assert isinstance(session.get_adapter('http://'), PulpRetryAdapter)
+        assert isinstance(session.get_adapter('https://'), PulpRetryAdapter)
