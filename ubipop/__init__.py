@@ -242,7 +242,6 @@ class UbiPopulateRunner(object):
         for module in modules:
             for pkg in module.packages:
                 rpm_without_epoch = reg.sub('', pkg)
-                name, _, _, _, arch = split_filename(rpm_without_epoch)
                 rpm_filename = rpm_without_epoch + '.rpm'
                 pkgs.add(rpm_filename)
 
