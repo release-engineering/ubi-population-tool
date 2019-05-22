@@ -999,7 +999,7 @@ def test_get_pkgs_from_all_modules(mock_ubipop_runner):
                       packages=["tomcatjss-0:8.4.7-2.el8+1944+b6c8e16f.noarch"])
          ]
 
-    pkgs = mock_ubipop_runner._get_pkgs_from_all_modules()  # pylint: disable=protected-
+    pkgs = mock_ubipop_runner._get_pkgs_from_all_modules()  # pylint: disable=protected-access
     assert len(pkgs) == 2
     assert "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm" in pkgs
     assert "tomcatjss-8.4.7-2.el8+1944+b6c8e16f.noarch.rpm" in pkgs
