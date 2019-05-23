@@ -605,7 +605,14 @@ class UbiPopulateRunner(object):
         """
         Keeps n latest modules in modules sorted list
         """
-        modules[:] = modules[-n:]
+        modules_to_keep = []
+        versions_to_keep = sorted(set([m.version for m in modules]))[-n:]
+
+        for module in modules:
+            if module.version in versions_to_keep:
+                modules_to_keep.append(module)
+
+        modules[:] = modules_to_keep
 
     def sort_packages(self, packages):
         """

@@ -5,6 +5,7 @@ import sys
 import tempfile
 
 from copy import deepcopy
+from collections import defaultdict
 
 import pytest
 import ubiconfig
@@ -218,18 +219,51 @@ def test_sort_packages(mock_ubipop_runner):
     assert "2.0.14.1-33" in packages[4].filename
     assert "2.0.14.1-34" in packages[5].filename
 
-
-def test_keep_n_latest_modules(mock_ubipop_runner):
-    sorted_modules = [
-        get_test_mod(version=1),
-        get_test_mod(version=2),
-        get_test_mod(version=3),
+@pytest.mark.parametrize("n, expected_versions_modules",
+                         [(1, {3: 2}), (2, {2: 3, 3: 2}), (3, {1: 1, 2: 3, 3: 2})])
+def test_keep_n_latest_module_duplicate_versions(mock_ubipop_runner, n, expected_versions_modules):
+    # 3 modules with version 2
+    # 2 modules with version 3
+    # 1 modules with version 1
+    modules = [
+        get_test_mod(version=2, context="a"),
+        get_test_mod(version=3, context="b"),
+        get_test_mod(version=1, context="c"),
+        get_test_mod(version=3, context="d"),
+        get_test_mod(version=2, context="f"),
+        get_test_mod(version=2, context="e"),
     ]
 
-    mock_ubipop_runner.keep_n_latest_modules(sorted_modules)
+    mock_ubipop_runner.sort_modules(modules)
+    mock_ubipop_runner.keep_n_latest_modules(modules, n)
 
-    assert len(sorted_modules) == 1
-    assert sorted_modules[0].version == 3
+    current_versions = set([m.version for m in modules])
+    assert current_versions == set(expected_versions_modules.keys())
+
+    md_per_version = defaultdict(list)
+    for module in modules:
+        md_per_version[module.version].append(module)
+
+    for version, modules_number in expected_versions_modules.items():
+        assert len(md_per_version[version]) == modules_number
+        assert len(set([m.context for m in md_per_version[version]])) == modules_number
+
+
+@pytest.mark.parametrize("n, expected_versions",
+                         [(1, [3]), (2, [2, 3]), (3, [1, 2, 3])])
+def test_keep_n_latest_modules_no_duplicate_version(mock_ubipop_runner, n, expected_versions):
+    modules = [
+        get_test_mod(version=2),
+        get_test_mod(version=3),
+        get_test_mod(version=1),
+    ]
+
+    mock_ubipop_runner.sort_modules(modules)
+    mock_ubipop_runner.keep_n_latest_modules(modules, n)
+
+    assert len(modules) == n
+    current_versions = [m.version for m in modules]
+    assert current_versions == expected_versions
 
 
 def test_sort_modules(mock_ubipop_runner):
