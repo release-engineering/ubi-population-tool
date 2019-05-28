@@ -128,6 +128,7 @@ def test_get_packages_from_module_by_name(mock_ubipop_runner):
     pkg = rpms[0]
     # filename is without  epoch
     assert pkg.filename == "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"
+    assert pkg.is_modular is True
 
 
 def test_get_packages_from_module(mock_ubipop_runner):
@@ -152,7 +153,7 @@ def test_get_packages_from_module(mock_ubipop_runner):
     rpms, debug_rpms = mock_ubipop_runner.get_packages_from_module(input_modules)
     assert len(rpms) == 2 # srpm is not included
     assert len(debug_rpms) == 0  # no debug rpm in this testcase
-
+    assert all([rpm.is_modular for rpm in rpms])
 
 def test_get_packages_from_module_debuginfo(mock_ubipop_runner):
     input_modules = [
@@ -290,7 +291,7 @@ def _get_search_rpms_side_effect(package_name_or_filename_or_list, debug_only=Fa
             return
 
         if len(args) > 1 and args[1] == package_name_or_filename_or_list:
-            return [get_test_pkg(name=args[1])]
+            return [get_test_pkg(name=args[1], filename=args[1] + '.rpm')]
 
         if isinstance(package_name_or_filename_or_list, list):
             if kwargs['filename'] in package_name_or_filename_or_list:
@@ -310,13 +311,23 @@ def _get_search_rpms_side_effect(package_name_or_filename_or_list, debug_only=Fa
     return _f
 
 
-def test_match_binary_rpms(mock_ubipop_runner):
-    package_name = 'foo-pkg'
-    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(package_name)
-    mock_ubipop_runner._match_binary_rpms() # pylint: disable=protected-access
+@pytest.mark.parametrize("pkg, modular", [("foo-no-match", False), ("foo-pkg", True)])
+def test_match_binary_rpms(mock_ubipop_runner, pkg, modular):
+    mock_ubipop_runner.pulp.search_modules.return_value = \
+        [get_test_mod(name="m1",
+                      profiles={'prof1': ["tomcatjss"]},
+                      packages=["foo-2-pkg-0:7.3.6-1.el8+1944+b6c8e16f.noarch", pkg]),
+         ]
 
+    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect("foo-pkg")
+
+    mock_ubipop_runner._match_binary_rpms()  # pylint: disable=protected-access
+
+    current_pkg = mock_ubipop_runner.repos.packages["foo-pkg"][0]
     assert len(mock_ubipop_runner.repos.packages) == 1
-    assert mock_ubipop_runner.repos.packages[package_name][0].name == package_name
+    assert current_pkg.name == "foo-pkg"
+    assert current_pkg.filename == "foo-pkg.rpm"
+    assert current_pkg.is_modular is modular
 
 
 def test_match_debug_rpms(mock_ubipop_runner):
@@ -972,3 +983,23 @@ def test_exclude_blacklisted_packages(mock_ubipop_runner):
     # no blacklisting from pkgs from mds
     assert len(mock_ubipop_runner.repos.pkgs_from_modules) == 1
     assert len(mock_ubipop_runner.repos.debug_rpms) == 0
+
+
+def test_get_pkgs_from_all_modules(mock_ubipop_runner):
+    mock_ubipop_runner.pulp.search_modules.return_value = \
+        [get_test_mod(name="m1",
+                      profiles={'prof1': ["tomcatjss"]},
+                      packages=["tomcatjss-0:7.3.6-1.el8+1944+b6c8e16f.noarch"]),
+         get_test_mod(name="m2",
+                      profiles={'prof1': ["tomcatjss"]},
+                      packages=["tomcatjss-0:8.4.7-2.el8+1944+b6c8e16f.noarch"]),
+         # intentionally the same pkg as m2 module, pkgs are not to be duplicated
+         get_test_mod(name="m3",
+                      profiles={'prof1': ["tomcatjss"]},
+                      packages=["tomcatjss-0:8.4.7-2.el8+1944+b6c8e16f.noarch"])
+         ]
+
+    pkgs = mock_ubipop_runner._get_pkgs_from_all_modules()  # pylint: disable=protected-access
+    assert len(pkgs) == 2
+    assert "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm" in pkgs
+    assert "tomcatjss-8.4.7-2.el8+1944+b6c8e16f.noarch.rpm" in pkgs

@@ -234,11 +234,25 @@ class UbiPopulateRunner(object):
             if module_defaults:
                 self.repos.module_defaults[fts[ft]].extend(module_defaults)
 
+    def _get_pkgs_from_all_modules(self):
+        modules = self.pulp.search_modules(self.repos.in_repos.rpm)
+        pkgs = set()
+        regex = r'\d+:'
+        reg = re.compile(regex)
+        for module in modules:
+            for pkg in module.packages:
+                rpm_without_epoch = reg.sub('', pkg)
+                rpm_filename = rpm_without_epoch + '.rpm'
+                pkgs.add(rpm_filename)
+
+        return pkgs
+
     def _match_packages(self, repo, packages_dict):
         """
         Add matching packages from whitelist
         Globbing package name is not supported
         """
+        modular_pkgs = self._get_pkgs_from_all_modules()
         fts = {}
         for package_pattern in self.ubiconfig.packages.whitelist:
             name = package_pattern.name
@@ -249,6 +263,9 @@ class UbiPopulateRunner(object):
         for ft in as_completed(fts):
             packages = ft.result()
             if packages:
+                for pkg in packages:
+                    if pkg.filename in modular_pkgs:
+                        pkg.is_modular = True
                 packages_dict[fts[ft]].extend(packages)
 
     def _match_binary_rpms(self):
@@ -664,6 +681,7 @@ class UbiPopulateRunner(object):
                 rpms = self.pulp.search_rpms(self.repos.in_repos.rpm, filename=rpm_filename)
 
                 if rpms:
+                    rpms[0].is_modular = True
                     ret_rpms.append(rpms[0])
                 else:
                     # Check existence of rpm in debug repo
@@ -673,6 +691,7 @@ class UbiPopulateRunner(object):
                     )
 
                     if debug_rpms:
+                        debug_rpms[0].is_modular = True
                         ret_debug_rpms.append(debug_rpms[0])
                     else:
                         _LOG.warning("RPM %s is unavailable in input repos %s %s, skipping",
