@@ -625,26 +625,34 @@ def test_ubipopulate_load_all_ubiconfig(mocked_ubiconfig_load_all):
 
 
 def test_create_srpms_output_set(mock_ubipop_runner):
-    expected_src_rpm_filename = "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.src.rpm"
     mock_ubipop_runner.repos.packages['foo'] = [
         get_test_pkg(
             name="tomcatjss",
             filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
-            sourcerpm_filename=expected_src_rpm_filename,
+            sourcerpm_filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.src.rpm",
         ),
+        # blacklisted
         get_test_pkg(
             name="kernel",
             filename="kernel-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
             sourcerpm_filename="kernel.src.rpm",
         ),
+        # blacklisted but referenced in some module
+        get_test_pkg(
+            name="foo-pkg",
+            filename="foo-pkg-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
+            sourcerpm_filename="foo-pkg-7.3.6-1.el8+1944+b6c8e16f.src.rpm",
+            is_modular=True,
+        ),
     ]
 
-    mock_ubipop_runner._create_srpms_output_set() # pylint: disable=protected-access
+    mock_ubipop_runner._create_srpms_output_set()  # pylint: disable=protected-access
 
     out_srpms = mock_ubipop_runner.repos.source_rpms
-    assert len(out_srpms) == 1
-    assert out_srpms['tomcatjss'][0].name == "tomcatjss"
-    assert out_srpms['tomcatjss'][0].filename == expected_src_rpm_filename
+    assert len(out_srpms) == 2
+    assert "tomcatjss" and "foo-pkg" in out_srpms
+    assert out_srpms['tomcatjss'][0].filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.src.rpm"
+    assert out_srpms['foo-pkg'][0].filename == "foo-pkg-7.3.6-1.el8+1944+b6c8e16f.src.rpm"
 
 
 def test_create_srpms_output_set_missings_srpm_reference(capsys, set_logging, mock_ubipop_runner):

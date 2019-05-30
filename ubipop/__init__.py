@@ -343,14 +343,19 @@ class UbiPopulateRunner(object):
                 continue
 
             self.repos.source_rpms[package.name].append(
-                Package(package.name, package.sourcerpm_filename)
+                Package(
+                    package.name,
+                    package.sourcerpm_filename,
+                    is_modular=package.is_modular)
             )
 
         blacklisted_srpms = self.get_blacklisted_packages(
-            list(chain.from_iterable(self.repos.source_rpms.values())))
+            list(chain.from_iterable(self.repos.source_rpms.values()))
+        )
 
         for pkg in blacklisted_srpms:
-            self.repos.source_rpms.pop(pkg.name, None)
+            if not pkg.is_modular:
+                self.repos.source_rpms.pop(pkg.name, None)
 
     def _determine_pulp_actions(self, units, current, diff_f):
         expected = list(chain.from_iterable(units.values()))
