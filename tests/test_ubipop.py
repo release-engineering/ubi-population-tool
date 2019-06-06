@@ -206,19 +206,22 @@ def test_sort_packages(mock_ubipop_runner):
         get_test_pkg(filename="rubygems-2.0.14-26.el7_1.noarch.rpm"),
         get_test_pkg(filename="rubygems-2.0.14-25.el7_1.noarch.rpm"),
         get_test_pkg(filename="rubygems-2.0.14.1-33.el7_6.noarch.rpm"),
-        get_test_pkg(filename="rubygems-2.0.14.1-34.el7_6.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.14.1-34.1.el7_6.noarch.rpm"),
+        get_test_pkg(filename="rubygems-2.0.14.1-34.1.1.el7_6.noarch.rpm"),
         get_test_pkg(filename="rubygems-2.0.13.1-34.el7_6.noarch.rpm"),
         get_test_pkg(filename="rubygems-2.0.13.2-34.el7_6.noarch.rpm"),
     ]
 
     mock_ubipop_runner.sort_packages(packages)
 
-    assert "2.0.13.1-34" in packages[0].filename
-    assert "2.0.13.2-34" in packages[1].filename
-    assert "2.0.14-25" in packages[2].filename
-    assert "2.0.14-26" in packages[3].filename
-    assert "2.0.14.1-33" in packages[4].filename
-    assert "2.0.14.1-34" in packages[5].filename
+    assert "2.0.13.1-34.el7_6" in packages[0].filename
+    assert "2.0.13.2-34.el7_6" in packages[1].filename
+    assert "2.0.14-25.el7_1" in packages[2].filename
+    assert "2.0.14-26.el7_1" in packages[3].filename
+    assert "2.0.14.1-33.el7_6" in packages[4].filename
+    assert "2.0.14.1-34.1.el7_6" in packages[5].filename
+    assert "2.0.14.1-34.1.1.el7_6" in packages[6].filename
+
 
 @pytest.mark.parametrize("n, expected_versions_modules",
                          [(1, {3: 2}), (2, {2: 3, 3: 2}), (3, {1: 1, 2: 3, 3: 2})])
