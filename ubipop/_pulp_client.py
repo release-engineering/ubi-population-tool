@@ -4,6 +4,7 @@ import threading
 import time
 
 from urllib3.util.retry import Retry
+from ubipop._utils import split_filename
 
 try:
     from urllib.parse import urljoin
@@ -11,8 +12,8 @@ except ImportError:
     from urlparse import urljoin
 
 import requests
+from rpm import labelCompare as label_compare  # pylint: disable=no-name-in-module
 
-from cmp_version import cmp_version
 
 _LOG = logging.getLogger("ubipop")
 
@@ -296,24 +297,27 @@ class Package(object):
         self.filename = filename
         self.sourcerpm_filename = sourcerpm_filename
         self.is_modular = is_modular
+        #  return name, ver, rel, epoch, arch
+        _, self.version, self.release, self.epoch, _ = split_filename(self.filename)
+        self.evr_tuple = (self.epoch, self.version, self.release)
 
     def __lt__(self, other):
-        return cmp_version(self.filename, other.filename) < 0
+        return label_compare(self.evr_tuple, other.evr_tuple) < 0
 
     def __gt__(self, other):
-        return cmp_version(self.filename, other.filename) > 0
+        return label_compare(self.evr_tuple, other.evr_tuple) > 0
 
     def __eq__(self, other):
-        return cmp_version(self.filename, other.filename) == 0
+        return label_compare(self.evr_tuple, other.evr_tuple) == 0
 
     def __le__(self, other):
-        return cmp_version(self.filename, other.filename) <= 0
+        return label_compare(self.evr_tuple, other.evr_tuple) <= 0
 
     def __ge__(self, other):
-        return cmp_version(self.filename, other.filename) >= 0
+        return label_compare(self.evr_tuple, other.evr_tuple) >= 0
 
     def __ne__(self, other):
-        return cmp_version(self.filename, other.filename) != 0
+        return label_compare(self.evr_tuple, other.evr_tuple) != 0
 
     def __str__(self):
         return self.filename
