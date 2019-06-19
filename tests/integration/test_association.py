@@ -51,12 +51,11 @@ def run_ubipop_tool(config_file, workers=10, dry_run=False):
 def get_repos_from_cs(cs, skip_dot_version=False):
     p = Pulp(PULP_HOSTNAME, (PULP_USER, PULP_PWD), not PULP_SECURE)
 
-    ret = p.do_request('post', 'repositories/search/', {
-        'criteria': {
-            'filters': {'notes.content_set': cs},
-        },
-        'distributors': False,
-    })
+    ret = p.do_request(
+        'post',
+        'repositories/search/',
+        {'criteria': {'filters': {'notes.content_set': cs}}, 'distributors': False},
+    )
 
     ret.raise_for_status()
 
@@ -70,7 +69,7 @@ def get_repos_from_cs(cs, skip_dot_version=False):
             'id': item['id'],
             'name': item['display_name'],
             'url': notes['relative_url'],
-            'arch': notes['arch']
+            'arch': notes['arch'],
         }
 
 
@@ -96,11 +95,9 @@ def query_pulp_rpms(repo_id, name=None, arch=None):
 
     for item in res.json():
         metadata = item['metadata']
-        rpms.append({
-            'name': metadata['name'],
-            'arch': metadata['arch'],
-            'filename': metadata['filename'],
-        })
+        rpms.append(
+            {'name': metadata['name'], 'arch': metadata['arch'], 'filename': metadata['filename']}
+        )
 
     return rpms
 
@@ -121,13 +118,15 @@ def query_pulp_modules(repo_id, name=None, stream=None):
 
     for item in res.json():
         metadata = item['metadata']
-        modules.append({
-            'name': metadata['name'],
-            'arch': metadata['arch'],
-            'stream': metadata['stream'],
-            'artifacts': metadata['artifacts'],
-            'profiles': metadata['profiles'],
-        })
+        modules.append(
+            {
+                'name': metadata['name'],
+                'arch': metadata['arch'],
+                'stream': metadata['stream'],
+                'artifacts': metadata['artifacts'],
+                'profiles': metadata['profiles'],
+            }
+        )
 
     return modules
 
@@ -146,7 +145,7 @@ def query_repo_rpms(query, repo_id, repo_url, force_refresh=True, arch_list=None
         args.append('--refresh')
 
     if arch_list is not None:
-        args.append('--archlist={}'.format(','.join(arch_list)),)
+        args.append('--archlist={}'.format(','.join(arch_list)))
 
     if query is not None:
         args.append(query)
@@ -173,7 +172,7 @@ def query_repo_modules(query, repo_id, repo_url, force_refresh=True, arch_list=N
         args.append('--refresh')
 
     if arch_list is not None:
-        args.append('--archlist={}'.format(','.join(arch_list)),)
+        args.append('--archlist={}'.format(','.join(arch_list)))
 
     if query is not None:
         args.append(query)
@@ -196,10 +195,7 @@ def get_repo_url(relative_url):
         scheme = 'http'
 
     return '{scheme}://{host}{prefix}{relative_url}'.format(
-        scheme=scheme,
-        host=PULP_HOSTNAME,
-        prefix=PULP_RPM_REPO_PREFIX,
-        relative_url=relative_url,
+        scheme=scheme, host=PULP_HOSTNAME, prefix=PULP_RPM_REPO_PREFIX, relative_url=relative_url
     )
 
 
@@ -286,6 +282,7 @@ def test_ubipop_can_associate_packages():
     No packages are blacklisted.
     No modules are whitelisted or blacklisted.
     '''
+
     def assert_pkgs(pkgs_included, pkgs_found):
         assert len(pkgs_found) == len(pkgs_included)
 
@@ -336,11 +333,14 @@ def test_ubipop_can_associate_packages():
 
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason='Integration test is not set up.')
-@pytest.mark.parametrize('cfg_file', [
-    'do-not-associate-excluded-pkg.yaml',
-    'do-not-associate-pkg-if-in-exclude.yaml',
-    'do-not-associate-pkg-if-not-in-include.yaml',
-])
+@pytest.mark.parametrize(
+    'cfg_file',
+    [
+        'do-not-associate-excluded-pkg.yaml',
+        'do-not-associate-pkg-if-in-exclude.yaml',
+        'do-not-associate-pkg-if-not-in-include.yaml',
+    ],
+)
 def test_ubipop_does_not_associate_packages(cfg_file):
     '''
     Test if ubipop does not associate packages in the repo.
@@ -397,6 +397,7 @@ def test_ubipop_can_associate_modules():
     No packages are explicit whitelisted or blacklisted, this means
     that all packages associated belong to a profile of a module.
     '''
+
     def assert_mds(mds_included, mds_found):
         assert len(mds_found) == len(mds_included)
 

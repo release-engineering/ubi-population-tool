@@ -29,18 +29,22 @@ def test_raise_not_implemented_associate_action():
     pytest.raises(NotImplementedError, action.get_action, None)
 
 
-@pytest.mark.parametrize("klass, method", [
-    (AssociateActionModules, "associate_modules"),
-    (AssociateActionModuleDefaults, "associate_module_defaults"),
-    (AssociateActionRpms, "associate_packages"),
-])
+@pytest.mark.parametrize(
+    "klass, method",
+    [
+        (AssociateActionModules, "associate_modules"),
+        (AssociateActionModuleDefaults, "associate_module_defaults"),
+        (AssociateActionRpms, "associate_packages"),
+    ],
+)
 def test_get_action_associate(klass, method):
     units = ["unit1", "unit2"]
     dst_repo = Repo("test_dst", "1", "2", None)
     src_repo = Repo("test_src", "1", "2", None)
     action = klass(units, dst_repo, src_repo)
-    associate_action, src_repo_current, dst_repo_current, current_units = \
-        action.get_action(MagicMock())
+    associate_action, src_repo_current, dst_repo_current, current_units = action.get_action(
+        MagicMock()
+    )
 
     assert "mock." + method in str(associate_action)
     assert current_units == units
@@ -48,11 +52,14 @@ def test_get_action_associate(klass, method):
     assert src_repo_current.repo_id == src_repo.repo_id
 
 
-@pytest.mark.parametrize("klass, method", [
-    (UnassociateActionModules, "unassociate_modules"),
-    (UnassociateActionModuleDefaults, "unassociate_module_defaults"),
-    (UnassociateActionRpms, "unassociate_packages"),
-])
+@pytest.mark.parametrize(
+    "klass, method",
+    [
+        (UnassociateActionModules, "unassociate_modules"),
+        (UnassociateActionModuleDefaults, "unassociate_module_defaults"),
+        (UnassociateActionRpms, "unassociate_packages"),
+    ],
+)
 def test_get_action_unassociate(klass, method):
     units = ["unit1", "unit2"]
     dst_repo = Repo("test_dst", "1", "2", None)

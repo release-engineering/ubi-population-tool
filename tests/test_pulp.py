@@ -19,7 +19,7 @@ from ubipop._pulp_client import Repo, Package, ModuleDefaults, Pulp, PulpRetryAd
 ORIG_HTTP_TOTAL_RETRIES = pulp_client.HTTP_TOTAL_RETRIES
 ORIG_HTTP_RETRY_BACKOFF = pulp_client.HTTP_RETRY_BACKOFF
 
-if sys.version_info <= (2, 7,):
+if sys.version_info <= (2, 7):
     import requests_mock as rm
 
     @pytest.fixture(name='requests_mock')
@@ -30,31 +30,27 @@ if sys.version_info <= (2, 7,):
 
 @pytest.fixture(name='mock_pulp')
 def fixture_mock_pulp():
-    yield Pulp("foo.pulp.com", (None, ))
+    yield Pulp("foo.pulp.com", (None,))
 
 
 @pytest.fixture(name='search_repo_response')
 def fixture_search_repo_response():
-    yield [{
-        "id": "test_repo",
-        "notes": {
-            "arch": "x86_64",
-            "platform_full_version": "7",
-        },
-        "distributors": [{
-            "id": "dist_id",
-            "distributor_type_id": "d_type_id",
-        }],
-    }]
+    yield [
+        {
+            "id": "test_repo",
+            "notes": {"arch": "x86_64", "platform_full_version": "7"},
+            "distributors": [{"id": "dist_id", "distributor_type_id": "d_type_id"}],
+        }
+    ]
 
 
 @pytest.fixture(name='mock_repo')
 def fixture_mock_repo():
     yield Repo(
-        "test_repo", "x86_64", "7", [
-            ("dist_id_1", "dist_type_id_1"),
-            ("dist_id_2", "dist_type_id_2"),
-        ],
+        "test_repo",
+        "x86_64",
+        "7",
+        [("dist_id_1", "dist_type_id_1"), ("dist_id_2", "dist_type_id_2")],
     )
 
 
@@ -80,44 +76,47 @@ def fixture_search_rpms_response(request):
     except AttributeError:
         pkg_number = 1
 
-    yield [{
-        "metadata": {
-            "name": "foo-pkg",
-            "filename": "foo-pkg.rpm",
-            "sourcerpm": "foo-pkg.src.rpm",
-            "is_modular": False,
+    yield [
+        {
+            "metadata": {
+                "name": "foo-pkg",
+                "filename": "foo-pkg.rpm",
+                "sourcerpm": "foo-pkg.src.rpm",
+                "is_modular": False,
+            }
         }
-    } for _ in range(pkg_number)]
+        for _ in range(pkg_number)
+    ]
 
 
 @pytest.fixture(name='search_modules_response')
 def fixture_search_modules_response():
-    yield [{
-        "metadata": {
-            "name": "foo-module",
-            "stream": "9.6",
-            "version": 1111,
-            "context": "foo-context",
-            "arch": "x86_64",
-            'artifacts': ["foo-pkg"],
-            'profiles': {
-                "foo-prof": ["pkg-name"]
-            },
-        },
-    }]
+    yield [
+        {
+            "metadata": {
+                "name": "foo-module",
+                "stream": "9.6",
+                "version": 1111,
+                "context": "foo-context",
+                "arch": "x86_64",
+                'artifacts': ["foo-pkg"],
+                'profiles': {"foo-prof": ["pkg-name"]},
+            }
+        }
+    ]
 
 
 @pytest.fixture(name='search_module_defaults_response')
 def fixture_search_module_defaults_response():
-    yield [{
-        "metadata": {
-            "name": "virt",
-            "stream": "rhel",
-            "profiles": {
-                "rhel": ["default", "common"]
-            },
-        },
-    }]
+    yield [
+        {
+            "metadata": {
+                "name": "virt",
+                "stream": "rhel",
+                "profiles": {"rhel": ["default", "common"]},
+            }
+        }
+    ]
 
 
 @pytest.fixture(name='mock_search_rpms')
@@ -146,22 +145,23 @@ def fixture_mock_search_repos(requests_mock, search_repo_response):
 
 @pytest.fixture(name='mock_publish')
 def fixture_mock_publish(requests_mock, mock_repo, mock_response_for_async_req):
-    url = "/pulp/api/v2/repositories/{repo_id}/actions/publish/"\
-        .format(repo_id=mock_repo.repo_id)
+    url = "/pulp/api/v2/repositories/{repo_id}/actions/publish/".format(repo_id=mock_repo.repo_id)
     requests_mock.register_uri('POST', url, json=mock_response_for_async_req)
 
 
 @pytest.fixture(name='mock_associate')
 def fixture_mock_associate(requests_mock, mock_repo, mock_response_for_async_req):
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/"\
-        .format(dst_repo=mock_repo.repo_id)
+    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/".format(
+        dst_repo=mock_repo.repo_id
+    )
     yield requests_mock.register_uri('POST', url, json=mock_response_for_async_req)
 
 
 @pytest.fixture(name='mock_unassociate')
 def fixture_mock_unassociate(requests_mock, mock_repo, mock_response_for_async_req):
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/"\
-        .format(dst_repo=mock_repo.repo_id)
+    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/".format(
+        dst_repo=mock_repo.repo_id
+    )
     requests_mock.register_uri('POST', url, json=mock_response_for_async_req)
 
 
@@ -286,41 +286,88 @@ def make_mock_response(status, text=None):
     [
         # test everything is retryable
         (True, 500, None, "search_repo_by_cs", ("",), '{}', pulp_client.HTTP_TOTAL_RETRIES),
-        (True, 500, None, "search_rpms",
-         (MagicMock(repo_id='fake_id'),), '[]', pulp_client.HTTP_TOTAL_RETRIES),
-        (True, 500, None, "search_modules",
-         (MagicMock(repo_id='fake_id'),), '[]', pulp_client.HTTP_TOTAL_RETRIES),
-        (True, 500, None, "wait_for_tasks", (['fake-tid'],),
-         '{"state":"finished","task_id":"fake-tid"}', pulp_client.HTTP_TOTAL_RETRIES),
+        (
+            True,
+            500,
+            None,
+            "search_rpms",
+            (MagicMock(repo_id='fake_id'),),
+            '[]',
+            pulp_client.HTTP_TOTAL_RETRIES,
+        ),
+        (
+            True,
+            500,
+            None,
+            "search_modules",
+            (MagicMock(repo_id='fake_id'),),
+            '[]',
+            pulp_client.HTTP_TOTAL_RETRIES,
+        ),
+        (
+            True,
+            500,
+            None,
+            "wait_for_tasks",
+            (['fake-tid'],),
+            '{"state":"finished","task_id":"fake-tid"}',
+            pulp_client.HTTP_TOTAL_RETRIES,
+        ),
         (True, 500, None, "search_tasks", ([MagicMock()],), '[]', pulp_client.HTTP_TOTAL_RETRIES),
-        (True, 500, None, "unassociate_units", ((2 * (MagicMock(), )) + (['rpm'], )),
-         '{"spawned_tasks":[]}', pulp_client.HTTP_TOTAL_RETRIES),
-        (True, 500, None, "associate_units", (MagicMock(repo_id='fake_id'),
-                                              MagicMock(repo_id='fake_id'),
-                                              MagicMock(), ['rpm'], ),
-         '{"spawned_tasks":[]}', pulp_client.HTTP_TOTAL_RETRIES),
-        (True, 500, None, "publish_repo", (
-            MagicMock(distributors_ids_type_ids_tuples=[('a', 'b')]), ),
-         '{"spawned_tasks":[]}', pulp_client.HTTP_TOTAL_RETRIES),
-
+        (
+            True,
+            500,
+            None,
+            "unassociate_units",
+            ((2 * (MagicMock(),)) + (['rpm'],)),
+            '{"spawned_tasks":[]}',
+            pulp_client.HTTP_TOTAL_RETRIES,
+        ),
+        (
+            True,
+            500,
+            None,
+            "associate_units",
+            (MagicMock(repo_id='fake_id'), MagicMock(repo_id='fake_id'), MagicMock(), ['rpm']),
+            '{"spawned_tasks":[]}',
+            pulp_client.HTTP_TOTAL_RETRIES,
+        ),
+        (
+            True,
+            500,
+            None,
+            "publish_repo",
+            (MagicMock(distributors_ids_type_ids_tuples=[('a', 'b')]),),
+            '{"spawned_tasks":[]}',
+            pulp_client.HTTP_TOTAL_RETRIES,
+        ),
         # test custom number of retries
         (True, 500, 3, "search_repo_by_cs", ("",), '{}', 3),
-
         # test 400 status is not retryable
         (False, 400, 3, "search_repo_by_cs", ("",), '{}', 3),
-    ]
+    ],
 )
-def test_retries(mocked_getresponse, mock_pulp, should_retry,
-                 err_status_code, env_retries, retry_call,
-                 retry_args, ok_response, expected_retries):
+def test_retries(
+    mocked_getresponse,
+    mock_pulp,
+    should_retry,
+    err_status_code,
+    env_retries,
+    retry_call,
+    retry_args,
+    ok_response,
+    expected_retries,
+):
     pulp_client.HTTP_RETRY_BACKOFF = 0
 
     try:
         if env_retries:
             pulp_client.HTTP_TOTAL_RETRIES = env_retries
 
-        retries = [make_mock_response(err_status_code, 'Fake Http error')
-                   for _ in range(pulp_client.HTTP_TOTAL_RETRIES-1)]
+        retries = [
+            make_mock_response(err_status_code, 'Fake Http error')
+            for _ in range(pulp_client.HTTP_TOTAL_RETRIES - 1)
+        ]
         retries.extend([make_mock_response(200, ok_response)])
         mocked_getresponse.side_effect = retries
 
@@ -335,12 +382,9 @@ def test_retries(mocked_getresponse, mock_pulp, should_retry,
         pulp_client.HTTP_RETRY_BACKOFF = ORIG_HTTP_RETRY_BACKOFF
 
 
-@pytest.mark.parametrize('method,called', [
-    ('get', True),
-    ('post', True),
-    ('put', False),
-    ('delete', False),
-])
+@pytest.mark.parametrize(
+    'method,called', [('get', True), ('post', True), ('put', False), ('delete', False)]
+)
 def test_do_request(mock_pulp, method, called):
     mock_pulp.local.session = MagicMock()
 
@@ -356,13 +400,10 @@ def test_do_request(mock_pulp, method, called):
         assert response is None
 
 
-@pytest.mark.parametrize('auth', [
-    (['/path/file.crt']),
-    (['user', 'pwd']),
-])
+@pytest.mark.parametrize('auth', [(['/path/file.crt']), (['user', 'pwd'])])
 def test_make_session(mock_pulp, auth):
     mock_pulp.auth = auth
-    mock_pulp._make_session() # pylint: disable=protected-access
+    mock_pulp._make_session()  # pylint: disable=protected-access
 
     assert hasattr(mock_pulp.local, 'session')
 
@@ -373,14 +414,10 @@ def test_make_session(mock_pulp, auth):
     assert isinstance(session.get_adapter('https://'), PulpRetryAdapter)
 
 
-@pytest.mark.parametrize('count', [
-    (2),
-    (5),
-    (10),
-])
+@pytest.mark.parametrize('count', [(2), (5), (10)])
 def test_session_is_not_shared(mock_pulp, count):
     def make_session(sessions):
-        mock_pulp._make_session() # pylint: disable=protected-access
+        mock_pulp._make_session()  # pylint: disable=protected-access
         sessions.append(mock_pulp.local.session)
 
     threads = []
