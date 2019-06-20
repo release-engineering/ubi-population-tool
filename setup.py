@@ -1,4 +1,5 @@
 from setuptools import setup
+import pkg_resources
 
 
 def get_description():
@@ -14,9 +15,24 @@ def get_long_description():
     return text[idx:]
 
 
+def get_rpm_distribution():
+    for distribution in ['rpm', 'rpm-python']:
+        try:
+            pkg_resources.get_distribution(distribution)
+        except pkg_resources.DistributionNotFound:
+            continue
+        else:
+            return distribution
+    return 'rpm-py-installer'
+
+
 def get_requirements():
+    requirements = [get_rpm_distribution()]
+
     with open('requirements.txt') as f:
-        return f.read().splitlines()
+        requirements.extend(f.read().splitlines())
+
+    return requirements
 
 
 setup(name='ubi-population-tool',

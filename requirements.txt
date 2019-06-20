@@ -1,4 +1,3 @@
 requests
 more-executors
 ubi-config
-rpm-py-installer
