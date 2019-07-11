@@ -376,6 +376,19 @@ class UbiPopulateRunner(object):
     def _get_pulp_actions_pkgs(self, pkgs, current):
         return self._determine_pulp_actions(pkgs, current, self._diff_packages_by_filename)
 
+    def _get_pulp_actions_src_pkgs(self, pkgs, current):
+        src_pkgs = {}
+        uniq_srpms = {}
+        for _, pkgs in pkgs.items():
+            for pkg in pkgs:
+                fn = pkg.filename or pkg.sourcerpm_filename
+                uniq_srpms[fn] = pkg
+
+        for _, srpm in uniq_srpms.items():
+            src_pkgs[srpm.name] = [srpm]
+
+        return self._determine_pulp_actions(src_pkgs, current, self._diff_packages_by_filename)
+
     def _get_pulp_actions(self, current_modules_ft, current_module_defaults_ft, current_rpms_ft,
                           current_srpms_ft, current_debug_rpms_ft):
         """
@@ -394,8 +407,8 @@ class UbiPopulateRunner(object):
 
         rpms_assoc, rpms_unassoc = self._get_pulp_actions_pkgs(self.repos.packages,
                                                                current_rpms_ft.result())
-        srpms_assoc, srpms_unassoc = self._get_pulp_actions_pkgs(self.repos.source_rpms,
-                                                                 current_srpms_ft.result())
+        srpms_assoc, srpms_unassoc = self._get_pulp_actions_src_pkgs(self.repos.source_rpms,
+                                                                     current_srpms_ft.result())
 
         debug_assoc = None
         debug_unassoc = None

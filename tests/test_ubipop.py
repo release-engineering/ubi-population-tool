@@ -903,6 +903,39 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     assert unassoc_line.strip() == "No unassociation expected for modules from test_dst"
 
 
+def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
+
+    mock_ubipop_runner.repos.modules = {"test": [get_test_mod(name="md_current")]}
+    mock_ubipop_runner.repos.module_defaults = \
+        {"test": [get_test_mod_defaults(name='mdd_current',
+                                        stream='rhel',
+                                        profiles={'2.5': 'common'})]}
+    mock_ubipop_runner.repos.packages = {"test_rpm": [get_test_pkg(name="rpm_current",
+                                                                   filename="rpm_current.rpm")]}
+    mock_ubipop_runner.repos.debug_rpms = {"test_debug_pkg": [get_test_pkg(name="debug_rpm_current",
+                                                                           filename="debug_rpm_current.rpm")]}
+
+    mock_ubipop_runner.repos.source_rpms = {"test_srpm": [get_test_pkg(name="test_srpm",
+                                                                       filename=
+                                                                       "srpm_current.src.rpm")],
+                                            "test_pkg": [get_test_pkg(name="test_pkg",
+                                                                      filename=
+                                                                      "srpm_new.src.rpm")],
+                                            "foo_pkg": [get_test_pkg(name="foo_pkg",
+                                                                     filename=
+                                                                     "srpm_new.src.rpm")],
+                                            "bar_pkg": [get_test_pkg(name="bar_pkg",
+                                                                     filename=
+                                                                     "srpm_new_next.src.rpm")]}
+
+    associations, _, _, _ = \
+        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=W0212
+
+    _, _, srpms, _ = associations
+    # only two srpm associations, no duplicates
+    assert len(srpms.units) == 2
+
+
 def test_associate_units(mock_ubipop_runner):
     src_repo = get_test_repo(repo_id='test_src')
     dst_repo = get_test_repo(repo_id='test_dst')
