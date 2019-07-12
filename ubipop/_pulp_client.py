@@ -46,6 +46,10 @@ class Pulp(object):
         self.base_url = urljoin(self.scheme + hostname, self.PULP_API)
         self.insecure = insecure
         self.local = threading.local()
+        if insecure:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
     def _make_session(self):
         adapter = PulpRetryAdapter()

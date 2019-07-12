@@ -403,3 +403,8 @@ def test_session_is_not_shared(mock_pulp, count):
         assert isinstance(session, requests.Session)
         assert isinstance(session.get_adapter('http://'), PulpRetryAdapter)
         assert isinstance(session.get_adapter('https://'), PulpRetryAdapter)
+
+def test_insecure():
+    with patch("urllib3.disable_warnings") as patched_warnings:
+        Pulp('foo.host', ('fake', 'user'), insecure=True)
+        patched_warnings.assert_called_once()
