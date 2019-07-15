@@ -377,13 +377,19 @@ class UbiPopulateRunner(object):
         return self._determine_pulp_actions(pkgs, current, self._diff_packages_by_filename)
 
     def _get_pulp_actions_src_pkgs(self, pkgs, current):
+        """
+        Get required pulp actions to make sure existing and desired source packages are in
+        match.
+        """
         src_pkgs = {}
         uniq_srpms = {}
+        # filter out packages that share same source rpm
         for _, pkgs in pkgs.items():
             for pkg in pkgs:
                 fn = pkg.filename or pkg.sourcerpm_filename
                 uniq_srpms[fn] = pkg
 
+        # remap uniq srpms to format accepted by _determine_pulp_actions
         for _, srpm in uniq_srpms.items():
             src_pkgs[srpm.name] = [srpm]
 
