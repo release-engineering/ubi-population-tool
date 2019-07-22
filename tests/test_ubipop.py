@@ -569,6 +569,44 @@ def test_keep_n_newest_packages_with_referenced_pkg_in_module(mock_ubipop_runner
     assert "7.3.7" in packages[0].filename
 
 
+def test_keep_n_latest_packages_no_dupes_from_modular(mock_ubipop_runner):
+    """Ensure that modular packages referenced also in the package
+     white list are included only once in the output list.
+
+    Notice that this situation was observed only on integration tests
+    due to the test data used.
+    In practice, packages in modules have "module" as part of the
+    filename: "go-toolset-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm"
+    """
+
+    packages = [
+        get_test_pkg(
+            name="tomcatjss",
+            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
+            is_modular=True,
+        ),
+        get_test_pkg(
+            name="tomcatjss",
+            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
+            is_modular=False,
+        ),
+    ]
+
+    mock_ubipop_runner.repos.modules["ns"] = []
+    mock_ubipop_runner.repos.pkgs_from_modules["ns"] = [
+        get_test_pkg(
+            name="tomcatjss",
+            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
+            is_modular=True,
+        ),
+    ]
+
+    mock_ubipop_runner.keep_n_latest_packages(packages)
+
+    assert len(packages) == 1
+    assert packages[0].is_modular
+
+
 @pytest.mark.parametrize("rhel_repo_set, ubi_repo_set, fail", [
     (
         RepoSet(None, None, "foo-debug"),
