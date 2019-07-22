@@ -733,20 +733,22 @@ class UbiPopulateRunner(object):
 
     def keep_n_latest_packages(self, packages, n=1):
         """
-        Keep n latest non-modular packages, modular packages are kept
-        only if they are referenced by some of remaining modules.
+        Keep n latest non-modular packages.
+        Modular packages are kept only if they are referenced by some of
+        remaining modules.
 
         Arguments:
-            packages (List[Packages]): Sorted, oldest goes first
+            packages (List[Package]): Sorted, oldest goes first
 
         Keyword arguments:
             n (int): Number of non-modular package versions to keep
 
         Returns:
-            None. The packages list is changed in-place.
+            None. The packages list is changed in-place
         """
 
         packages_to_keep = []
+        filenames_to_keep = set()  # from modular packages
 
         # Use a queue of n elements per arch
         pkgs_per_arch = defaultdict(lambda: deque(maxlen=n))
@@ -767,7 +769,10 @@ class UbiPopulateRunner(object):
             elif package.filename in modular_packages_filenames:
                 # this skips modular pkgs that are not referenced by module
                 packages_to_keep.append(package)
+                filenames_to_keep.add(package.filename)
 
-        latest_pkgs_per_arch = list(chain.from_iterable(pkgs_per_arch.values()))
+        # Packages already included from modules are skipped
+        latest_pkgs_per_arch = [pkg for pkg in chain.from_iterable(pkgs_per_arch.values())
+                                if pkg.filename not in filenames_to_keep]
 
         packages[:] = latest_pkgs_per_arch + packages_to_keep
