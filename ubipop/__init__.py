@@ -1,7 +1,7 @@
 import logging
 import re
 
-from collections import namedtuple, defaultdict
+from collections import defaultdict, deque, namedtuple
 from concurrent.futures import as_completed
 from itertools import chain
 
@@ -733,33 +733,41 @@ class UbiPopulateRunner(object):
 
     def keep_n_latest_packages(self, packages, n=1):
         """
-        Keep n latest non-modular packages,
-        modular packages are kept only if they are referenced by some of remaining modules
-        Parameter packages: sorted list of Packages objects, oldest goes first
+        Keep n latest non-modular packages, modular packages are kept
+        only if they are referenced by some of remaining modules.
+
+        Arguments:
+            packages (List[Packages]): Sorted, oldest goes first
+
+        Keyword arguments:
+            n (int): Number of non-modular package versions to keep
+
+        Returns:
+            None. The packages list is changed in-place.
         """
+
         packages_to_keep = []
-        non_modular_pkgs = []
+
+        # Use a queue of n elements per arch
+        pkgs_per_arch = defaultdict(lambda: deque(maxlen=n))
+
+        # Set of package filenames from modules. Modular packages in
+        # packages list are kept if referenced here.
+        modular_packages_filenames = set()
+        for module_name_stream, packages_in_module in self.repos.pkgs_from_modules.items():
+            if module_name_stream in self.repos.modules:
+                modular_packages_filenames |= set([pkg.filename for pkg in packages_in_module])
+
         for package in packages:
-            if package.is_modular:
-                for module_name_stream, packages_ref_by_module in \
-                        self.repos.pkgs_from_modules.items():
-                    pkgs_filenames_from_modules = [pkg.filename for pkg in packages_ref_by_module]
-                    if package.filename in pkgs_filenames_from_modules \
-                            and module_name_stream in self.repos.modules:
-                        # this skips modular pkgs that are not referenced by module
-                        packages_to_keep.append(package)
-            else:
-                non_modular_pkgs.append(package)
+            if not package.is_modular:
+                # filter non-modular pkgs per arches, there can be rpms
+                # with different arches for package in one repository
+                _, _, _, _, arch = split_filename(package.filename)
+                pkgs_per_arch[arch].append(package)
+            elif package.filename in modular_packages_filenames:
+                # this skips modular pkgs that are not referenced by module
+                packages_to_keep.append(package)
 
-        # filter non-modular pkgs per arches, there can be rpms with different arches
-        # for package in one repository
-        pkgs_per_arch = defaultdict(list)
-        for pkg in non_modular_pkgs:
-            _, _, _, _, arch = split_filename(pkg.filename)
-            pkgs_per_arch[arch].append(pkg)
-
-        latest_pkgs_per_arch = []
-        for pkgs in pkgs_per_arch.values():
-            latest_pkgs_per_arch += pkgs[-n:]
+        latest_pkgs_per_arch = list(chain.from_iterable(pkgs_per_arch.values()))
 
         packages[:] = latest_pkgs_per_arch + packages_to_keep
