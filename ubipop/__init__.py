@@ -391,7 +391,7 @@ class UbiPopulateRunner(object):
 
         # remap uniq srpms to format accepted by _determine_pulp_actions
         for _, srpm in uniq_srpms.items():
-            src_pkgs[srpm.name] = [srpm]
+            src_pkgs[(srpm.name, srpm.version, srpm.release)] = [srpm]
 
         return self._determine_pulp_actions(src_pkgs, current, self._diff_packages_by_filename)
 

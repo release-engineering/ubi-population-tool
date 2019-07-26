@@ -915,25 +915,29 @@ def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
     mock_ubipop_runner.repos.debug_rpms = {"test_debug_pkg": [get_test_pkg(name="debug_rpm_current",
                                                                            filename="debug_rpm_current.rpm")]}
 
-    mock_ubipop_runner.repos.source_rpms = {"test_srpm": [get_test_pkg(name="test_srpm",
-                                                                       filename=
-                                                                       "srpm_current.src.rpm")],
-                                            "test_pkg": [get_test_pkg(name="test_pkg",
-                                                                      filename=
-                                                                      "srpm_new.src.rpm")],
-                                            "foo_pkg": [get_test_pkg(name="foo_pkg",
-                                                                     filename=
-                                                                     "srpm_new.src.rpm")],
-                                            "bar_pkg": [get_test_pkg(name="bar_pkg",
-                                                                     filename=
-                                                                     "srpm_new_next.src.rpm")]}
+    mock_ubipop_runner.repos.source_rpms = {
+        "test_srpm": [
+            get_test_pkg(name="test_srpm",
+                         filename="test_srpm-1.0-1.src.rpm")],
+        "test_srpm2": [
+            get_test_pkg(name="test_srpm",
+                         filename="test_srpm-1.0-2.src.rpm")],
+        "test_srpm3": [
+            get_test_pkg(name="test_srpm",
+                         filename="test_srpm-1.1-1.src.rpm")],
+        "test_pkg": [get_test_pkg(name="test_pkg",
+                                  filename="srpm_new.src.rpm")],
+        "foo_pkg": [get_test_pkg(name="foo_pkg",
+                                 filename="srpm_new.src.rpm")],
+        "bar_pkg": [get_test_pkg(name="bar_pkg",
+                                 filename="srpm_new_next.src.rpm")]}
 
     associations, _, _, _ = \
         mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=W0212
 
     _, _, srpms, _ = associations
-    # only two srpm associations, no duplicates
-    assert len(srpms.units) == 2
+    # only 5 srpm associations, no duplicates
+    assert len(srpms.units) == 5
 
 
 def test_associate_units(mock_ubipop_runner):
