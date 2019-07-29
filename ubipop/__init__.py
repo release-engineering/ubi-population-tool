@@ -766,7 +766,8 @@ class UbiPopulateRunner(object):
                 # with different arches for package in one repository
                 _, _, _, _, arch = split_filename(package.filename)
                 pkgs_per_arch[arch].append(package)
-            elif package.filename in modular_packages_filenames:
+            elif (package.filename in modular_packages_filenames
+                  and package.filename not in filenames_to_keep):
                 # this skips modular pkgs that are not referenced by module
                 packages_to_keep.append(package)
                 filenames_to_keep.add(package.filename)
