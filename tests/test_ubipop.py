@@ -570,16 +570,19 @@ def test_keep_n_newest_packages_with_referenced_pkg_in_module(mock_ubipop_runner
 
 
 def test_keep_n_latest_packages_no_dupes_from_modular(mock_ubipop_runner):
-    """Ensure that modular packages referenced also in the package
-     white list are included only once in the output list.
-
-    Notice that this situation was observed only on integration tests
-    due to the test data used.
-    In practice, packages in modules have "module" as part of the
-    filename: "go-toolset-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm"
+    """Ensure that modular packages are not duplicated in the output
+    package list.
+    Duplicates should be avoided when modular package is also present in
+    and when the there are duplicated modular packages in the input
+    package list.
     """
 
     packages = [
+        get_test_pkg(
+            name="tomcatjss",
+            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
+            is_modular=True,
+        ),
         get_test_pkg(
             name="tomcatjss",
             filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
