@@ -57,8 +57,8 @@ def test_wrong_user_pass_cert_combination(capsys, auth_args):
 def test_default_config_source(mock_ubipopulate):
     args = ['--pulp-hostname', 'foo.pulp.com', '--user', 'foo', '--pass', 'foo']
     main(args)
-    mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [], None,
-                                             False, 4, None)
+    mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [],
+                                             None, None, None, False, 4, None)
 
 
 @mock.patch('ubipop.UbiPopulate')
@@ -67,7 +67,7 @@ def test_custom_config_source(mock_ubipopulate):
             'custom/conf/dir']
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [],
-                                             'custom/conf/dir', False, 4, None)
+                                             'custom/conf/dir', None, None, False, 4, None)
 
 
 @mock.patch('ubipop.UbiPopulate')
@@ -76,7 +76,7 @@ def test_crt(mock_ubipopulate):
             'custom/conf/dir']
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('/cert.cert', ), False, [],
-                                             'custom/conf/dir', False, 4, None)
+                                             'custom/conf/dir', None, None, False, 4, None)
 
 
 @mock.patch('ubipop.UbiPopulate')
@@ -85,7 +85,26 @@ def test_specified_filenames(mock_ubipopulate):
             'custom/conf/dir', 'f1', 'f2']
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, ['f1', 'f2'],
-                                             'custom/conf/dir', False, 4, None)
+                                             'custom/conf/dir', None, None, False, 4, None)
+
+
+@mock.patch('ubipop.UbiPopulate')
+def test_specified_content_sets(mock_ubipopulate):
+    args = ['--pulp-hostname', 'foo.pulp.com', '--user', 'foo', '--pass', 'foo', '--content-sets',
+            'test_repo1-rpms', 'test_repo2-rpms']
+    main(args)
+    mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [],
+                                             None, ['test_repo1-rpms', 'test_repo2-rpms'], None,
+                                             False, 4, None)
+
+
+@mock.patch('ubipop.UbiPopulate')
+def test_specified_repo_ids(mock_ubipopulate):
+    args = ['--pulp-hostname', 'foo.pulp.com', '--user', 'foo', '--pass', 'foo', '--repo-ids',
+            'test_repo1', 'test_repo2']
+    main(args)
+    mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [],
+                                             None, None, ['test_repo1', 'test_repo2'], False, 4, None)
 
 
 @mock.patch('ubipop.UbiPopulate')
@@ -94,7 +113,7 @@ def test_dry_run(mock_ubipopulate):
             'custom/conf/dir', 'f1', 'f2', '--dry-run']
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), True, ['f1', 'f2'],
-                                             'custom/conf/dir', False, 4, None)
+                                             'custom/conf/dir', None, None, False, 4, None)
 
 
 @mock.patch('ubipop.UbiPopulate')
@@ -103,7 +122,7 @@ def test_custom_workers_number(mock_ubipopulate):
             'custom/conf/dir', 'f1', 'f2', '--workers', '42']
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, ['f1', 'f2'],
-                                             'custom/conf/dir', False, 42, None)
+                                             'custom/conf/dir', None, None, False, 42, None)
 
 
 @mock.patch('ubipop.UbiPopulate')
@@ -112,7 +131,7 @@ def test_insecure(mock_ubipopulate):
             'custom/conf/dir', 'f1', 'f2', '--workers', '42', '--insecure']
     main(args)
     mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, ['f1', 'f2'],
-                                             'custom/conf/dir', True, 42, None)
+                                             'custom/conf/dir', None, None, True, 42, None)
 
 
 @mock.patch('ubipop.UbiPopulate')
@@ -120,5 +139,5 @@ def test_output_file(mock_ubipopulate):
     args = ['--pulp-hostname', 'foo.pulp.com', '--user', 'foo', '--pass', 'foo',
             '--output-repos', '/foo/out/repos.txt']
     main(args)
-    mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [], None,
-                                             False, 4, '/foo/out/repos.txt')
+    mock_ubipopulate.assert_called_once_with('foo.pulp.com', ('foo', 'foo'), False, [],
+                                             None, None, None, False, 4, '/foo/out/repos.txt')

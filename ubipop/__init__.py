@@ -80,23 +80,52 @@ class UbiRepoSet(object):
 
 class UbiPopulate(object):
     def __init__(self, pulp_hostname, pulp_auth, dry_run, ubiconfig_filename_list=None,
-                 ubiconfig_dir_or_url=None, insecure=False, workers_count=4,
-                 output_repos=None):
+                 ubiconfig_dir_or_url=None, content_sets=None, repo_ids=None, insecure=False,
+                 workers_count=4, output_repos=None):
 
-        self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list,
-                                                   ubiconfig_dir_or_url)
-        self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
         self.dry_run = dry_run
-        self.output_repos = output_repos
+        self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
         self._executor = Executors.thread_pool(max_workers=workers_count).with_retry()
+        self.ubiconfig_list = self._load_ubiconfig(filenames=ubiconfig_filename_list,
+                                                   ubiconfig_dir_or_url=ubiconfig_dir_or_url,
+                                                   content_sets=content_sets, repo_ids=repo_ids)
+        self.output_repos = output_repos
 
-    def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url):
+    def _load_ubiconfig(self, filenames=None, ubiconfig_dir_or_url=None, content_sets=None,
+                        repo_ids=None):
         loader = ubiconfig.get_loader(ubiconfig_dir_or_url)
         ubi_conf_list = []
+
         if filenames:
             ubi_conf_list.extend(loader.load(filename) for filename in filenames)
         else:
             ubi_conf_list.extend(loader.load_all())
+
+        if repo_ids:
+            # find repos for each repo ID and add their content set
+            # labels to content_sets
+            if content_sets is None:
+                content_sets = []
+            fts = [self._executor.submit(self.pulp.search_repo_by_id, r_id) for r_id in repo_ids]
+            for repo_set in [ft.result() for ft in fts]:
+                content_sets.extend(repo.content_set for repo in repo_set)
+
+        if content_sets:
+            # replace ubi_conf_list with configurations matching the
+            # provided content set lables
+            matches = []
+            for conf in ubi_conf_list:
+                rpms_cs = conf.content_sets.rpm
+                source_cs = conf.content_sets.srpm
+                debug_cs = conf.content_sets.debuginfo
+                for repo in [
+                    rpms_cs.input, rpms_cs.output,
+                    source_cs.input, source_cs.output,
+                    debug_cs.input, debug_cs.output,
+                ]:
+                    if repo in content_sets:
+                        matches.append(conf)
+            ubi_conf_list = matches
 
         return ubi_conf_list
 
