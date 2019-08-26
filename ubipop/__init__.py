@@ -83,13 +83,13 @@ class UbiPopulate(object):
                  ubiconfig_dir_or_url=None, content_sets=None, repo_ids=None, insecure=False,
                  workers_count=4, output_repos=None):
 
-        self.dry_run = dry_run
         self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
+        self.dry_run = dry_run
+        self.output_repos = output_repos
         self._executor = Executors.thread_pool(max_workers=workers_count).with_retry()
         self.ubiconfig_list = self._load_ubiconfig(filenames=ubiconfig_filename_list,
                                                    ubiconfig_dir_or_url=ubiconfig_dir_or_url,
                                                    content_sets=content_sets, repo_ids=repo_ids)
-        self.output_repos = output_repos
 
     def _load_ubiconfig(self, filenames=None, ubiconfig_dir_or_url=None, content_sets=None,
                         repo_ids=None):

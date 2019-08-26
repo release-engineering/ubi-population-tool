@@ -69,6 +69,7 @@ class Pulp(object):
             self._make_session()
 
         req_url = urljoin(self.base_url, url)
+
         if req_type == "post":
             ret = self.local.session.post(req_url, json=data, verify=not self.insecure)
         elif req_type == "get":
