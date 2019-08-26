@@ -107,16 +107,16 @@ def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
 
 def test_load_config_by_content_set_labels():
     """Ensure correct config is returned when given a content set label"""
-    ubipop = UbiPopulate(
+    ubipop_conf_list = UbiPopulate(
         pulp_hostname="foo.pulp.com",
         pulp_auth=(None,),
         dry_run=False,
         ubiconfig_dir_or_url=TEST_DATA_DIR,
         content_sets=["rhel-7-server-rpms", ],
-    )
+    ).ubiconfig_list
 
-    assert len(ubipop.ubiconfig_list) == 1
-    assert ubipop.ubiconfig_list[0].content_sets.rpm.output == "ubi-7-server-rpms"
+    assert len(ubipop_conf_list) == 1
+    assert ubipop_conf_list[0].content_sets.rpm.output == "ubi-7-server-rpms"
 
 
 @patch("ubipop._pulp_client.Pulp.search_repo_by_id")
