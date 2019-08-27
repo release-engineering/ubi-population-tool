@@ -80,19 +80,18 @@ class UbiRepoSet(object):
 
 class UbiPopulate(object):
     def __init__(self, pulp_hostname, pulp_auth, dry_run, ubiconfig_filename_list=None,
-                 ubiconfig_dir_or_url=None, content_sets=None, repo_ids=None, insecure=False,
-                 workers_count=4, output_repos=None):
+                 ubiconfig_dir_or_url=None, insecure=False, workers_count=4, output_repos=None,
+                 **kwargs):
 
         self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
         self.dry_run = dry_run
         self.output_repos = output_repos
         self._executor = Executors.thread_pool(max_workers=workers_count).with_retry()
-        self.ubiconfig_list = self._load_ubiconfig(filenames=ubiconfig_filename_list,
-                                                   ubiconfig_dir_or_url=ubiconfig_dir_or_url,
-                                                   content_sets=content_sets, repo_ids=repo_ids)
+        self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list, ubiconfig_dir_or_url,
+                                                   content_sets=kwargs.get('content_sets', None),
+                                                   repo_ids=kwargs.get('repo_ids', None))
 
-    def _load_ubiconfig(self, filenames=None, ubiconfig_dir_or_url=None, content_sets=None,
-                        repo_ids=None):
+    def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url, content_sets=None, repo_ids=None):
         loader = ubiconfig.get_loader(ubiconfig_dir_or_url)
         ubi_conf_list = []
 
