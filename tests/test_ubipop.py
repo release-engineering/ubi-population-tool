@@ -174,9 +174,8 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
         ), ],
     ]
 
-    # call populate by content set labels for both invalid and valid repo sets
-    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR,
-                         content_sets=["rhel-7-server-rpms", "rhel-8-for-x86_64-appstream-rpms"])
+    # populate both invalid and valid repo sets
+    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR)
     ubipop.populate_ubi_repos()
 
     # should've only populated rhel-8-for-x86_64-appstream
@@ -189,9 +188,9 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
     # should've logged that ubi-7-server repos were skipped
     for message in [
         "Skipping repos not labeled for population:",
-        "ubi-7-server-rpms",
-        "ubi-7-server-source-rpms",
-        "ubi-7-server-debuginfo-rpms"
+        "ubi-7-server-rpms__7_DOT_2__x86_64",
+        "ubi-7-server-source-rpms__7_DOT_2__x86_64",
+        "ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64"
     ]:
         assert message in caplog.text
 

@@ -193,7 +193,7 @@ class UbiPopulate(object):
             no_populate = [r for r in (out_rpm, out_source, out_debug_info) if not r.ubi_population]
             if no_populate:
                 _LOG.debug("Skipping repos not labeled for population:\n\t%s",
-                           "\n\t".join(r.content_set for r in no_populate))
+                           "\n\t".join(r.repo_id for r in no_populate))
                 continue
 
             rhel_repo_set = RepoSet(in_rpm, in_source, in_debug_info)
