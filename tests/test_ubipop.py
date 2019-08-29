@@ -10,7 +10,7 @@ from collections import defaultdict
 import pytest
 import ubiconfig
 
-from mock import MagicMock, patch, call, ANY
+from mock import MagicMock, patch, call
 from more_executors import Executors
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
@@ -180,12 +180,8 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
 
     # should've only populated rhel-8-for-x86_64-appstream
     assert mocked_ubipop_runner.call_count == 1
-    golang_config = [c for c in ubipop.ubiconfig_list if str(c) == "ubiconf_golang.yaml"][0]
-    mocked_ubipop_runner.assert_called_with(
-        ubipop.pulp, ANY, golang_config, False, ubipop._executor
-    )
 
-    # should've logged that ubi-7-server repos were skipped
+    # should've skipped ubi-7-server repos
     for message in [
         "Skipping repos not labeled for population:",
         "ubi-7-server-rpms__7_DOT_2__x86_64",
