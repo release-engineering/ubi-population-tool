@@ -56,6 +56,7 @@ def fixture_mock_repo():
         arch="x86_64",
         content_set="test_repo-source-rpms",
         platform_full_version="7",
+        ubi_population=None,
         dist_ids_type_ids=[
             ("dist_id_1", "dist_type_id_1"),
             ("dist_id_2", "dist_type_id_2"),

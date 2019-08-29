@@ -92,6 +92,7 @@ class Pulp(object):
                 arch=notes['arch'],
                 content_set=notes['content_set'],
                 platform_full_version=notes['platform_full_version'],
+                ubi_population=notes.get('ubi_population', None),  # ubi repos only
                 dist_ids_type_ids=dist_info,
             ))
 
@@ -306,11 +307,13 @@ class Pulp(object):
 
 
 class Repo(object):
-    def __init__(self, repo_id, arch, content_set, platform_full_version, dist_ids_type_ids):
+    def __init__(self, repo_id, arch, content_set, platform_full_version, ubi_population,
+                 dist_ids_type_ids):
         self.repo_id = repo_id
         self.arch = arch
         self.content_set = content_set
         self.platform_full_version = platform_full_version
+        self.ubi_population = ubi_population
         self.distributors_ids_type_ids_tuples = dist_ids_type_ids
 
 

@@ -162,6 +162,7 @@ class UbiPopulate(object):
         rpms_cs = ubiconfig_item.content_sets.rpm
         source_cs = ubiconfig_item.content_sets.srpm
         debug_cs = ubiconfig_item.content_sets.debuginfo
+
         _LOG.info(
             "Getting input repos for input content sets:\n\t%s\n\t%s\n\t%s",
             rpms_cs.input, source_cs.input, debug_cs.input)
@@ -180,18 +181,23 @@ class UbiPopulate(object):
 
         repo_pairs = []
         for input_repo in in_repos_ft.result():
-            rpm = input_repo
-            source = self._get_repo_counterpart(input_repo, in_source_repos_ft.result())
-            debug_info = self._get_repo_counterpart(input_repo, in_debug_repos_ft.result())
+            in_rpm = input_repo
+            in_source = self._get_repo_counterpart(input_repo, in_source_repos_ft.result())
+            in_debug_info = self._get_repo_counterpart(input_repo, in_debug_repos_ft.result())
 
-            rhel_repo_set = RepoSet(rpm, source, debug_info)
+            out_rpm = self._get_repo_counterpart(input_repo, out_repos_ft.result())
+            out_source = self._get_repo_counterpart(input_repo, out_source_repos_ft.result())
+            out_debug_info = self._get_repo_counterpart(input_repo, out_debug_repos_ft.result())
 
-            rpm = self._get_repo_counterpart(input_repo, out_repos_ft.result())
-            source = self._get_repo_counterpart(input_repo, out_source_repos_ft.result())
-            debug_info = self._get_repo_counterpart(input_repo, out_debug_repos_ft.result())
+            # identify any ubi repos not marked for population
+            no_populate = [r for r in (out_rpm, out_source, out_debug_info) if not r.ubi_population]
+            if no_populate:
+                _LOG.debug("Skipping repos not labeled for population:\n\t%s",
+                           "\n\t".join(r.content_set for r in no_populate))
+                continue
 
-            ubi_repo_set = RepoSet(rpm, source, debug_info)
-
+            rhel_repo_set = RepoSet(in_rpm, in_source, in_debug_info)
+            ubi_repo_set = RepoSet(out_rpm, out_source, out_debug_info)
             repo_pairs.append(UbiRepoSet(rhel_repo_set, ubi_repo_set))
 
         return repo_pairs
