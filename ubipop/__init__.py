@@ -190,7 +190,11 @@ class UbiPopulate(object):
             out_debug_info = self._get_repo_counterpart(input_repo, out_debug_repos_ft.result())
 
             # identify any ubi repos not marked for population
-            no_populate = [r for r in (out_rpm, out_source, out_debug_info) if not r.ubi_population]
+            no_populate = []
+            for repo in (out_rpm, out_source, out_debug_info):
+                if repo.ubi_population is False:
+                    no_populate.append(repo)
+
             if no_populate:
                 _LOG.debug("Skipping repos not labeled for population:\n\t%s",
                            "\n\t".join(r.repo_id for r in no_populate))
