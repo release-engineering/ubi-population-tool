@@ -189,20 +189,15 @@ class UbiPopulate(object):
             out_source = self._get_repo_counterpart(input_repo, out_source_repos_ft.result())
             out_debug_info = self._get_repo_counterpart(input_repo, out_debug_repos_ft.result())
 
-            # identify any ubi repos not marked for population
-            no_populate = []
-            for repo in (out_rpm, out_source, out_debug_info):
-                if repo.ubi_population is False:
-                    no_populate.append(repo)
+            # skip repo set if not all output repos are intended for population
+            can_pop = [r for r in (out_rpm, out_source, out_debug_info) if r.ubi_population is True]
+            if len(can_pop) == 3:
+                rhel_repo_set = RepoSet(in_rpm, in_source, in_debug_info)
+                ubi_repo_set = RepoSet(out_rpm, out_source, out_debug_info)
+                repo_pairs.append(UbiRepoSet(rhel_repo_set, ubi_repo_set))
 
-            if no_populate:
-                _LOG.debug("Skipping repos not labeled for population:\n\t%s",
-                           "\n\t".join(r.repo_id for r in no_populate))
-                continue
-
-            rhel_repo_set = RepoSet(in_rpm, in_source, in_debug_info)
-            ubi_repo_set = RepoSet(out_rpm, out_source, out_debug_info)
-            repo_pairs.append(UbiRepoSet(rhel_repo_set, ubi_repo_set))
+            _LOG.debug("Skipping repos not labeled for population:\n\t%s", "\n\t".join(
+                [r.repo_id for r in (out_rpm, out_source, out_debug_info) if r not in can_pop]))
 
         return repo_pairs
 
