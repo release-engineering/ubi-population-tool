@@ -80,25 +80,57 @@ class UbiRepoSet(object):
 
 class UbiPopulate(object):
     def __init__(self, pulp_hostname, pulp_auth, dry_run, ubiconfig_filename_list=None,
-                 ubiconfig_dir_or_url=None, insecure=False, workers_count=4,
-                 output_repos=None):
+                 ubiconfig_dir_or_url=None, insecure=False, workers_count=4, output_repos=None,
+                 **kwargs):
 
-        self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list,
-                                                   ubiconfig_dir_or_url)
         self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
         self.dry_run = dry_run
         self.output_repos = output_repos
         self._executor = Executors.thread_pool(max_workers=workers_count).with_retry()
+        self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list, ubiconfig_dir_or_url,
+                                                   content_sets=kwargs.get('content_sets', None),
+                                                   repo_ids=kwargs.get('repo_ids', None))
 
-    def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url):
+    def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url, content_sets=None, repo_ids=None):
         loader = ubiconfig.get_loader(ubiconfig_dir_or_url)
         ubi_conf_list = []
+
         if filenames:
             ubi_conf_list.extend(loader.load(filename) for filename in filenames)
         else:
             ubi_conf_list.extend(loader.load_all())
 
-        return ubi_conf_list
+        return self._filter_ubi_conf_list(ubi_conf_list, content_sets, repo_ids)
+
+    def _filter_ubi_conf_list(self, config_list, content_sets, repo_ids):
+        """
+        Reduces the list of UBI configurations to only those matching
+        provided content sets and/or repo IDs.
+        """
+
+        filtered_conf_list = []
+
+        content_sets = content_sets or []
+        repo_ids = repo_ids or []
+
+        if not content_sets and not repo_ids:
+            return config_list
+
+        fts = [self._executor.submit(self.pulp.search_repo_by_id, r) for r in repo_ids]
+        for repo_list in [ft.result() for ft in fts]:
+            content_sets.extend(repo.content_set for repo in repo_list)
+
+        for conf in config_list:
+            for label in [
+                conf.content_sets.rpm.input, conf.content_sets.rpm.output,
+                conf.content_sets.srpm.input, conf.content_sets.srpm.output,
+                conf.content_sets.debuginfo.input, conf.content_sets.debuginfo.output,
+            ]:
+                if label in content_sets:
+                    filtered_conf_list.append(conf)
+                    break
+
+        return filtered_conf_list
 
     def populate_ubi_repos(self):
         out_repos = set()

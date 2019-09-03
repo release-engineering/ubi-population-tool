@@ -39,6 +39,7 @@ def fixture_search_repo_response():
         "id": "test_repo",
         "notes": {
             "arch": "x86_64",
+            "content_set": "test_repo-source-rpms",
             "platform_full_version": "7",
         },
         "distributors": [{
@@ -51,7 +52,11 @@ def fixture_search_repo_response():
 @pytest.fixture(name='mock_repo')
 def fixture_mock_repo():
     yield Repo(
-        "test_repo", "x86_64", "7", [
+        repo_id="test_repo",
+        arch="x86_64",
+        content_set="test_repo-source-rpms",
+        platform_full_version="7",
+        dist_ids_type_ids=[
             ("dist_id_1", "dist_type_id_1"),
             ("dist_id_2", "dist_type_id_2"),
         ],
@@ -167,12 +172,26 @@ def fixture_mock_unassociate(requests_mock, mock_repo, mock_response_for_async_r
 
 def test_search_repo_by_cs(mock_pulp, mock_search_repos):
     # pylint: disable=unused-argument
-    repos = mock_pulp.search_repo_by_cs("foo")
+    repos = mock_pulp.search_repo_by_cs("test_repo-source-rpms")
 
     assert len(repos) == 1
     repo = repos[0]
     assert repo.repo_id == "test_repo"
     assert repo.arch == "x86_64"
+    assert repo.content_set == "test_repo-source-rpms"
+    assert repo.platform_full_version == "7"
+    assert repo.distributors_ids_type_ids_tuples[0] == ("dist_id", "d_type_id")
+
+
+def test_search_repo_by_id(mock_pulp, mock_search_repos):
+    # pylint: disable=unused-argument
+    repos = mock_pulp.search_repo_by_id("test_repo")
+
+    assert len(repos) == 1
+    repo = repos[0]
+    assert repo.repo_id == "test_repo"
+    assert repo.arch == "x86_64"
+    assert repo.content_set == "test_repo-source-rpms"
     assert repo.platform_full_version == "7"
     assert repo.distributors_ids_type_ids_tuples[0] == ("dist_id", "d_type_id")
 
@@ -286,6 +305,7 @@ def make_mock_response(status, text=None):
     [
         # test everything is retryable
         (True, 500, None, "search_repo_by_cs", ("",), '{}', pulp_client.HTTP_TOTAL_RETRIES),
+        (True, 500, None, "search_repo_by_id", ("",), '{}', pulp_client.HTTP_TOTAL_RETRIES),
         (True, 500, None, "search_rpms",
          (MagicMock(repo_id='fake_id'),), '[]', pulp_client.HTTP_TOTAL_RETRIES),
         (True, 500, None, "search_modules",

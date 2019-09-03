@@ -15,7 +15,11 @@ def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('input', action="store", nargs='*',
                         help="path to ubi config file")
-    parser.add_argument('--conf-src', action="store",
+    parser.add_argument('--content-sets', action="store", nargs='+', type=str, required=False,
+                        help="content set labels from which to source ubi config")
+    parser.add_argument('--repo-ids', action="store", nargs='+', type=str, required=False,
+                        help="repo IDs from which to source ubi config")
+    parser.add_argument('--conf-src', action="store", required=False,
                         help="source of ubi config, directory or url")
     parser.add_argument('--dry-run', action='store_true', default=False,
                         help="if True, print pulp actions")
@@ -59,10 +63,9 @@ def main(args):
 
     opts, auth = parse_args(args)
 
-    ubipop.UbiPopulate(opts.pulp_hostname, auth, opts.dry_run, opts.input,
-                       opts.conf_src, opts.insecure, opts.workers,
-                       opts.output_repos)\
-        .populate_ubi_repos()
+    ubipop.UbiPopulate(opts.pulp_hostname, auth, opts.dry_run, opts.input, opts.conf_src,
+                       opts.insecure, opts.workers, opts.output_repos,
+                       content_sets=opts.content_sets, repo_ids=opts.repo_ids).populate_ubi_repos()
 
 
 def entry_point():

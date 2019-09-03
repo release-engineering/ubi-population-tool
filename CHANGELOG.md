@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-n/a
+- Accepts content set labels and repo IDs for content calculation
 
 ## [0.1.19] - 2019-06-25
 

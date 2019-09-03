@@ -79,21 +79,39 @@ class Pulp(object):
 
         return ret
 
-    def search_repo_by_cs(self, content_set):
+    def _search_repo(self, criteria):
         url = "repositories/search/"
-        payload = {"criteria": {"filters": {"notes.content_set": content_set}},
-                   "distributors": True}
-
-        ret = self.do_request("post", url, payload)
+        ret = self.do_request("post", url, criteria)
         ret.raise_for_status()
         repos = []
         for item in ret.json():
             notes = item['notes']
-            repos.append(Repo(item['id'], notes['arch'], notes['platform_full_version'],
-                              [(distributor['id'], distributor['distributor_type_id'])
-                               for distributor in item['distributors']]))
+            dist_info = [(dist['id'], dist['distributor_type_id']) for dist in item['distributors']]
+            repos.append(Repo(
+                repo_id=item['id'],
+                arch=notes['arch'],
+                content_set=notes['content_set'],
+                platform_full_version=notes['platform_full_version'],
+                dist_ids_type_ids=dist_info,
+            ))
 
         return repos
+
+    def search_repo_by_cs(self, content_set):
+        """Returns a list of Repo objects with matching content set labels"""
+
+        criteria = {"criteria": {"filters": {"notes.content_set": content_set}},
+                    "distributors": True}
+
+        return self._search_repo(criteria)
+
+    def search_repo_by_id(self, repo_id):
+        """Returns a list of Repo objects with matching repo IDs"""
+
+        criteria = {"criteria": {"filters": {"id": repo_id}},
+                    "distributors": True}
+
+        return self._search_repo(criteria)
 
     def search_rpms(self, repo, name=None, arch=None, name_globbing=False, filename=None):
         url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
@@ -288,11 +306,12 @@ class Pulp(object):
 
 
 class Repo(object):
-    def __init__(self, repo_id, arch, platform_full_version, distributors_ids_type_ids):
+    def __init__(self, repo_id, arch, content_set, platform_full_version, dist_ids_type_ids):
         self.repo_id = repo_id
         self.arch = arch
+        self.content_set = content_set
         self.platform_full_version = platform_full_version
-        self.distributors_ids_type_ids_tuples = distributors_ids_type_ids
+        self.distributors_ids_type_ids_tuples = dist_ids_type_ids
 
 
 class Package(object):

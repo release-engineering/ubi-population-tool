@@ -64,6 +64,7 @@ def get_test_repo(**kwargs):
     return Repo(
         kwargs.get('repo_id'),
         kwargs.get('arch'),
+        kwargs.get('content_set'),
         kwargs.get('platform_full_version'),
         kwargs.get('distributors_ids_type_ids'),
     )
@@ -652,6 +653,26 @@ def test_ubipopulate_load_ubiconfig(mocked_ubiconfig_load):
     ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False, ['cfg.yaml'])
     assert len(ubipop.ubiconfig_list) == 1
     assert ubipop.ubiconfig_list[0] == "test"
+
+
+def test_load_ubiconfig_by_content_set_labels():
+    """Ensure correct config is returned when given a content set label"""
+    ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False, ubiconfig_dir_or_url=TEST_DATA_DIR,
+                         content_sets=["rhel-7-server-rpms", ])
+    assert len(ubipop.ubiconfig_list) == 1
+    assert ubipop.ubiconfig_list[0].content_sets.rpm.output == "ubi-7-server-rpms"
+
+
+@patch("ubipop._pulp_client.Pulp.search_repo_by_id")
+def test_load_ubiconfig_by_repo_ids(mocked_search_repo_by_id):
+    """Ensure correct config is returned when given a repo ID"""
+    mocked_search_repo_by_id.return_value = [
+        get_test_repo(repo_id="rhel-7-server", content_set="rhel-7-server-rpms"),
+    ]
+    ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False, ubiconfig_dir_or_url=TEST_DATA_DIR,
+                         repo_ids=["rhel-7-server", ])
+    assert len(ubipop.ubiconfig_list) == 1
+    assert ubipop.ubiconfig_list[0].content_sets.rpm.output == "ubi-7-server-rpms"
 
 
 @pytest.fixture(name='mocked_ubiconfig_load_all')
