@@ -66,8 +66,8 @@ def get_test_repo(**kwargs):
         kwargs.get('arch'),
         kwargs.get('content_set'),
         kwargs.get('platform_full_version'),
-        kwargs.get('ubi_population'),
         kwargs.get('distributors_ids_type_ids'),
+        kwargs.get('ubi_population'),
     )
 
 
@@ -109,9 +109,9 @@ def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
 @patch("ubipop.UbiPopulateRunner")
 @patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
 def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner, caplog):
-    # don't actually query Pulp for repos
+    # Don't actually query Pulp for repos
     mocked_search_repo_by_cs.side_effect = [
-        # input repos - rhel-8-for-x86_64-appstream
+        # Input repos - rhel-8-for-x86_64-appstream
         [get_test_repo(
             repo_id="rhel-8-for-x86_64-appstream-rpms",
             content_set="rhel-8-for-x86_64-appstream-rpms",
@@ -125,7 +125,7 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
             content_set="rhel-8-for-x86_64-appstream-debug-rpms",
         ), ],
 
-        # output repos - rhel-8-for-x86_64-appstream
+        # Output repos - rhel-8-for-x86_64-appstream
         [get_test_repo(
             repo_id="ubi-8-for-x86_64-appstream-rpms",
             content_set="ubi-8-for-x86_64-appstream-rpms",
@@ -142,7 +142,7 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
             ubi_population=True
         ), ],
 
-        # input repos - rhel-7-server
+        # Input repos - rhel-7-server
         [get_test_repo(
             repo_id="rhel-7-server-rpms__7_DOT_2__x86_64",
             content_set="rhel-7-server-rpms",
@@ -156,7 +156,7 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
             content_set="rhel-7-server-debuginfo-rpms",
         ), ],
 
-        # output repos - rhel-7-server
+        # Output repos - rhel-7-server
         [get_test_repo(
             repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
             content_set="ubi-7-server-rpms",
@@ -174,21 +174,18 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
         ), ],
     ]
 
-    # populate both invalid and valid repo sets
+    # Attempt to populate both invalid and valid repo sets
     ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR)
     ubipop.populate_ubi_repos()
 
-    # should've only populated rhel-8-for-x86_64-appstream
+    # Should've populated rhel-8-for-x86_64-appstream
     assert mocked_ubipop_runner.call_count == 1
+    msg = "Skipping repo set for rhel-8-for-x86_64-appstream-rpms: should not be populated"
+    assert msg not in caplog.text
 
-    # should've skipped ubi-7-server repos
-    for message in [
-        "Skipping repos not labeled for population:",
-        "ubi-7-server-rpms__7_DOT_2__x86_64",
-        "ubi-7-server-source-rpms__7_DOT_2__x86_64",
-        "ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64"
-    ]:
-        assert message in caplog.text
+    # Should've skipped rhel-7-server repo set
+    msg = "Skipping repo set for rhel-7-server-rpms__7_DOT_2__x86_64: should not be populated"
+    assert msg in caplog.text
 
 
 def test_get_packages_from_module_by_name(mock_ubipop_runner):
