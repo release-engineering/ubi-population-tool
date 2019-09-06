@@ -132,6 +132,55 @@ class UbiPopulate(object):
 
         return filtered_conf_list
 
+    def expected_pulp_actions(self):
+        """
+        Returns a list of Pulp actions expected to be performed for each selected UBI configuration.
+
+        :return expected_pulp_actions_list:
+        .. code-block:: json
+            [
+                {
+                    "repo ID": {
+                        "associations": (
+                            AssociateActionModules,
+                            AssociateActionRpms,
+                            AssociateActionRpms,
+                            AssociateActionRpms
+                        ),
+                        "unassociations": (
+                            UnassociateActionModules,
+                            UnassociateActionRpms,
+                            UnassociateActionRpms,
+                            UnassociateActionRpms
+                        ),
+                        "mdd_association": AssociateActionModuleDefaults,
+                        "mdd_unassociation": UnassociateActionModuleDefaults,
+                    },
+                    ...
+                },
+                ...
+            ]
+        """
+
+        expected_pulp_actions_list = []
+
+        for config in self.ubiconfig_list:
+            config_dict = {}
+            try:
+                repo_pairs = self._get_input_and_output_repo_pairs(config)
+            except RepoMissing:
+                _LOG.warning("Skipping current content triplet, some repos are missing")
+                continue
+
+            for repo_set in repo_pairs:
+                set_name = repo_set.in_repos.rpm.repo_id
+                config_dict[set_name] = UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run,
+                                                          self._executor).pulp_actions_map()
+
+            expected_pulp_actions_list.append(config_dict)
+
+        return expected_pulp_actions_list
+
     def populate_ubi_repos(self):
         out_repos = set()
 
@@ -497,10 +546,18 @@ class UbiPopulateRunner(object):
 
         return diff
 
-    def run_ubi_population(self):
-        current_modules_ft, current_module_defaults_ft, current_rpms_ft, \
-            current_srpms_ft, current_debug_rpms_ft = self._get_current_content()
+    def pulp_actions_map(self):
+        associations, unassociations, mdd_association, mdd_unassociation = \
+            self._get_pulp_actions(*self._get_current_content())
 
+        return {
+            "associations": associations,
+            "unassociations": unassociations,
+            "mdd_association": mdd_association,
+            "mdd_unassociation": mdd_unassociation,
+        }
+
+    def run_ubi_population(self):
         self._match_modules()
         self._match_binary_rpms()
         if self.repos.out_repos.debug:
@@ -512,21 +569,13 @@ class UbiPopulateRunner(object):
         self._match_module_defaults()
         self._create_srpms_output_set()
 
+        current_content = self._get_current_content()
+
         associations, unassociations, mdd_association, mdd_unassociation = \
-            self._get_pulp_actions(current_modules_ft,
-                                   current_module_defaults_ft,
-                                   current_rpms_ft,
-                                   current_srpms_ft,
-                                   current_debug_rpms_ft)
+            self._get_pulp_actions(*current_content)
 
         if self.dry_run:
-            self.log_curent_content(
-                current_modules_ft,
-                current_module_defaults_ft,
-                current_rpms_ft,
-                current_srpms_ft,
-                current_debug_rpms_ft,
-            )
+            self.log_curent_content(*current_content)
             self.log_pulp_actions(
                 associations + (mdd_association,),
                 unassociations + (mdd_unassociation,),
@@ -539,7 +588,7 @@ class UbiPopulateRunner(object):
 
             self._associate_unassociate_md_defaults((mdd_association,), (mdd_unassociation,))
 
-            # wait repo publication
+            # wait for repo publication
             self._wait_pulp(self._publish_out_repos())
 
     def _associate_unassociate_units(self, action_list):

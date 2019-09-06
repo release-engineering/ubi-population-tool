@@ -10,7 +10,7 @@ from collections import defaultdict
 import pytest
 import ubiconfig
 
-from mock import MagicMock, patch, call
+from mock import MagicMock, patch, call, ANY
 from more_executors import Executors
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
@@ -768,6 +768,60 @@ def test_create_output_file_all_repos(mock_ubipop_runner, mock_get_repo_pairs,
         assert sorted(content) == sorted(["ubi-foo-rpms\n", "ubi-foo-source\n", "ubi-foo-debug\n"])
     finally:
         shutil.rmtree(path)
+
+
+@patch("ubipop.UbiPopulateRunner._get_current_content")
+@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
+def test_expected_pulp_actions(mocked_search_repo_by_cs, mocked_current_content,
+                               mock_current_content_ft):
+    # Don't actually query Pulp for repos or their content
+    mocked_search_repo_by_cs.side_effect = [
+        # Input repos - rhel-7-server
+        [get_test_repo(
+            repo_id="rhel-7-server-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-server-source-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-source-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-server-debuginfo-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-debuginfo-rpms",
+        ), ],
+
+        # Output repos - rhel-7-server
+        [get_test_repo(
+            repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-rpms",
+            ubi_population=True
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-source-rpms",
+            ubi_population=True
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-debuginfo-rpms",
+            ubi_population=True
+        ), ],
+    ]
+    mocked_current_content.return_value = mock_current_content_ft
+
+    ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False, ubiconfig_dir_or_url=TEST_DATA_DIR,
+                         content_sets=["rhel-7-server-rpms", ])
+
+    assert ubipop.expected_pulp_actions() == [
+        {
+            "rhel-7-server-rpms__7_DOT_2__x86_64": {
+                "associations": (ANY, ANY, ANY, ANY),
+                "unassociations": (ANY, ANY, ANY, ANY),
+                "mdd_association": ANY,
+                "mdd_unassociation": ANY
+            }
+        }
+    ]
 
 
 @pytest.fixture(name='mock_current_content_ft')
