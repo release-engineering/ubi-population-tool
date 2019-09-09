@@ -89,14 +89,14 @@ class Pulp(object):
             dist_info = [(dist['id'], dist['distributor_type_id']) for dist in item['distributors']]
             # Only UBI repos should have a ubi_population note, set to None for other platforms
             # If the UBI repo does not have this note, assume it is okay to populate
-            ubi_populate = notes.get('ubi_populate', True) if notes['platform'] == 'ubi' else None
+            ubi_population = notes.get('ubi_population', True) if notes['platform'] == 'ubi' else None
             repos.append(Repo(
                 repo_id=item['id'],
                 arch=notes['arch'],
                 content_set=notes['content_set'],
                 platform_full_version=notes['platform_full_version'],
                 dist_ids_type_ids=dist_info,
-                ubi_population=ubi_populate,
+                ubi_population=ubi_population,
             ))
 
         return repos
