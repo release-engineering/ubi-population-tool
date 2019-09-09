@@ -189,14 +189,18 @@ class UbiPopulate(object):
             out_source = self._get_repo_counterpart(input_repo, out_source_repos_ft.result())
             out_debug_info = self._get_repo_counterpart(input_repo, out_debug_repos_ft.result())
 
+            in_repos = (in_rpm, in_source, in_debug_info)
+            out_repos = (out_rpm, out_source, out_debug_info)
+
             # Skip repos sets containing output repos which should not be populated
-            if not all([r.ubi_population is True for r in (out_rpm, out_source, out_debug_info)]):
-                _LOG.debug("Skipping repo set for %s: should not be populated", in_rpm.repo_id)
+            if not all([r.ubi_population is True for r in out_repos]):
+                _LOG.debug(
+                    "Skipping %s, population disabled for output repo(s):\n\t%s",
+                    in_rpm.content_set,
+                    "\n\t".join(r.content_set for r in out_repos if r.ubi_population is False))
                 continue
 
-            rhel_repo_set = RepoSet(in_rpm, in_source, in_debug_info)
-            ubi_repo_set = RepoSet(out_rpm, out_source, out_debug_info)
-            repo_pairs.append(UbiRepoSet(rhel_repo_set, ubi_repo_set))
+            repo_pairs.append(UbiRepoSet(RepoSet(*in_repos), RepoSet(*out_repos)))
 
         return repo_pairs
 

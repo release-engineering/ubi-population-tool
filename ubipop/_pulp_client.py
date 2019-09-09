@@ -317,9 +317,7 @@ class Repo(object):
         self.content_set = content_set
         self.platform_full_version = platform_full_version
         self.distributors_ids_type_ids_tuples = dist_ids_type_ids
-        # Only assign ubi_population for UBI repos
-        if ubi_population is not None:
-            self.ubi_population = ubi_population
+        self.ubi_population = ubi_population
 
 
 class Package(object):

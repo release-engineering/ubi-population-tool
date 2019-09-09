@@ -10,7 +10,7 @@ from collections import defaultdict
 import pytest
 import ubiconfig
 
-from mock import MagicMock, patch, call
+from mock import MagicMock, patch, call, ANY
 from more_executors import Executors
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
@@ -160,7 +160,7 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
         [get_test_repo(
             repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
             content_set="ubi-7-server-rpms",
-            ubi_population=False
+            ubi_population=True
         ), ],
         [get_test_repo(
             repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
@@ -178,14 +178,12 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
     ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR)
     ubipop.populate_ubi_repos()
 
-    # Should've populated rhel-8-for-x86_64-appstream
+    # Should've only run once
     assert mocked_ubipop_runner.call_count == 1
-    msg = "Skipping repo set for rhel-8-for-x86_64-appstream-rpms: should not be populated"
-    assert msg not in caplog.text
-
-    # Should've skipped rhel-7-server repo set
-    msg = "Skipping repo set for rhel-7-server-rpms__7_DOT_2__x86_64: should not be populated"
-    assert msg in caplog.text
+    # For rhel-8-for-x86_64-appstream
+    assert "Skipping rhel-8-for-x86_64-appstream" not in caplog.text
+    # Not for rhel-7-server
+    assert "Skipping rhel-7-server-rpms" in caplog.text
 
 
 def test_get_packages_from_module_by_name(mock_ubipop_runner):
