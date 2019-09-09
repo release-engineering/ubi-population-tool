@@ -10,7 +10,7 @@ from collections import defaultdict
 import pytest
 import ubiconfig
 
-from mock import MagicMock, patch, call, ANY
+from mock import MagicMock, patch, call
 from more_executors import Executors
 from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
