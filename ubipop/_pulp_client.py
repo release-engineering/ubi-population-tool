@@ -87,12 +87,16 @@ class Pulp(object):
         for item in ret.json():
             notes = item['notes']
             dist_info = [(dist['id'], dist['distributor_type_id']) for dist in item['distributors']]
+            # Only UBI repos should have a ubi_population note, set to None for other platforms
+            # If the UBI repo does not have this note, assume it is okay to populate
+            ubi_population = notes.get('ubi_population', True) if notes['platform'] == 'ubi' else None
             repos.append(Repo(
                 repo_id=item['id'],
                 arch=notes['arch'],
                 content_set=notes['content_set'],
                 platform_full_version=notes['platform_full_version'],
                 dist_ids_type_ids=dist_info,
+                ubi_population=ubi_population,
             ))
 
         return repos
@@ -306,12 +310,14 @@ class Pulp(object):
 
 
 class Repo(object):
-    def __init__(self, repo_id, arch, content_set, platform_full_version, dist_ids_type_ids):
+    def __init__(self, repo_id, arch, content_set, platform_full_version, dist_ids_type_ids,
+                 ubi_population):
         self.repo_id = repo_id
         self.arch = arch
         self.content_set = content_set
         self.platform_full_version = platform_full_version
         self.distributors_ids_type_ids_tuples = dist_ids_type_ids
+        self.ubi_population = ubi_population
 
 
 class Package(object):

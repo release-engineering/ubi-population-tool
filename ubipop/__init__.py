@@ -162,6 +162,7 @@ class UbiPopulate(object):
         rpms_cs = ubiconfig_item.content_sets.rpm
         source_cs = ubiconfig_item.content_sets.srpm
         debug_cs = ubiconfig_item.content_sets.debuginfo
+
         _LOG.info(
             "Getting input repos for input content sets:\n\t%s\n\t%s\n\t%s",
             rpms_cs.input, source_cs.input, debug_cs.input)
@@ -180,19 +181,26 @@ class UbiPopulate(object):
 
         repo_pairs = []
         for input_repo in in_repos_ft.result():
-            rpm = input_repo
-            source = self._get_repo_counterpart(input_repo, in_source_repos_ft.result())
-            debug_info = self._get_repo_counterpart(input_repo, in_debug_repos_ft.result())
+            in_rpm = input_repo
+            in_source = self._get_repo_counterpart(input_repo, in_source_repos_ft.result())
+            in_debug_info = self._get_repo_counterpart(input_repo, in_debug_repos_ft.result())
 
-            rhel_repo_set = RepoSet(rpm, source, debug_info)
+            out_rpm = self._get_repo_counterpart(input_repo, out_repos_ft.result())
+            out_source = self._get_repo_counterpart(input_repo, out_source_repos_ft.result())
+            out_debug_info = self._get_repo_counterpart(input_repo, out_debug_repos_ft.result())
 
-            rpm = self._get_repo_counterpart(input_repo, out_repos_ft.result())
-            source = self._get_repo_counterpart(input_repo, out_source_repos_ft.result())
-            debug_info = self._get_repo_counterpart(input_repo, out_debug_repos_ft.result())
+            in_repos = (in_rpm, in_source, in_debug_info)
+            out_repos = (out_rpm, out_source, out_debug_info)
 
-            ubi_repo_set = RepoSet(rpm, source, debug_info)
+            # Skip repos sets containing output repos which should not be populated
+            if not all([r.ubi_population is True for r in out_repos]):
+                _LOG.debug(
+                    "Skipping %s, population disabled for output repo(s):\n\t%s",
+                    in_rpm.content_set,
+                    "\n\t".join(r.content_set for r in out_repos if r.ubi_population is False))
+                continue
 
-            repo_pairs.append(UbiRepoSet(rhel_repo_set, ubi_repo_set))
+            repo_pairs.append(UbiRepoSet(RepoSet(*in_repos), RepoSet(*out_repos)))
 
         return repo_pairs
 

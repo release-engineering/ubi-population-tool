@@ -67,6 +67,7 @@ def get_test_repo(**kwargs):
         kwargs.get('content_set'),
         kwargs.get('platform_full_version'),
         kwargs.get('distributors_ids_type_ids'),
+        kwargs.get('ubi_population'),
     )
 
 
@@ -103,6 +104,86 @@ def test_get_output_repo_ids(ubi_repo_set):
 def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
     repo_ids = ubi_repo_set_no_debug.get_output_repo_ids()
     assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source"])
+
+
+@patch("ubipop.UbiPopulateRunner")
+@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
+def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner, caplog):
+    # Don't actually query Pulp for repos
+    mocked_search_repo_by_cs.side_effect = [
+        # Input repos - rhel-8-for-x86_64-appstream
+        [get_test_repo(
+            repo_id="rhel-8-for-x86_64-appstream-rpms",
+            content_set="rhel-8-for-x86_64-appstream-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-8-for-x86_64-appstream-source-rpms",
+            content_set="rhel-8-for-x86_64-appstream-source-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-8-for-x86_64-appstream-debug-rpms",
+            content_set="rhel-8-for-x86_64-appstream-debug-rpms",
+        ), ],
+
+        # Output repos - rhel-8-for-x86_64-appstream
+        [get_test_repo(
+            repo_id="ubi-8-for-x86_64-appstream-rpms",
+            content_set="ubi-8-for-x86_64-appstream-rpms",
+            ubi_population=True
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-8-for-x86_64-appstream-source-rpms",
+            content_set="ubi-8-for-x86_64-appstream-source-rpms",
+            ubi_population=True
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-8-for-x86_64-appstream-debug-rpms",
+            content_set="ubi-8-for-x86_64-appstream-debug-rpms",
+            ubi_population=True
+        ), ],
+
+        # Input repos - rhel-7-server
+        [get_test_repo(
+            repo_id="rhel-7-server-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-server-source-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-source-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-server-debuginfo-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-debuginfo-rpms",
+        ), ],
+
+        # Output repos - rhel-7-server
+        [get_test_repo(
+            repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-rpms",
+            ubi_population=True
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-source-rpms",
+            ubi_population=False
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-debuginfo-rpms",
+            ubi_population=False
+        ), ],
+    ]
+
+    # Attempt to populate both invalid and valid repo sets
+    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR)
+    ubipop.populate_ubi_repos()
+
+    # Should've only run once
+    assert mocked_ubipop_runner.call_count == 1
+    # For rhel-8-for-x86_64-appstream
+    assert "Skipping rhel-8-for-x86_64-appstream" not in caplog.text
+    # Not for rhel-7-server
+    assert "Skipping rhel-7-server-rpms" in caplog.text
 
 
 def test_get_packages_from_module_by_name(mock_ubipop_runner):
