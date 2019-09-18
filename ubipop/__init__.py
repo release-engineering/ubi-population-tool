@@ -195,9 +195,9 @@ class UbiPopulate(object):
             # Skip repos sets containing output repos which should not be populated
             if not all([r.ubi_population is True for r in out_repos]):
                 _LOG.debug(
-                    "Skipping %s, population disabled for output repo(s):\n\t%s",
+                    "Skipping %s repo set, population disabled for output repos(s):\n\t%s",
                     in_rpm.content_set,
-                    "\n\t".join(r.content_set for r in out_repos if r.ubi_population is False))
+                    "\n\t".join(r.repo_id for r in out_repos if r.ubi_population is False))
                 continue
 
             repo_pairs.append(UbiRepoSet(RepoSet(*in_repos), RepoSet(*out_repos)))
