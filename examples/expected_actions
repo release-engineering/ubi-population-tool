@@ -1,0 +1,56 @@
+#! /usr/bin/python
+
+import logging
+from argparse import ArgumentParser
+from pprint import pprint
+
+from ubipop import UbiPopulate
+
+log = logging.getLogger("expected_actions")
+
+
+def parse_args():
+    parser = ArgumentParser(description="Show Pulp actions expected from UBI Population")
+    parser.add_argument("--url", help="Pulp server URL")
+    parser.add_argument("--user", help="Pulp username")
+    parser.add_argument("--password", help="Pulp password (or set PULP_PASSWORD in env)")
+    parser.add_argument('--cert', action="store", help="path to to user cert")
+    parser.add_argument('--filenames', action="store", nargs='+', type=str,
+                        help="path to ubi config file")
+    parser.add_argument('--conf-src', action="store", help="source of ubi config, directory or url")
+    parser.add_argument('--content-sets', nargs='+', type=str,
+                        help="content set labels from which to source ubi config")
+    parser.add_argument('--repo-ids', nargs='+', type=str,
+                        help="repo IDs from which to source ubi config")
+
+    parsed = parser.parse_args()
+
+    auth_err_msg = "Provide --user and --password options or --cert"
+    if all((parsed.user, parsed.password, parsed.cert)):
+        parser.error(auth_err_msg)
+
+    auth = None
+    if parsed.user and parsed.password:
+        auth = (parsed.user, parsed.password)
+    elif parsed.user and not parsed.password or not parsed.user and parsed.password:
+        parser.error(auth_err_msg)
+    elif parsed.cert:
+        auth = (parsed.cert,)
+    else:
+        parser.error(auth_err_msg)
+
+    return parser.parse_args(), auth
+
+
+def main():
+    log.setLevel(logging.INFO)
+    logging.basicConfig(format="%(message)s", level=logging.INFO)
+
+    opts, auth = parse_args()
+
+    ubipop = UbiPopulate(opts.url, auth, False, opts.filenames, opts.conf_src)
+    pprint(ubipop.expected_pulp_actions(opts.content_sets, opts.repo_ids))
+
+
+if __name__ == "__main__":
+    main()

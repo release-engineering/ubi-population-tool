@@ -27,6 +27,7 @@ class RepoMissing(Exception):
 
 
 RepoSet = namedtuple('RepoSet', ['rpm', 'source', 'debug'])
+ExpectedPulpActions = namedtuple('ExpectedPulpActions', ['associations', 'unassociations'])
 
 
 class UbiRepoSet(object):
@@ -132,6 +133,43 @@ class UbiPopulate(object):
 
         return filtered_conf_list
 
+    def expected_pulp_actions(self, content_sets=None, repo_ids=None):
+        """
+        Returns a named tuple, ExpectedPulpActions, which contains a list of
+        associations and a list of unassociations expected to be performed by
+        Pulp for the loaded UBI configurations, optionally filtered by content
+        sets or repo IDs.
+
+        :param  content_sets:           list of content set labels by which to
+                                        filter UBI configurations
+
+        :param  repo_ids:               list of repos IDs by which to filter
+                                        UBI configurations
+
+        :return expected_pulp_actions:  namedtuple containing associations and
+                                        unassociations expected to be performed
+                                        by Pulp
+        """
+
+        expected_pulp_actions = ExpectedPulpActions([], [])
+
+        for config in self._filter_ubi_conf_list(self.ubiconfig_list, content_sets, repo_ids):
+            try:
+                repo_pairs = self._get_input_and_output_repo_pairs(config)
+            except RepoMissing:
+                _LOG.warning("Skipping current content triplet, some repos are missing")
+                continue
+
+            for repo_set in repo_pairs:
+                associations, unassociations = UbiPopulateRunner(
+                    self.pulp, repo_set, config, self.dry_run, self._executor
+                ).export_pulp_actions()
+
+                expected_pulp_actions.associations.extend(associations)
+                expected_pulp_actions.unassociations.extend(unassociations)
+
+        return expected_pulp_actions
+
     def populate_ubi_repos(self):
         out_repos = set()
 
@@ -218,6 +256,11 @@ class UbiPopulateRunner(object):
         self.ubiconfig = ubiconfig_item
         self.dry_run = dry_run
         self._executor = executor
+
+        self._associations = None
+        self._unassociations = None
+        self._mdd_association = None
+        self._mdd_unassociation = None
 
     def _match_modules(self):
         # Add matching modules
@@ -435,16 +478,19 @@ class UbiPopulateRunner(object):
 
         return self._determine_pulp_actions(src_pkgs, current, self._diff_packages_by_filename)
 
-    def _get_pulp_actions(self, current_modules_ft, current_module_defaults_ft, current_rpms_ft,
-                          current_srpms_ft, current_debug_rpms_ft):
+    def _set_pulp_actions(self):
         """
         Determines expected pulp actions by comparing current content of output repos and
-        expected content.
+        expected content. Stores expected pulp actions as UbiPopulateRunner attributes.
 
         Content that needs association: unit is in expected but not in current
         Content that needs unassociation: unit is in current but not in expected
         No action: unit is in current and in expected
         """
+
+        current_modules_ft, current_module_defaults_ft, current_rpms_ft, current_srpms_ft, \
+            current_debug_rpms_ft = self._get_current_content()
+
         modules_assoc, modules_unassoc = self._get_pulp_actions_mds(self.repos.modules,
                                                                     current_modules_ft.result())
         md_defaults_assoc, md_defaults_unassoc = \
@@ -462,33 +508,30 @@ class UbiPopulateRunner(object):
             debug_assoc, debug_unassoc = self._get_pulp_actions_pkgs(self.repos.debug_rpms,
                                                                      current_debug_rpms_ft.result())
 
-        associations = (AssociateActionModules(modules_assoc,
-                                               self.repos.out_repos.rpm,
-                                               self.repos.in_repos.rpm),
-                        AssociateActionRpms(rpms_assoc,
-                                            self.repos.out_repos.rpm,
-                                            self.repos.in_repos.rpm),
-                        AssociateActionRpms(srpms_assoc,
-                                            self.repos.out_repos.source,
-                                            self.repos.in_repos.source),
-                        AssociateActionRpms(debug_assoc,
-                                            self.repos.out_repos.debug,
-                                            self.repos.in_repos.debug)
-                       )
+        self._associations = (AssociateActionModules(modules_assoc,
+                                                     self.repos.out_repos.rpm,
+                                                     self.repos.in_repos.rpm),
+                              AssociateActionRpms(rpms_assoc,
+                                                  self.repos.out_repos.rpm,
+                                                  self.repos.in_repos.rpm),
+                              AssociateActionRpms(srpms_assoc,
+                                                  self.repos.out_repos.source,
+                                                  self.repos.in_repos.source),
+                              AssociateActionRpms(debug_assoc,
+                                                  self.repos.out_repos.debug,
+                                                  self.repos.in_repos.debug))
 
-        unassociations = (UnassociateActionModules(modules_unassoc, self.repos.out_repos.rpm),
-                          UnassociateActionRpms(rpms_unassoc, self.repos.out_repos.rpm),
-                          UnassociateActionRpms(srpms_unassoc, self.repos.out_repos.source),
-                          UnassociateActionRpms(debug_unassoc, self.repos.out_repos.debug))
+        self._unassociations = (UnassociateActionModules(modules_unassoc, self.repos.out_repos.rpm),
+                                UnassociateActionRpms(rpms_unassoc, self.repos.out_repos.rpm),
+                                UnassociateActionRpms(srpms_unassoc, self.repos.out_repos.source),
+                                UnassociateActionRpms(debug_unassoc, self.repos.out_repos.debug))
 
-        mdd_association = AssociateActionModuleDefaults(md_defaults_assoc,
-                                                        self.repos.out_repos.rpm,
-                                                        self.repos.in_repos.rpm)
+        self._mdd_association = AssociateActionModuleDefaults(md_defaults_assoc,
+                                                              self.repos.out_repos.rpm,
+                                                              self.repos.in_repos.rpm)
 
-        mdd_unassociation = UnassociateActionModuleDefaults(md_defaults_unassoc,
-                                                            self.repos.out_repos.rpm)
-
-        return associations, unassociations, mdd_association, mdd_unassociation
+        self._mdd_unassociation = UnassociateActionModuleDefaults(md_defaults_unassoc,
+                                                                  self.repos.out_repos.rpm)
 
     def _diff_modules_by_nsvca(self, modules_1, modules_2):
         return self._diff_lists_by_attr(modules_1, modules_2, 'nsvca')
@@ -505,10 +548,17 @@ class UbiPopulateRunner(object):
 
         return diff
 
-    def run_ubi_population(self):
-        current_modules_ft, current_module_defaults_ft, current_rpms_ft, \
-            current_srpms_ft, current_debug_rpms_ft = self._get_current_content()
+    def export_pulp_actions(self):
+        """Returns associations and unassociations expected to be executed by Pulp"""
 
+        self._set_pulp_actions()
+
+        return ExpectedPulpActions(
+            [a for a in self._associations + (self._mdd_association, ) if a.units],
+            [u for u in self._unassociations + (self._mdd_unassociation, ) if u.units]
+        )
+
+    def run_ubi_population(self):
         self._match_modules()
         self._match_binary_rpms()
         if self.repos.out_repos.debug:
@@ -519,33 +569,20 @@ class UbiPopulateRunner(object):
         self._finalize_debug_output_set()
         self._match_module_defaults()
         self._create_srpms_output_set()
-
-        associations, unassociations, mdd_association, mdd_unassociation = \
-            self._get_pulp_actions(current_modules_ft,
-                                   current_module_defaults_ft,
-                                   current_rpms_ft,
-                                   current_srpms_ft,
-                                   current_debug_rpms_ft)
+        self._set_pulp_actions()
 
         if self.dry_run:
-            self.log_curent_content(
-                current_modules_ft,
-                current_module_defaults_ft,
-                current_rpms_ft,
-                current_srpms_ft,
-                current_debug_rpms_ft,
-            )
-            self.log_pulp_actions(
-                associations + (mdd_association,),
-                unassociations + (mdd_unassociation,),
-            )
+            self.log_curent_content()
+            self.log_pulp_actions(self._associations + (self._mdd_association,),
+                                  self._unassociations + (self._mdd_unassociation,))
         else:
             fts = []
-            fts.extend(self._associate_unassociate_units(associations + unassociations))
+            fts.extend(self._associate_unassociate_units(self._associations + self._unassociations))
             # wait for associate/unassociate tasks
             self._wait_pulp(fts)
 
-            self._associate_unassociate_md_defaults((mdd_association,), (mdd_unassociation,))
+            self._associate_unassociate_md_defaults((self._mdd_association,),
+                                                    (self._mdd_unassociation,))
 
             # wait repo publication
             self._wait_pulp(self._publish_out_repos())
@@ -576,8 +613,10 @@ class UbiPopulateRunner(object):
             if tasks:
                 self.pulp.wait_for_tasks(tasks)
 
-    def log_curent_content(self, current_modules_ft, current_module_defaults_ft,
-                           current_rpms_ft, current_srpms_ft, current_debug_rpms_ft):
+    def log_curent_content(self):
+        current_modules_ft, current_module_defaults_ft, current_rpms_ft, current_srpms_ft, \
+            current_debug_rpms_ft = self._get_current_content()
+
         _LOG.info("Current modules in repo: %s", self.repos.out_repos.rpm.repo_id)
         for module in current_modules_ft.result():
             _LOG.info(module.nsvca)

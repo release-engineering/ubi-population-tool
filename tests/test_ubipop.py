@@ -851,6 +851,79 @@ def test_create_output_file_all_repos(mock_ubipop_runner, mock_get_repo_pairs,
         shutil.rmtree(path)
 
 
+@patch("ubipop.UbiPopulateRunner._get_current_content")
+@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
+def test_expected_pulp_actions(mocked_search_repo_by_cs, mocked_current_content,
+                               mock_current_content_ft):
+    # Don't actually query Pulp for repos or their content
+    mocked_search_repo_by_cs.side_effect = [
+        # Input repos - rhel-7-server
+        [get_test_repo(
+            repo_id="rhel-7-server-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-server-source-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-source-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-server-debuginfo-rpms__7_DOT_2__x86_64",
+            content_set="rhel-7-server-debuginfo-rpms",
+        ), ],
+
+        # Output repos - rhel-7-server
+        [get_test_repo(
+            repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-rpms",
+            ubi_population=True
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-source-rpms",
+            ubi_population=True
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-debuginfo-rpms",
+            ubi_population=True
+        ), ],
+    ]
+    mocked_current_content.return_value = mock_current_content_ft
+
+    ret = UbiPopulate(
+        "foo.pulp.com",
+        ('foo', 'foo'),
+        False,
+        ubiconfig_dir_or_url=TEST_DATA_DIR,
+    ).expected_pulp_actions(content_sets=["rhel-7-server-rpms", ])
+
+    # associations
+    assert len(ret.associations) == 0
+
+    # unassociations
+    assert len(ret.unassociations) == 5
+
+    assert ret.unassociations[0].units[0].name == "md_current"
+    assert ret.unassociations[0].TYPE == "modules"
+    assert ret.unassociations[0].dst_repo.repo_id == "ubi-7-server-rpms__7_DOT_2__x86_64"
+
+    assert ret.unassociations[1].units[0].name == "rpm_current"
+    assert ret.unassociations[1].TYPE == "packages"
+    assert ret.unassociations[1].dst_repo.repo_id == "ubi-7-server-rpms__7_DOT_2__x86_64"
+
+    assert ret.unassociations[2].units[0].name == "srpm_current"
+    assert ret.unassociations[2].TYPE == "packages"
+    assert ret.unassociations[2].dst_repo.repo_id == "ubi-7-server-source-rpms__7_DOT_2__x86_64"
+
+    assert ret.unassociations[3].units[0].name == "debug_rpm_current"
+    assert ret.unassociations[3].TYPE == "packages"
+    assert ret.unassociations[3].dst_repo.repo_id == "ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64"
+
+    assert ret.unassociations[4].units[0].name == "mdd_current"
+    assert ret.unassociations[4].TYPE == "module_defaults"
+    assert ret.unassociations[4].dst_repo.repo_id == "ubi-7-server-rpms__7_DOT_2__x86_64"
+
+
 @pytest.fixture(name='mock_current_content_ft')
 def fixture_mock_current_content_ft():
     current_modules_ft = MagicMock()
@@ -879,7 +952,10 @@ def fixture_mock_current_content_ft():
         current_srpms_ft, current_debug_rpms_ft
 
 
-def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
+@patch("ubipop.UbiPopulateRunner._get_current_content")
+def test_get_pulp_actions(mocked_current_content, mock_ubipop_runner, mock_current_content_ft):
+    # pylint: disable=protected-access
+
     mock_ubipop_runner.repos.modules = {
         "test": [
             get_test_mod(name="test_md"),
@@ -906,11 +982,11 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
         ],
     }
 
-    associations, unassociations, mdd_association, mdd_unassociation = \
-        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=protected-access
+    mocked_current_content.return_value = mock_current_content_ft
+    mock_ubipop_runner._set_pulp_actions()
 
     # firstly, check correct associations, there should 1 unit of each type associated
-    modules, rpms, srpms, debug_rpms = associations
+    modules, rpms, srpms, debug_rpms = mock_ubipop_runner._associations
     assert len(modules.units) == 1
     assert modules.units[0].name == "test_md"
     assert modules.dst_repo.repo_id == "ubi-foo-rpms"
@@ -932,7 +1008,7 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     assert debug_rpms.src_repo.repo_id == "foo-debug"
 
     # secondly, check correct unassociations, there should 1 unit of each type unassociated
-    modules, rpms, srpms, debug_rpms = unassociations
+    modules, rpms, srpms, debug_rpms = mock_ubipop_runner._unassociations
     assert len(modules.units) == 1
     assert modules.units[0].name == "md_current"
     assert modules.dst_repo.repo_id == "ubi-foo-rpms"
@@ -949,17 +1025,20 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     assert debug_rpms.units[0].name == "debug_rpm_current"
     assert debug_rpms.dst_repo.repo_id == "ubi-foo-debug"
 
-    assert len(mdd_association.units) == 1
-    assert mdd_association.dst_repo.repo_id == 'ubi-foo-rpms'
-    assert mdd_association.src_repo.repo_id == 'foo-rpms'
+    assert len(mock_ubipop_runner._mdd_association.units) == 1
+    assert mock_ubipop_runner._mdd_association.dst_repo.repo_id == 'ubi-foo-rpms'
+    assert mock_ubipop_runner._mdd_association.src_repo.repo_id == 'foo-rpms'
 
-    assert len(mdd_unassociation.units) == 1
-    assert mdd_unassociation.units[0].name == 'mdd_current'
-    assert mdd_unassociation.dst_repo.repo_id == 'ubi-foo-rpms'
+    assert len(mock_ubipop_runner._mdd_unassociation.units) == 1
+    assert mock_ubipop_runner._mdd_unassociation.units[0].name == 'mdd_current'
+    assert mock_ubipop_runner._mdd_unassociation.dst_repo.repo_id == 'ubi-foo-rpms'
 
 
+@patch("ubipop.UbiPopulateRunner._get_current_content")
+def test_get_pulp_actions_no_actions(mocked_current_content, mock_ubipop_runner,
+                                     mock_current_content_ft):
+    # pylint: disable=protected-access
 
-def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft):
     mock_ubipop_runner.repos.modules = {
         "test": [
             get_test_mod(name="md_current"),
@@ -986,21 +1065,21 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
         ],
     }
 
-    associations, unassociations, mdd_association, mdd_unassociation = \
-        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=protected-access
+    mocked_current_content.return_value = mock_current_content_ft
+    mock_ubipop_runner._set_pulp_actions()
 
     # firstly, check correct associations, there should 0 units associated
-    modules, rpms, srpms, debug_rpms = associations
+    modules, rpms, srpms, debug_rpms = mock_ubipop_runner._associations
     assert len(modules.units) == 0
-    assert len(mdd_association.units) == 0
+    assert len(mock_ubipop_runner._mdd_association.units) == 0
     assert len(rpms.units) == 0
     assert len(srpms.units) == 0
     assert len(debug_rpms.units) == 0
 
     # secondly, check correct unassociations, there should 0 units unassociated
-    modules, rpms, srpms, debug_rpms = unassociations
+    modules, rpms, srpms, debug_rpms = mock_ubipop_runner._unassociations
     assert len(modules.units) == 0
-    assert len(mdd_unassociation.units) == 0
+    assert len(mock_ubipop_runner._mdd_unassociation.units) == 0
     assert len(rpms.units) == 0
     assert len(srpms.units) == 0
     assert len(debug_rpms.units) == 0
@@ -1046,7 +1125,9 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     assert unassoc_line.strip() == "No unassociation expected for modules from test_dst"
 
 
-def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
+@patch("ubipop.UbiPopulateRunner._get_current_content")
+def test_get_pulp_no_duplicates(mocked_current_content, mock_ubipop_runner, mock_current_content_ft):
+    # pylint: disable=protected-access
 
     mock_ubipop_runner.repos.modules = {"test": [get_test_mod(name="md_current")]}
     mock_ubipop_runner.repos.module_defaults = \
@@ -1075,10 +1156,10 @@ def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
         "bar_pkg": [get_test_pkg(name="bar_pkg",
                                  filename="srpm_new_next.src.rpm")]}
 
-    associations, _, _, _ = \
-        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=W0212
+    mocked_current_content.return_value = mock_current_content_ft
+    mock_ubipop_runner._set_pulp_actions()
 
-    _, _, srpms, _ = associations
+    _, _, srpms, _ = mock_ubipop_runner._associations
     # only 5 srpm associations, no duplicates
     assert len(srpms.units) == 5
 
