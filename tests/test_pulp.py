@@ -2,13 +2,14 @@ import sys
 import threading
 
 try:
-    from http.client import HTTPMessage
+    from http.client import HTTPResponse
 except ImportError:
-    from httplib import HTTPMessage
+    from httplib import HTTPResponse
+
+from io import BytesIO
 
 import pytest
 import requests
-import six
 
 from mock import MagicMock, patch
 from requests.exceptions import HTTPError
@@ -298,12 +299,21 @@ def fixture_mocked_getresponse():
         yield mocked_get_conn.return_value.getresponse
 
 
-def make_mock_response(status, text=None):
-    m = MagicMock(name='MockResponse', status=status)
-    m.isclosed.side_effect = [False, True]
-    m.msg = MagicMock(spec=HTTPMessage, headers=[], status=status)
-    m.read.return_value = six.b(text)
-    return m
+def make_mock_response(status, text):
+    response_string = (
+        "HTTP/1.1 {0} Reason\r\n"
+        "Content-Type: application/json\r\n"
+        "\r\n"
+        "{1}"
+    ).format(status, text)
+
+    mocked_sock = MagicMock()
+    mocked_sock.makefile.return_value = BytesIO(response_string.encode())
+
+    http_response = HTTPResponse(mocked_sock)
+    http_response.begin()
+
+    return http_response
 
 
 @pytest.mark.parametrize(
