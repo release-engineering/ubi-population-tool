@@ -186,7 +186,7 @@ class Pulp(object):
         while _tasks:
             statuses = self.search_tasks(_tasks)
             for status in statuses:
-                if status["state"] in ("finished", "error", "cancelled"):
+                if status["state"] in ("finished", "error", "canceled"):
                     _tasks -= set([status["task_id"]])
                 results[status["task_id"]] = status
             if _tasks:
