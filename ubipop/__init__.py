@@ -90,6 +90,7 @@ class UbiPopulate(object):
         self.ubiconfig_list = self._load_ubiconfig(ubiconfig_filename_list, ubiconfig_dir_or_url,
                                                    content_sets=kwargs.get('content_sets', None),
                                                    repo_ids=kwargs.get('repo_ids', None))
+        self.ubiconfig_map = self._create_config_map()
 
     def _load_ubiconfig(self, filenames, ubiconfig_dir_or_url, content_sets=None, repo_ids=None):
         loader = ubiconfig.get_loader(ubiconfig_dir_or_url)
@@ -132,10 +133,51 @@ class UbiPopulate(object):
 
         return filtered_conf_list
 
+    def _create_config_map(self):
+        """Create a config map from self.ubiconfig_list, it has the form in:
+            {
+                "7.7":
+                    {
+                        "config_filename1": config1,
+                        "config_filename2": config2,
+                        ...,
+                    },
+                "8.1":
+                    {
+                        "config_filename1": config1,
+                        ...,
+                    },
+                ....
+            }
+        """
+
+        config_map = {}
+        for config in self.ubiconfig_list:
+            config_map.setdefault(config.version, {})\
+                .setdefault(config.filename, config)
+
+        return config_map
+
     def populate_ubi_repos(self):
         out_repos = set()
-
+        used_content_sets = set()
+        # since repos are searched by content sets, same repo could be searched and ppopulated
+        # multiple times, to avoid that, cache the content sets already used and skip the config
+        # whose content sets are all in the cache
         for config in self.ubiconfig_list:
+            content_sets = [
+                config.content_sets.rpm,
+                config.content_sets.srpm,
+                config.content_sets.debuginfo
+            ]
+            to_use = [cs for cs in content_sets if cs not in used_content_sets]
+            if to_use:
+                for cs in to_use:
+                    used_content_sets.add(cs)
+            else:
+                _LOG.debug("Skipping %s, since its been used already")
+                continue
+
             try:
                 repo_pairs = self._get_ubi_repo_sets(config)
 
@@ -144,7 +186,13 @@ class UbiPopulate(object):
                 continue
 
             for repo_set in repo_pairs:
-                UbiPopulateRunner(self.pulp, repo_set, config, self.dry_run,
+                # get the right config file by ubi_config_version attr, if it's None,
+                # then it's not a mainline repo, use platform_full_version instead.
+                version = repo_set.out_repos.rpm.ubi_config_version \
+                    or repo_set.out_repos.rpm.platform_full_version
+                right_config = self.ubiconfig_map.get(version, {}).get(config.filename)
+
+                UbiPopulateRunner(self.pulp, repo_set, right_config, self.dry_run,
                                   self._executor).run_ubi_population()
 
                 out_repos.update(repo_set.get_output_repo_ids())

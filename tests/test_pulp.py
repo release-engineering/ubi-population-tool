@@ -43,6 +43,7 @@ def fixture_search_repo_response():
             "content_set": "test_repo-source-rpms",
             "platform": "ubi",
             "platform_full_version": "7",
+            "ubi_config_version": "7",
         },
         "distributors": [{
             "id": "dist_id",

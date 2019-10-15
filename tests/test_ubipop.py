@@ -47,8 +47,9 @@ def fixture_ubi_repo_set_no_debug():
 
 @pytest.fixture(name='test_ubiconfig')
 def fixture_test_ubiconfig():
-    yield ubiconfig.get_loader(TEST_DATA_DIR).load("conf.yaml")
-
+    config = ubiconfig.get_loader(TEST_DATA_DIR).load("conf.yaml")
+    config.version = '7.7'
+    yield config
 
 @pytest.fixture(name='executor')
 def fixture_executor():
@@ -69,6 +70,7 @@ def get_test_repo(**kwargs):
         kwargs.get('distributors_ids_type_ids'),
         kwargs.get('ubi_population'),
         kwargs.get('population_sources'),
+        kwargs.get('ubi_config_version'),
     )
 
 
