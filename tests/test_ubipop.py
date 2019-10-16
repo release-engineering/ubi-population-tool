@@ -195,6 +195,43 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
     assert "ubi-7-server-rpms__7_DOT_2__x86_64" in caplog.text
 
 
+@patch("ubipop._pulp_client.Pulp.search_repo_by_id")
+def test_get_population_sources_repo_note(mocked_search_repo_by_id):
+    repo = get_test_repo(
+        repo_id="rhel-8-for-x86_64-appstream-rpms",
+        content_set="rhel-8-for-x86_64-appstream-rpms",
+        population_sources=['src_1', 'src_2']
+    )
+    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR)
+    mocked_search_repo_by_id.side_effect = [[get_test_repo(repo_id="src_1",
+                                                           content_set="src_1_cs",
+                                                          )
+                                             ],
+                                            [get_test_repo(repo_id="src_2",
+                                                           content_set="src_2_cs",
+                                                          )
+                                             ],
+                                            ]
+    repos = ubipop._get_population_sources(repo, None)
+    assert len(repos) == 2
+
+
+@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
+def test_get_population_sources_by_search(search_repo_by_cs):
+    repo = get_test_repo(
+        repo_id="rhel-8-for-x86_64-appstream-rpms",
+        content_set="rhel-8-for-x86_64-appstream-rpms",
+    )
+    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR)
+    search_repo_by_cs.side_effect = [[get_test_repo(repo_id="src_1",
+                                                    content_set="src_1_cs",
+                                                    )
+                                      ],
+                                     ]
+    repos = ubipop._get_population_sources(repo, None)
+    assert len(repos) == 1
+
+
 def test_get_packages_from_module_by_name(mock_ubipop_runner):
     package_name = "postgresql"
     input_modules = [
