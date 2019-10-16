@@ -26,6 +26,10 @@ class RepoMissing(Exception):
     pass
 
 
+class ConfigMissing(Exception):
+    pass
+
+
 RepoSet = namedtuple('RepoSet', ['rpm', 'source', 'debug'])
 
 
@@ -154,7 +158,7 @@ class UbiPopulate(object):
         config_map = {}
         for config in self.ubiconfig_list:
             config_map.setdefault(config.version, {})\
-                .setdefault(config.filename, config)
+                .setdefault(config.file_name, config)
 
         return config_map
 
@@ -164,7 +168,8 @@ class UbiPopulate(object):
         # since repos are searched by content sets, same repo could be searched and populated
         # multiple times, to avoid that, cache the content sets already used and skip the config
         # whose content sets are all in the cache
-        for config in self.ubiconfig_list:
+
+        for config in sorted(self.ubiconfig_list, key=str):
             content_sets = [
                 config.content_sets.rpm,
                 config.content_sets.srpm,
@@ -175,7 +180,7 @@ class UbiPopulate(object):
                 for cs in to_use:
                     used_content_sets.add(cs)
             else:
-                _LOG.debug("Skipping %s, since it's been used already", config.filename)
+                _LOG.debug("Skipping %s, since it's been used already", config.file_name)
                 continue
 
             try:
@@ -190,13 +195,26 @@ class UbiPopulate(object):
                 platform_full_version = repo_set.out_repos.rpm.platform_full_version
                 # get the right config file by ubi_config_version attr, if it's None,
                 # then it's not a mainline repo, use platform_full_version instead.
+                # config file could also be missing for specific version, then the
+                # default config file will be used.
                 version = ubi_config_version or platform_full_version
-                right_config = self.ubiconfig_map.get(version, {}).get(config.filename)
-                # right_config could be None, because the config file for specific version
-                # might not available, then fall back to use the default config file.
-                if right_config is None:
-                    right_config = self.ubiconfig_map.get(platform_full_version, {})\
-                        .get(config.filename)
+                right_config = self.ubiconfig_map\
+                    .get(str(version), {})\
+                    .get(config.file_name)\
+                    or self.ubiconfig_map\
+                        .get(str(platform_full_version), {})\
+                        .get(config.file_name)
+
+                # if config file is missing from wanted version, as well as default
+                # branch, raise exception
+                if not right_config:
+                    _LOG.error(
+                        'Config file %s missing from %s and default %s branches',
+                        config.file_name,
+                        version,
+                        platform_full_version,
+                    )
+                    raise ConfigMissing()
 
                 UbiPopulateRunner(self.pulp, repo_set, right_config, self.dry_run,
                                   self._executor).run_ubi_population()
@@ -212,7 +230,7 @@ class UbiPopulate(object):
         """
         Searches for ubi repository triplet (binary rpm, srpm, debug) for
         one ubi config item and tries to determine their population sources
-        (input repositories). Returns list UbiRepoSet objects that provides 
+        (input repositories). Returns list UbiRepoSet objects that provides
         input and output repositories that are used for population process.
         """
         rpm_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs,

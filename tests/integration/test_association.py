@@ -19,7 +19,7 @@ PULP_CERT_PATH = os.getenv('TEST_PULP_CERT_PATH')
 PULP_SECURE = os.getenv('TEST_PULP_SECURE', '0').lower() in ['true', 'yes', '1']
 PULP_RPM_REPO_PREFIX = '/pulp/rpmrepos/'
 
-TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), './data')
+TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), './data/ubi7')
 
 INTEGRATION_NOT_SETUP = PULP_HOSTNAME is None
 
