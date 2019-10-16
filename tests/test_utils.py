@@ -46,7 +46,7 @@ def test_get_action_associate(klass, method):
     action = klass(units, dst_repo, src_repos)
     actions = action.get_actions(MagicMock())
 
-    for i, action in enumerate(actions):
+    for action in actions:
         associate_action, src_repo_current, dst_repo_current, current_units = action
         assert "mock." + method in str(associate_action)
         assert len(current_units) == 1
