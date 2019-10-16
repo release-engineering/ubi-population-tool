@@ -171,8 +171,8 @@ class UbiPopulate(object):
                 # it is sufficient to check only binary from repo triplet for disabling population
                 _LOG.debug(
                     "Skipping population for output binary repo and "
-                    "related source and debug repos:\n\t%s"
-                    % out_rpm_repo.repo_id)
+                    "related source and debug repos:\n\t%s",
+                    out_rpm_repo.repo_id)
                 continue
 
             out_source_repo = self.get_repo_counterpart(out_rpm_repo, source_repos_ft.result())

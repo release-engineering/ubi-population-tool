@@ -49,7 +49,9 @@ def test_get_action_associate(klass, method):
     for i, action in enumerate(actions):
         associate_action, src_repo_current, dst_repo_current, current_units = action
         assert "mock." + method in str(associate_action)
-        assert current_units == [units[i]]
+
+        assert sorted(current_units) == [u for u in units
+                                         if u.associate_source_repo_id == src_repo_current.repo_id]
         assert dst_repo_current.repo_id == dst_repo.repo_id
         assert src_repo_current.repo_id == src_repos[i].repo_id
 
