@@ -212,7 +212,7 @@ def test_get_population_sources_repo_note(mocked_search_repo_by_id):
                                                           )
                                              ],
                                             ]
-    repos = ubipop._get_population_sources(repo, None)
+    repos = ubipop._get_population_sources(repo, None)  # pylint: disable=protected-access
     assert len(repos) == 2
 
 
@@ -228,7 +228,7 @@ def test_get_population_sources_by_search(search_repo_by_cs):
                                                     )
                                       ],
                                      ]
-    repos = ubipop._get_population_sources(repo, None)
+    repos = ubipop._get_population_sources(repo, None)  # pylint: disable=protected-access
     assert len(repos) == 1
 
 
