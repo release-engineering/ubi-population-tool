@@ -161,7 +161,7 @@ class UbiPopulate(object):
     def populate_ubi_repos(self):
         out_repos = set()
         used_content_sets = set()
-        # since repos are searched by content sets, same repo could be searched and ppopulated
+        # since repos are searched by content sets, same repo could be searched and populated
         # multiple times, to avoid that, cache the content sets already used and skip the config
         # whose content sets are all in the cache
         for config in self.ubiconfig_list:
@@ -175,7 +175,7 @@ class UbiPopulate(object):
                 for cs in to_use:
                     used_content_sets.add(cs)
             else:
-                _LOG.debug("Skipping %s, since its been used already")
+                _LOG.debug("Skipping %s, since it's been used already", config.filename)
                 continue
 
             try:
@@ -186,11 +186,17 @@ class UbiPopulate(object):
                 continue
 
             for repo_set in repo_pairs:
+                ubi_config_version = repo_set.out_repos.rpm.ubi_config_version
+                platform_full_version = repo_set.out_repos.rpm.platform_full_version
                 # get the right config file by ubi_config_version attr, if it's None,
                 # then it's not a mainline repo, use platform_full_version instead.
-                version = repo_set.out_repos.rpm.ubi_config_version \
-                    or repo_set.out_repos.rpm.platform_full_version
+                version = ubi_config_version or platform_full_version
                 right_config = self.ubiconfig_map.get(version, {}).get(config.filename)
+                # right_config could be None, because the config file for specific version
+                # might not available, then fall back to use the default config file.
+                if right_config is None:
+                    right_config = self.ubiconfig_map.get(platform_full_version, {})\
+                        .get(config.filename)
 
                 UbiPopulateRunner(self.pulp, repo_set, right_config, self.dry_run,
                                   self._executor).run_ubi_population()
