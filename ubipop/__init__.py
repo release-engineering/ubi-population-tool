@@ -155,7 +155,12 @@ class UbiPopulate(object):
                     f.write(repo.strip() + '\n')
 
     def _get_ubi_repo_sets(self, ubi_config_item):
-
+        """
+        Searches for ubi repository triplet (binary rpm, srpm, debug) for
+        one ubi config item and tries to determine their population sources
+        (input repositories). Returns list UbiRepoSet objects that provides 
+        input and output repositories that are used for population process.
+        """
         rpm_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs,
                                              ubi_config_item.content_sets.rpm.output)
         source_repos_ft = self._executor.submit(self.pulp.search_repo_by_cs,
