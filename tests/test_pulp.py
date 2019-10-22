@@ -63,17 +63,18 @@ def fixture_mock_repo():
             ("dist_id_2", "dist_type_id_2"),
         ],
         ubi_population=None,
+        population_sources=None
     )
 
 
 @pytest.fixture(name='mock_package')
 def fixture_mock_package():
-    yield Package("foo-pkg", "foo-pkg.rpm")
+    yield Package("foo-pkg", "foo-pkg.rpm", "src_repo_id")
 
 
 @pytest.fixture(name='mock_mdd')
 def fixture_mock_mdd():
-    yield ModuleDefaults("virt", "rhel", {"2.6": ["common"]})
+    yield ModuleDefaults("virt", "rhel", {"2.6": ["common"]}, "src_repo_id")
 
 
 @pytest.fixture(name='mock_response_for_async_req')

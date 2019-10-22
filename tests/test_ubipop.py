@@ -27,9 +27,9 @@ TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), './data')
 
 @pytest.fixture(name='ubi_repo_set')
 def fixture_ubi_repo_set():
-    yield UbiRepoSet(RepoSet(get_test_repo(repo_id="foo-rpms"),
-                             get_test_repo(repo_id="foo-source"),
-                             get_test_repo(repo_id="foo-debug")),
+    yield UbiRepoSet(RepoSet([get_test_repo(repo_id="foo-rpms")],
+                             [get_test_repo(repo_id="foo-source")],
+                             [get_test_repo(repo_id="foo-debug")]),
                      RepoSet(get_test_repo(repo_id="ubi-foo-rpms"),
                              get_test_repo(repo_id="ubi-foo-source"),
                              get_test_repo(repo_id="ubi-foo-debug")))
@@ -37,8 +37,8 @@ def fixture_ubi_repo_set():
 
 @pytest.fixture(name='ubi_repo_set_no_debug')
 def fixture_ubi_repo_set_no_debug():
-    yield UbiRepoSet(RepoSet(get_test_repo(repo_id="foo-rpms"),
-                             get_test_repo(repo_id="foo-source"),
+    yield UbiRepoSet(RepoSet([get_test_repo(repo_id="foo-rpms")],
+                             [get_test_repo(repo_id="foo-source")],
                              None),
                      RepoSet(get_test_repo(repo_id="ubi-foo-rpms"),
                              get_test_repo(repo_id="ubi-foo-source"),
@@ -68,6 +68,7 @@ def get_test_repo(**kwargs):
         kwargs.get('platform_full_version'),
         kwargs.get('distributors_ids_type_ids'),
         kwargs.get('ubi_population'),
+        kwargs.get('population_sources'),
     )
 
 
@@ -75,6 +76,7 @@ def get_test_pkg(**kwargs):
     return Package(
         kwargs.get('name'),
         kwargs.get('filename'),
+        kwargs.get('src_repo_id'),
         sourcerpm_filename=kwargs.get('sourcerpm_filename'),
         is_modular=kwargs.get('is_modular', False),
     )
@@ -89,11 +91,16 @@ def get_test_mod(**kwargs):
         kwargs.get('arch', ''),
         kwargs.get('packages', ''),
         kwargs.get('profiles', ''),
+        kwargs.get('src_repo_id'),
     )
 
 
 def get_test_mod_defaults(**kwargs):
-    return ModuleDefaults(kwargs['name'], kwargs['stream'], kwargs['profiles'])
+    return ModuleDefaults(kwargs['name'],
+                          kwargs['stream'],
+                          kwargs['profiles'],
+                          kwargs.get('src_repo_id'),
+                         )
 
 
 def test_get_output_repo_ids(ubi_repo_set):
@@ -111,20 +118,6 @@ def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
 def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner, caplog):
     # Don't actually query Pulp for repos
     mocked_search_repo_by_cs.side_effect = [
-        # Input repos - rhel-8-for-x86_64-appstream
-        [get_test_repo(
-            repo_id="rhel-8-for-x86_64-appstream-rpms",
-            content_set="rhel-8-for-x86_64-appstream-rpms",
-        ), ],
-        [get_test_repo(
-            repo_id="rhel-8-for-x86_64-appstream-source-rpms",
-            content_set="rhel-8-for-x86_64-appstream-source-rpms",
-        ), ],
-        [get_test_repo(
-            repo_id="rhel-8-for-x86_64-appstream-debug-rpms",
-            content_set="rhel-8-for-x86_64-appstream-debug-rpms",
-        ), ],
-
         # Output repos - rhel-8-for-x86_64-appstream
         [get_test_repo(
             repo_id="ubi-8-for-x86_64-appstream-rpms",
@@ -142,6 +135,39 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
             ubi_population=True
         ), ],
 
+        # Input repos - rhel-8-for-x86_64-appstream
+        [get_test_repo(
+            repo_id="rhel-8-for-x86_64-appstream-rpms",
+            content_set="rhel-8-for-x86_64-appstream-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-8-for-x86_64-appstream-source-rpms",
+            content_set="rhel-8-for-x86_64-appstream-source-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-8-for-x86_64-appstream-debug-rpms",
+            content_set="rhel-8-for-x86_64-appstream-debug-rpms",
+        ), ],
+
+        # Output repos - rhel-7-server
+        [get_test_repo(
+            repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-rpms",
+            ubi_population=False
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-source-rpms",
+            ubi_population=True
+            # doesn't matter here, it sufficient to have ubi_population==False at rpm binary repo
+            # for skipping whole repo triplet
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-debuginfo-rpms",
+            ubi_population=False
+        ), ],
+
         # Input repos - rhel-7-server
         [get_test_repo(
             repo_id="rhel-7-server-rpms__7_DOT_2__x86_64",
@@ -155,23 +181,6 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
             repo_id="rhel-7-server-debuginfo-rpms__7_DOT_2__x86_64",
             content_set="rhel-7-server-debuginfo-rpms",
         ), ],
-
-        # Output repos - rhel-7-server
-        [get_test_repo(
-            repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
-            content_set="ubi-7-server-rpms",
-            ubi_population=True
-        ), ],
-        [get_test_repo(
-            repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
-            content_set="ubi-7-server-source-rpms",
-            ubi_population=False
-        ), ],
-        [get_test_repo(
-            repo_id="ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64",
-            content_set="ubi-7-server-debuginfo-rpms",
-            ubi_population=False
-        ), ],
     ]
 
     # Attempt to populate both invalid and valid repo sets
@@ -180,10 +189,47 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
 
     # Should've only run once
     assert mocked_ubipop_runner.call_count == 1
-    # For rhel-8-for-x86_64-appstream
-    assert "Skipping rhel-8-for-x86_64-appstream" not in caplog.text
-    # Not for rhel-7-server
-    assert "Skipping rhel-7-server-rpms" in caplog.text
+    # For ubi-8
+    assert "ubi-8-for-x86_64-appstream-rpms" not in caplog.text
+    # Not for ubi-7-server
+    assert "ubi-7-server-rpms__7_DOT_2__x86_64" in caplog.text
+
+
+@patch("ubipop._pulp_client.Pulp.search_repo_by_id")
+def test_get_population_sources_repo_note(mocked_search_repo_by_id):
+    repo = get_test_repo(
+        repo_id="rhel-8-for-x86_64-appstream-rpms",
+        content_set="rhel-8-for-x86_64-appstream-rpms",
+        population_sources=['src_1', 'src_2']
+    )
+    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR)
+    mocked_search_repo_by_id.side_effect = [[get_test_repo(repo_id="src_1",
+                                                           content_set="src_1_cs",
+                                                          )
+                                             ],
+                                            [get_test_repo(repo_id="src_2",
+                                                           content_set="src_2_cs",
+                                                          )
+                                             ],
+                                            ]
+    repos = ubipop._get_population_sources(repo, None)  # pylint: disable=protected-access
+    assert len(repos) == 2
+
+
+@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
+def test_get_population_sources_by_search(search_repo_by_cs):
+    repo = get_test_repo(
+        repo_id="rhel-8-for-x86_64-appstream-rpms",
+        content_set="rhel-8-for-x86_64-appstream-rpms",
+    )
+    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR)
+    search_repo_by_cs.side_effect = [[get_test_repo(repo_id="src_1",
+                                                    content_set="src_1_cs",
+                                                    )
+                                      ],
+                                     ]
+    repos = ubipop._get_population_sources(repo, None)  # pylint: disable=protected-access
+    assert len(repos) == 1
 
 
 def test_get_packages_from_module_by_name(mock_ubipop_runner):
@@ -776,12 +822,14 @@ def test_create_srpms_output_set(mock_ubipop_runner):
             name="tomcatjss",
             filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
             sourcerpm_filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.src.rpm",
+            src_repo_id="foo-rpms",
         ),
         # blacklisted
         get_test_pkg(
             name="kernel",
             filename="kernel-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
             sourcerpm_filename="kernel.src.rpm",
+            src_repo_id="foo-rpms",
         ),
         # blacklisted but referenced in some module
         get_test_pkg(
@@ -789,6 +837,7 @@ def test_create_srpms_output_set(mock_ubipop_runner):
             filename="foo-pkg-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
             sourcerpm_filename="foo-pkg-7.3.6-1.el8+1944+b6c8e16f.src.rpm",
             is_modular=True,
+            src_repo_id="foo-rpms",
         ),
     ]
 
@@ -822,9 +871,9 @@ def test_create_srpms_output_set_missings_srpm_reference(capsys, set_logging, mo
 
 @pytest.fixture(name='mock_get_repo_pairs')
 def fixture_mock_get_repo_pairs(ubi_repo_set):
-    with patch('ubipop.UbiPopulate._get_input_and_output_repo_pairs') as get_repo_pairs:
-        get_repo_pairs.return_value = [ubi_repo_set]
-        yield get_repo_pairs
+    with patch('ubipop.UbiPopulate._get_ubi_repo_sets') as get_ubi_repo_sets:
+        get_ubi_repo_sets.return_value = [ubi_repo_set]
+        yield get_ubi_repo_sets
 
 
 @pytest.fixture(name='mock_run_ubi_population')
@@ -914,22 +963,26 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     assert len(modules.units) == 1
     assert modules.units[0].name == "test_md"
     assert modules.dst_repo.repo_id == "ubi-foo-rpms"
-    assert modules.src_repo.repo_id == "foo-rpms"
+    assert len(modules.src_repos) == 1
+    assert modules.src_repos[0].repo_id == "foo-rpms"
 
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "test_rpm"
     assert rpms.dst_repo.repo_id == "ubi-foo-rpms"
-    assert rpms.src_repo.repo_id == "foo-rpms"
+    assert len(rpms.src_repos) == 1
+    assert rpms.src_repos[0].repo_id == "foo-rpms"
 
     assert len(srpms.units) == 1
     assert srpms.units[0].name == "test_srpm"
     assert srpms.dst_repo.repo_id == "ubi-foo-source"
-    assert srpms.src_repo.repo_id == "foo-source"
+    assert len(srpms.src_repos) == 1
+    assert srpms.src_repos[0].repo_id == "foo-source"
 
     assert len(debug_rpms.units) == 1
     assert debug_rpms.units[0].name == "test_debug_pkg"
     assert debug_rpms.dst_repo.repo_id == "ubi-foo-debug"
-    assert debug_rpms.src_repo.repo_id == "foo-debug"
+    assert len(debug_rpms.src_repos) == 1
+    assert debug_rpms.src_repos[0].repo_id == "foo-debug"
 
     # secondly, check correct unassociations, there should 1 unit of each type unassociated
     modules, rpms, srpms, debug_rpms = unassociations
@@ -951,12 +1004,12 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
 
     assert len(mdd_association.units) == 1
     assert mdd_association.dst_repo.repo_id == 'ubi-foo-rpms'
-    assert mdd_association.src_repo.repo_id == 'foo-rpms'
+    assert len(mdd_association.src_repos) == 1
+    assert mdd_association.src_repos[0].repo_id == 'foo-rpms'
 
     assert len(mdd_unassociation.units) == 1
     assert mdd_unassociation.units[0].name == 'mdd_current'
     assert mdd_unassociation.dst_repo.repo_id == 'ubi-foo-rpms'
-
 
 
 def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft):
@@ -1018,7 +1071,9 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
     set_logging.addHandler(logging.StreamHandler(sys.stdout))
     src_repo = get_test_repo(repo_id='test_src')
     dst_repo = get_test_repo(repo_id='test_dst')
-    associations = [AssociateActionModules([get_test_mod(name="test_assoc")], dst_repo, src_repo)]
+    associations = [AssociateActionModules([get_test_mod(name="test_assoc",
+                                                         src_repo_id=src_repo.repo_id)],
+                                           dst_repo, [src_repo])]
     unassociations = [UnassociateActionModules([get_test_mod(name="test_unassoc")], dst_repo)]
 
     mock_ubipop_runner.log_pulp_actions(associations, unassociations)
@@ -1034,7 +1089,7 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     set_logging.addHandler(logging.StreamHandler(sys.stdout))
     src_repo = get_test_repo(repo_id='test_src')
     dst_repo = get_test_repo(repo_id='test_dst')
-    associations = [AssociateActionModules([], dst_repo, src_repo)]
+    associations = [AssociateActionModules([], dst_repo, [src_repo])]
     unassociations = [UnassociateActionModules([], dst_repo)]
 
     mock_ubipop_runner.log_pulp_actions(associations, unassociations)
@@ -1042,7 +1097,7 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     assoc_line, unassoc_line = out.split('\n', 1)
 
     assert err == ""
-    assert assoc_line.strip() == "No association expected for modules from test_src to test_dst"
+    assert assoc_line.strip() == "No association expected for modules from ['test_src'] to test_dst"
     assert unassoc_line.strip() == "No unassociation expected for modules from test_dst"
 
 
@@ -1088,7 +1143,7 @@ def test_associate_units(mock_ubipop_runner):
     dst_repo = get_test_repo(repo_id='test_dst')
 
     associations = [
-        AssociateActionModules([get_test_mod(name="test_assoc")], dst_repo, src_repo),
+        AssociateActionModules([get_test_mod(name="test_assoc")], dst_repo, [src_repo]),
     ]
 
     mock_ubipop_runner.pulp.associate_modules.return_value = ["task_id"]
@@ -1108,7 +1163,7 @@ def test_associate_unassociate_md_defaults(mock_ubipop_runner):
             stream='rhel',
             profiles={'2.5': ["common"]},
         ),
-    ], dst_repo, src_repo)
+    ], dst_repo, [src_repo])
 
     unassociations = UnassociateActionModuleDefaults([
         get_test_mod_defaults(

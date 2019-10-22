@@ -97,6 +97,7 @@ class Pulp(object):
                 platform_full_version=notes['platform_full_version'],
                 dist_ids_type_ids=dist_info,
                 ubi_population=ubi_population,
+                population_sources=notes.get('population_sources')
             ))
 
         return repos
@@ -141,7 +142,7 @@ class Pulp(object):
         ret.raise_for_status()
         for item in ret.json():
             metadata = item['metadata']
-            rpms.append(Package(metadata['name'], metadata['filename'],
+            rpms.append(Package(metadata['name'], metadata['filename'], repo.repo_id,
                                 sourcerpm_filename=metadata.get('sourcerpm')))
         return rpms
 
@@ -160,7 +161,8 @@ class Pulp(object):
             metadata = item['metadata']
             modules.append(Module(metadata['name'], metadata['stream'],
                                   metadata['version'], metadata['context'],
-                                  metadata['arch'], metadata['artifacts'], metadata['profiles']))
+                                  metadata['arch'], metadata['artifacts'], metadata['profiles'],
+                                  repo.repo_id))
         return modules
 
     def search_module_defaults(self, repo, name=None, stream=None):
@@ -176,7 +178,7 @@ class Pulp(object):
         for item in ret.json():
             metadata = item['metadata']
             module_defaults.append(ModuleDefaults(metadata['name'], metadata['stream'],
-                                                  metadata['profiles']))
+                                                  metadata['profiles'], repo.repo_id))
         return module_defaults
 
     def wait_for_tasks(self, task_id_list, delay=5.0):
@@ -311,17 +313,18 @@ class Pulp(object):
 
 class Repo(object):
     def __init__(self, repo_id, arch, content_set, platform_full_version, dist_ids_type_ids,
-                 ubi_population):
+                 ubi_population, population_sources):
         self.repo_id = repo_id
         self.arch = arch
         self.content_set = content_set
         self.platform_full_version = platform_full_version
         self.distributors_ids_type_ids_tuples = dist_ids_type_ids
         self.ubi_population = ubi_population
+        self.population_sources = population_sources
 
 
 class Package(object):
-    def __init__(self, name, filename, sourcerpm_filename=None, is_modular=False):
+    def __init__(self, name, filename, src_repo_id, sourcerpm_filename=None, is_modular=False):
         self.name = name
         self.filename = filename
         self.sourcerpm_filename = sourcerpm_filename
@@ -329,6 +332,7 @@ class Package(object):
         #  return name, ver, rel, epoch, arch
         _, self.version, self.release, self.epoch, _ = split_filename(self.filename)
         self.evr_tuple = (self.epoch, self.version, self.release)
+        self.associate_source_repo_id = src_repo_id
 
     def __lt__(self, other):
         return label_compare(self.evr_tuple, other.evr_tuple) < 0
@@ -353,7 +357,7 @@ class Package(object):
 
 
 class Module(object):
-    def __init__(self, name, stream, version, context, arch, packages, profiles):
+    def __init__(self, name, stream, version, context, arch, packages, profiles, src_repo_id):
         self.name = name
         self.stream = stream
         self.version = version
@@ -361,6 +365,7 @@ class Module(object):
         self.arch = arch
         self.packages = packages
         self.profiles = profiles
+        self.associate_source_repo_id = src_repo_id
 
     @property
     def nsvca(self):
@@ -385,10 +390,11 @@ class ModuleDefaults(object):
     if someone asks to enable 'ruby:2.5' for some repo without specifing profiles, will
     get 'common' profile by defualt
     """
-    def __init__(self, name, stream, profiles):
+    def __init__(self, name, stream, profiles, src_repo_id):
         self.name = name
         self.stream = stream
         self.profiles = profiles  # a dict such as {'4.046':['common']}
+        self.associate_source_repo_id = src_repo_id
 
     def __str__(self):
         return self.name
