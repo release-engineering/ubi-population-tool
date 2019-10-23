@@ -127,9 +127,9 @@ class UbiPopulate(object):
 
         for conf in config_list:
             for label in [
-                conf.content_sets.rpm.input, conf.content_sets.rpm.output,
-                conf.content_sets.srpm.input, conf.content_sets.srpm.output,
-                conf.content_sets.debuginfo.input, conf.content_sets.debuginfo.output,
+                    conf.content_sets.rpm.input, conf.content_sets.rpm.output,
+                    conf.content_sets.srpm.input, conf.content_sets.srpm.output,
+                    conf.content_sets.debuginfo.input, conf.content_sets.debuginfo.output,
             ]:
                 if label in content_sets:
                     filtered_conf_list.append(conf)
@@ -171,10 +171,11 @@ class UbiPopulate(object):
 
         for config in sorted(self.ubiconfig_list, key=str):
             content_sets = [
-                config.content_sets.rpm,
-                config.content_sets.srpm,
-                config.content_sets.debuginfo
+                config.content_sets.rpm.output,
+                config.content_sets.srpm.output,
+                config.content_sets.debuginfo.output,
             ]
+
             to_use = [cs for cs in content_sets if cs not in used_content_sets]
             if to_use:
                 for cs in to_use:
@@ -193,6 +194,7 @@ class UbiPopulate(object):
             for repo_set in repo_pairs:
                 ubi_config_version = repo_set.out_repos.rpm.ubi_config_version
                 platform_full_version = repo_set.out_repos.rpm.platform_full_version
+                platform_major_version = repo_set.out_repos.rpm.platform_major_version
                 # get the right config file by ubi_config_version attr, if it's None,
                 # then it's not a mainline repo, use platform_full_version instead.
                 # config file could also be missing for specific version, then the
@@ -202,7 +204,7 @@ class UbiPopulate(object):
                     .get(str(version), {})\
                     .get(config.file_name)\
                     or self.ubiconfig_map\
-                        .get(str(platform_full_version), {})\
+                        .get(str(platform_major_version), {})\
                         .get(config.file_name)
 
                 # if config file is missing from wanted version, as well as default

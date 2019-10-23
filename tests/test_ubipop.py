@@ -12,7 +12,7 @@ import ubiconfig
 
 from mock import MagicMock, patch, call
 from more_executors import Executors
-from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
+from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate, ConfigMissing
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
 from ubipop._utils import (
     AssociateActionModules,
@@ -72,6 +72,7 @@ def get_test_repo(**kwargs):
         kwargs.get('arch'),
         kwargs.get('content_set'),
         kwargs.get('platform_full_version'),
+        kwargs.get('platform_major_version'),
         kwargs.get('distributors_ids_type_ids'),
         kwargs.get('ubi_population'),
         kwargs.get('population_sources'),
@@ -195,6 +196,59 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
     assert "ubi-8-for-x86_64-appstream-rpms" not in caplog.text
     # Not for ubi-7-server
     assert "ubi-7-server-rpms__7_DOT_2__x86_64" in caplog.text
+    # Used content sets won't be used again
+    assert "Skipping ubiconf_golang2.yaml, since it's been used already" in caplog.text
+
+
+@patch("ubipop.UbiPopulateRunner")
+@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
+def test_raise_config_missing(mocked_search_repo_by_cs, mocked_ubipop_runner, caplog):
+    mocked_search_repo_by_cs.side_effect = [
+        # Output repos - rhel-7-for-x86_64-appstream
+        [get_test_repo(
+            repo_id="ubi-7-for-x86_64-appstream-rpms",
+            content_set="ubi-7-for-x86_64-appstream-rpms",
+            ubi_population=True,
+            platform_full_version="7",
+            platform_major_version="7"
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-for-x86_64-appstream-source-rpms",
+            content_set="ubi-7-for-x86_64-appstream-source-rpms",
+            ubi_population=True,
+            platform_full_version="7",
+            platform_major_version="7"
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-for-x86_64-appstream-debug-rpms",
+            content_set="ubi-7-for-x86_64-appstream-debug-rpms",
+            ubi_population=True,
+            platform_full_version="7",
+            platform_major_version="7"
+        ), ],
+
+        # Input repos - rhel-7-for-x86_64-appstream
+        [get_test_repo(
+            repo_id="rhel-7-for-x86_64-appstream-rpms",
+            content_set="rhel-7-for-x86_64-appstream-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-for-x86_64-appstream-source-rpms",
+            content_set="rhel-7-for-x86_64-appstream-source-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-for-x86_64-appstream-debug-rpms",
+            content_set="rhel-7-for-x86_64-appstream-debug-rpms",
+        ), ],
+    ]
+    config_path = os.path.join(TEST_DATA_DIR, 'ubi8')
+    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=config_path)
+    with pytest.raises(ConfigMissing):
+        ubipop.populate_ubi_repos()
+
+    assert mocked_ubipop_runner.call_count == 0
+
+    assert "Config file ubiconf_golang.yaml missing from 7 and default 7 branches" in caplog.text
 
 
 @patch("ubipop._pulp_client.Pulp.search_repo_by_id")
