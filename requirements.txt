@@ -1,4 +1,4 @@
 requests
 more-executors
-ubi-config>=2.1.0
+ubi-config>=2.2.0
 rpm-py-installer
