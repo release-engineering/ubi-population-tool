@@ -43,6 +43,8 @@ def fixture_search_repo_response():
             "content_set": "test_repo-source-rpms",
             "platform": "ubi",
             "platform_full_version": "7",
+            "platform_major_version": "7",
+            "ubi_config_version": "7",
         },
         "distributors": [{
             "id": "dist_id",
@@ -58,6 +60,8 @@ def fixture_mock_repo():
         arch="x86_64",
         content_set="test_repo-source-rpms",
         platform_full_version="7",
+        platform_major_version="7",
+        ubi_config_version="7",
         dist_ids_type_ids=[
             ("dist_id_1", "dist_type_id_1"),
             ("dist_id_2", "dist_type_id_2"),
@@ -184,6 +188,7 @@ def test_search_repo_by_cs(mock_pulp, mock_search_repos):
     assert repo.arch == "x86_64"
     assert repo.content_set == "test_repo-source-rpms"
     assert repo.platform_full_version == "7"
+    assert repo.platform_major_version == "7"
     assert repo.distributors_ids_type_ids_tuples[0] == ("dist_id", "d_type_id")
     # ubi_population note was unset, so it should default to True
     assert repo.ubi_population is True
@@ -199,6 +204,7 @@ def test_search_repo_by_id(mock_pulp, mock_search_repos):
     assert repo.arch == "x86_64"
     assert repo.content_set == "test_repo-source-rpms"
     assert repo.platform_full_version == "7"
+    assert repo.ubi_config_version == "7"
     assert repo.distributors_ids_type_ids_tuples[0] == ("dist_id", "d_type_id")
     # ubi_population note was unset, so it should default to True
     assert repo.ubi_population is True

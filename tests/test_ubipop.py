@@ -12,7 +12,7 @@ import ubiconfig
 
 from mock import MagicMock, patch, call
 from more_executors import Executors
-from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate
+from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate, ConfigMissing
 from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
 from ubipop._utils import (
     AssociateActionModules,
@@ -27,12 +27,18 @@ TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), './data')
 
 @pytest.fixture(name='ubi_repo_set')
 def fixture_ubi_repo_set():
-    yield UbiRepoSet(RepoSet([get_test_repo(repo_id="foo-rpms")],
-                             [get_test_repo(repo_id="foo-source")],
-                             [get_test_repo(repo_id="foo-debug")]),
-                     RepoSet(get_test_repo(repo_id="ubi-foo-rpms"),
-                             get_test_repo(repo_id="ubi-foo-source"),
-                             get_test_repo(repo_id="ubi-foo-debug")))
+    yield UbiRepoSet(RepoSet([get_test_repo(repo_id="foo-rpms",
+                                            ubi_config_version="7")],
+                             [get_test_repo(repo_id="foo-source",
+                                            ubi_config_version="7")],
+                             [get_test_repo(repo_id="foo-debug",
+                                            ubi_config_version="7")]),
+                     RepoSet(get_test_repo(repo_id="ubi-foo-rpms",
+                                           ubi_config_version="7"),
+                             get_test_repo(repo_id="ubi-foo-source",
+                                           ubi_config_version="7"),
+                             get_test_repo(repo_id="ubi-foo-debug",
+                                           ubi_config_version="7")))
 
 
 @pytest.fixture(name='ubi_repo_set_no_debug')
@@ -47,7 +53,7 @@ def fixture_ubi_repo_set_no_debug():
 
 @pytest.fixture(name='test_ubiconfig')
 def fixture_test_ubiconfig():
-    yield ubiconfig.get_loader(TEST_DATA_DIR).load("conf.yaml")
+    yield ubiconfig.get_loader(TEST_DATA_DIR).load("ubi7/conf.yaml")
 
 
 @pytest.fixture(name='executor')
@@ -66,9 +72,11 @@ def get_test_repo(**kwargs):
         kwargs.get('arch'),
         kwargs.get('content_set'),
         kwargs.get('platform_full_version'),
+        kwargs.get('platform_major_version'),
         kwargs.get('distributors_ids_type_ids'),
         kwargs.get('ubi_population'),
         kwargs.get('population_sources'),
+        kwargs.get('ubi_config_version'),
     )
 
 
@@ -118,21 +126,49 @@ def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
 def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner, caplog):
     # Don't actually query Pulp for repos
     mocked_search_repo_by_cs.side_effect = [
+        # Output repos - rhel-7-server
+        [get_test_repo(
+            repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-rpms",
+            ubi_population=False,
+            platform_full_version="7.2",
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-source-rpms",
+            ubi_population=True,
+            # doesn't matter here, it sufficient to have ubi_population==False at rpm binary repo
+            # for skipping whole repo triplet
+            platform_full_version="7.2",
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64",
+            content_set="ubi-7-server-debuginfo-rpms",
+            ubi_population=False,
+            platform_full_version="7.2"
+        ), ],
+
         # Output repos - rhel-8-for-x86_64-appstream
         [get_test_repo(
             repo_id="ubi-8-for-x86_64-appstream-rpms",
             content_set="ubi-8-for-x86_64-appstream-rpms",
-            ubi_population=True
+            ubi_population=True,
+            ubi_config_version="8",
+            platform_full_version="8"
         ), ],
         [get_test_repo(
             repo_id="ubi-8-for-x86_64-appstream-source-rpms",
             content_set="ubi-8-for-x86_64-appstream-source-rpms",
-            ubi_population=True
+            ubi_population=True,
+            ubi_config_version="8",
+            platform_full_version="8"
         ), ],
         [get_test_repo(
             repo_id="ubi-8-for-x86_64-appstream-debug-rpms",
             content_set="ubi-8-for-x86_64-appstream-debug-rpms",
-            ubi_population=True
+            ubi_population=True,
+            ubi_config_version="8",
+            platform_full_version="8"
         ), ],
 
         # Input repos - rhel-8-for-x86_64-appstream
@@ -148,39 +184,6 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
             repo_id="rhel-8-for-x86_64-appstream-debug-rpms",
             content_set="rhel-8-for-x86_64-appstream-debug-rpms",
         ), ],
-
-        # Output repos - rhel-7-server
-        [get_test_repo(
-            repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
-            content_set="ubi-7-server-rpms",
-            ubi_population=False
-        ), ],
-        [get_test_repo(
-            repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
-            content_set="ubi-7-server-source-rpms",
-            ubi_population=True
-            # doesn't matter here, it sufficient to have ubi_population==False at rpm binary repo
-            # for skipping whole repo triplet
-        ), ],
-        [get_test_repo(
-            repo_id="ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64",
-            content_set="ubi-7-server-debuginfo-rpms",
-            ubi_population=False
-        ), ],
-
-        # Input repos - rhel-7-server
-        [get_test_repo(
-            repo_id="rhel-7-server-rpms__7_DOT_2__x86_64",
-            content_set="rhel-7-server-rpms",
-        ), ],
-        [get_test_repo(
-            repo_id="rhel-7-server-source-rpms__7_DOT_2__x86_64",
-            content_set="rhel-7-server-source-rpms",
-        ), ],
-        [get_test_repo(
-            repo_id="rhel-7-server-debuginfo-rpms__7_DOT_2__x86_64",
-            content_set="rhel-7-server-debuginfo-rpms",
-        ), ],
     ]
 
     # Attempt to populate both invalid and valid repo sets
@@ -193,6 +196,59 @@ def test_skip_outdated_dot_repos(mocked_search_repo_by_cs, mocked_ubipop_runner,
     assert "ubi-8-for-x86_64-appstream-rpms" not in caplog.text
     # Not for ubi-7-server
     assert "ubi-7-server-rpms__7_DOT_2__x86_64" in caplog.text
+    # Used content sets won't be used again
+    assert "Skipping ubiconf_golang2.yaml, since it's been used already" in caplog.text
+
+
+@patch("ubipop.UbiPopulateRunner")
+@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
+def test_raise_config_missing(mocked_search_repo_by_cs, mocked_ubipop_runner, caplog):
+    mocked_search_repo_by_cs.side_effect = [
+        # Output repos - rhel-7-for-x86_64-appstream
+        [get_test_repo(
+            repo_id="ubi-7-for-x86_64-appstream-rpms",
+            content_set="ubi-7-for-x86_64-appstream-rpms",
+            ubi_population=True,
+            platform_full_version="7",
+            platform_major_version="7"
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-for-x86_64-appstream-source-rpms",
+            content_set="ubi-7-for-x86_64-appstream-source-rpms",
+            ubi_population=True,
+            platform_full_version="7",
+            platform_major_version="7"
+        ), ],
+        [get_test_repo(
+            repo_id="ubi-7-for-x86_64-appstream-debug-rpms",
+            content_set="ubi-7-for-x86_64-appstream-debug-rpms",
+            ubi_population=True,
+            platform_full_version="7",
+            platform_major_version="7"
+        ), ],
+
+        # Input repos - rhel-7-for-x86_64-appstream
+        [get_test_repo(
+            repo_id="rhel-7-for-x86_64-appstream-rpms",
+            content_set="rhel-7-for-x86_64-appstream-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-for-x86_64-appstream-source-rpms",
+            content_set="rhel-7-for-x86_64-appstream-source-rpms",
+        ), ],
+        [get_test_repo(
+            repo_id="rhel-7-for-x86_64-appstream-debug-rpms",
+            content_set="rhel-7-for-x86_64-appstream-debug-rpms",
+        ), ],
+    ]
+    config_path = os.path.join(TEST_DATA_DIR, 'ubi8')
+    ubipop = UbiPopulate("foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=config_path)
+    with pytest.raises(ConfigMissing):
+        ubipop.populate_ubi_repos()
+
+    assert mocked_ubipop_runner.call_count == 0
+
+    assert "Config file ubiconf_golang.yaml missing from 7 and default 7 branches" in caplog.text
 
 
 @patch("ubipop._pulp_client.Pulp.search_repo_by_id")
@@ -522,7 +578,7 @@ def test_match_modules(mock_ubipop_runner):
 
 
 def test_match_modules_without_profile(ubi_repo_set, executor):
-    test_ubiconf = ubiconfig.get_loader(TEST_DATA_DIR).load('ubiconf_golang.yaml')
+    test_ubiconf = ubiconfig.get_loader(TEST_DATA_DIR).load('ubi8/ubiconf_golang.yaml')
     mocked_ubipop_runner = UbiPopulateRunner(
         MagicMock(),
         ubi_repo_set,
@@ -771,7 +827,10 @@ def test_ubi_repo_set(rhel_repo_set, ubi_repo_set, fail, caplog):
 @pytest.fixture(name='mocked_ubiconfig_load')
 def fixture_mocked_ubiconfig_load():
     with patch('ubiconfig.get_loader') as get_loader:
-        get_loader.return_value.load.return_value = "test"
+        m = MagicMock()
+        m.file_name = "test"
+        m.version = "7.7"
+        get_loader.return_value.load.return_value = m
         yield get_loader
 
 
@@ -779,7 +838,7 @@ def test_ubipopulate_load_ubiconfig(mocked_ubiconfig_load):
     # pylint: disable=unused-argument
     ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False, ['cfg.yaml'])
     assert len(ubipop.ubiconfig_list) == 1
-    assert ubipop.ubiconfig_list[0] == "test"
+    assert ubipop.ubiconfig_list[0].file_name == "test"
 
 
 def test_load_ubiconfig_by_content_set_labels():
@@ -805,7 +864,10 @@ def test_load_ubiconfig_by_repo_ids(mocked_search_repo_by_id):
 @pytest.fixture(name='mocked_ubiconfig_load_all')
 def fixture_mocked_ubiconfig_load_all():
     with patch('ubiconfig.get_loader') as get_loader:
-        get_loader.return_value.load_all.return_value = ["test"]
+        m = MagicMock()
+        m.file_name = "test"
+        m.version = "7"
+        get_loader.return_value.load_all.return_value = [m]
         yield get_loader
 
 
@@ -813,7 +875,7 @@ def test_ubipopulate_load_all_ubiconfig(mocked_ubiconfig_load_all):
     # pylint: disable=unused-argument
     ubipop = UbiPopulate("foo.pulp.com", ('foo', 'foo'), False)
     assert len(ubipop.ubiconfig_list) == 1
-    assert ubipop.ubiconfig_list[0] == "test"
+    assert ubipop.ubiconfig_list[0].file_name == "test"
 
 
 def test_create_srpms_output_set(mock_ubipop_runner):
