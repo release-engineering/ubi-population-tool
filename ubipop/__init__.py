@@ -798,7 +798,7 @@ class UbiPopulateRunner(object):
                     else:
                         _LOG.warning("RPM %s is unavailable in input repos %s %s, skipping",
                                      rpm_filename,
-                                     [r.repo_id for r in self.repos.in_repos.rpm.repo_id],
+                                     [r.repo_id for r in self.repos.in_repos.rpm],
                                      [r.repo_id for r in self.repos.in_repos.debug]
                                      )
         return ret_rpms, ret_debug_rpms
