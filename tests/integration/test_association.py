@@ -225,6 +225,12 @@ def can_download_package(rpm, repo_url):
 def clean_name(name):
     return split_filename(name)[0]
 
+def separate_modules(module_list):
+    '''
+    Create a tuple consisting of module name and additional module data.
+    '''
+    return [(module[:module.find(' ')], module[module.find(' ') + 1:])
+            for module in module_list]
 
 def assert_empty_repo(repo):
     repo_id = repo['id']
@@ -267,14 +273,14 @@ def test_modulemd_defaults_unit_copy():
     modules = query_repo_modules(None, 'ubi', repo_url, full_data=True)
 
     assert len(modules) == 2, 'Unexpected repo modules found.'
-    separated_modules = [(module[:module.find(' ')], module[module.find(' ') + 1:])
-                         for module in modules]
+    separated_modules = separate_modules(modules)
     
     for module in separated_modules:
         if module[0] == 'httpd':
             assert '[d]' not in module[1], 'Module httpd shouldn\'t have defaults.'
         elif module[0] == 'perl-FCGI':
-            assert '[d]' in module[1], 'Module perl-FCGI should have defaults.'
+            assert 'common [d]' in module[1], \
+                   'Module perl-FCGI should have common profile as default.'
         else:
             raise AssertionError('Unknown module in repo.')
     
@@ -282,9 +288,10 @@ def test_modulemd_defaults_unit_copy():
 
     modules = query_repo_modules(None, 'ubi', repo_url, full_data=True)
     assert len(modules) == 1, 'Unexpected repo modules found.'
-    separated_module = (modules[0][:modules[0].find(' ')], modules[0][modules[0].find(' ') + 1:])
+    separated_module = separate_modules(modules)[0]
     assert separated_module[0] == 'httpd', 'Unknown module in repo.'
-    assert '[d]' in separated_module[1], 'Module httpd should have defaults.'
+    assert 'common [d]' in separated_module[1], \
+           'Module httpd should have common profile as default.'
 
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason='Integration test is not set up.')
@@ -509,7 +516,7 @@ def test_add_packages_multiple_arch():
     cfg = load_ubiconfig('associate-pkg-multi-arch.yaml')
     rpm_repos = get_repos_from_cs(cfg.content_sets.rpm.output, skip_dot_version=True)
     for repo in rpm_repos:
-        repo_url = repo_url = get_repo_url(repo['url'])
+        repo_url = get_repo_url(repo['url'])
         break
     repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
     assert all('glibc' not in rpm for rpm in repo_rpms), \
@@ -535,7 +542,7 @@ def test_artifact_copy_if_profiles_not_speficied():
     cfg = load_ubiconfig('associate-md-pkg.yaml')
     rpm_repos = get_repos_from_cs(cfg.content_sets.rpm.output, skip_dot_version=True)
     for repo in rpm_repos:
-        repo_url = repo_url = get_repo_url(repo['url'])
+        repo_url = get_repo_url(repo['url'])
         break
     repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
     expected1 = ['httpd-2.4.6-88.el7.x86_64.rpm', 'httpd-tools-2.4.6-88.el7.x86_64.rpm',
@@ -546,7 +553,7 @@ def test_artifact_copy_if_profiles_not_speficied():
 
     debug_repos = get_repos_from_cs(cfg.content_sets.debuginfo.output, skip_dot_version=True)
     for repo in debug_repos:
-        repo_url = repo_url = get_repo_url(repo['url'])
+        repo_url = get_repo_url(repo['url'])
         break
     repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
     expected2 = 'nuxwdog-debuginfo-1.0.3-8.el7.x86_64.rpm'
@@ -558,7 +565,7 @@ def test_artifact_copy_if_profiles_not_speficied():
 
     srpm_rpm_repos = get_repos_from_cs(cfg.content_sets.srpm.output, skip_dot_version=True)
     for repo in srpm_rpm_repos:
-        repo_url = repo_url = get_repo_url(repo['url'])
+        repo_url = get_repo_url(repo['url'])
         break
     repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
     expected3 = ['httpd-2.4.6-88.el7.src.rpm',
@@ -572,7 +579,7 @@ def test_artifact_copy_if_profiles_not_speficied():
 
     rpm_repos = get_repos_from_cs(cfg.content_sets.rpm.output, skip_dot_version=True)
     for repo in rpm_repos:
-        repo_url = repo_url = get_repo_url(repo['url'])
+        repo_url = get_repo_url(repo['url'])
         break
     repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
     assert expected1[0] in repo_rpms and expected1[1] in repo_rpms, \
@@ -584,7 +591,7 @@ def test_artifact_copy_if_profiles_not_speficied():
 
     debug_repos = get_repos_from_cs(cfg.content_sets.debuginfo.output, skip_dot_version=True)
     for repo in debug_repos:
-        repo_url = repo_url = get_repo_url(repo['url'])
+        repo_url = get_repo_url(repo['url'])
         break
     repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
     assert expected2 in repo_rpms, \
@@ -596,7 +603,7 @@ def test_artifact_copy_if_profiles_not_speficied():
 
     srpm_repos = get_repos_from_cs(cfg.content_sets.srpm.output, skip_dot_version=True)
     for repo in srpm_repos:
-        repo_url = repo_url = get_repo_url(repo['url'])
+        repo_url = get_repo_url(repo['url'])
         break
     repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
     assert expected3[0] in repo_rpms, \
