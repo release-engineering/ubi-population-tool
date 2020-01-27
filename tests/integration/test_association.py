@@ -268,18 +268,18 @@ def test_modulemd_defaults_unit_copy():
     cfg = load_ubiconfig('associate-md.yaml')
     rpm_repos = get_repos_from_cs(cfg.content_sets.rpm.output, skip_dot_version=True)
     for repo in rpm_repos:
-        repo_url = repo_url = get_repo_url(repo['url'])
+        repo_url = get_repo_url(repo['url'])
         break
     modules = query_repo_modules(None, 'ubi', repo_url, full_data=True)
 
     assert len(modules) == 2, 'Unexpected repo modules found.'
     separated_modules = separate_modules(modules)
     
-    for module in separated_modules:
-        if module[0] == 'httpd':
-            assert '[d]' not in module[1], 'Module httpd shouldn\'t have defaults.'
-        elif module[0] == 'perl-FCGI':
-            assert 'common [d]' in module[1], \
+    for mod_name, mod_profile in separated_modules:
+        if mod_name == 'httpd':
+            assert '[d]' not in mod_profile, 'Module httpd shouldn\'t have defaults.'
+        elif mod_name == 'perl-FCGI':
+            assert 'common [d]' in mod_profile, \
                    'Module perl-FCGI should have common profile as default.'
         else:
             raise AssertionError('Unknown module in repo.')
@@ -288,9 +288,9 @@ def test_modulemd_defaults_unit_copy():
 
     modules = query_repo_modules(None, 'ubi', repo_url, full_data=True)
     assert len(modules) == 1, 'Unexpected repo modules found.'
-    separated_module = separate_modules(modules)[0]
-    assert separated_module[0] == 'httpd', 'Unknown module in repo.'
-    assert 'common [d]' in separated_module[1], \
+    mod_name, mod_profile = separate_modules(modules)[0]
+    assert mod_name == 'httpd', 'Expected module: httpd, found module: {}'.format(mod_name)
+    assert 'common [d]' in mod_profile, \
            'Module httpd should have common profile as default.'
 
 
@@ -529,9 +529,8 @@ def test_add_packages_multiple_arch():
     for rpm in repo_rpms:
         if 'glibc' in rpm:
             found_archs.append(rpm.split('.')[-2])
-    assert all(arch in found_archs for arch in ['i686', 'x86_64']), \
-           'Not all archs of glibs are present in the output repo.'
-    assert len(found_archs) == 2, 'Unexpected archs found in the output repo.'
+    assert set(found_archs) == {'i686', 'x86_64'}, \
+        'Found architectures are not i686, x86_64.'
 
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason='Integration test is not set up.')
