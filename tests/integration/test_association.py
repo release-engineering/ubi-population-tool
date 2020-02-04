@@ -529,7 +529,7 @@ def test_add_packages_multiple_arch():
     for rpm in repo_rpms:
         if 'glibc' in rpm:
             found_archs.append(rpm.split('.')[-2])
-    assert set(found_archs) == {'i686', 'x86_64'}, \
+    assert set(found_archs) == set(['i686', 'x86_64']), \
         'Found architectures are not i686, x86_64.'
 
 
