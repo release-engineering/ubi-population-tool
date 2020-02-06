@@ -1,5 +1,7 @@
 import os
 import subprocess
+import io
+import logging
 
 from itertools import chain
 
@@ -10,7 +12,6 @@ import ubipop
 
 from ubipop._pulp_client import Pulp
 from ubipop._utils import split_filename
-
 
 PULP_HOSTNAME = os.getenv('TEST_PULP_HOSTNAME')
 PULP_USER = os.getenv('TEST_PULP_USER')
@@ -29,7 +30,7 @@ def load_ubiconfig(filename):
     return loader.load(filename)
 
 
-def run_ubipop_tool(config_file, workers=10, dry_run=False):
+def run_ubipop_tool(config_file, workers=10, dry_run=False, capture_log=False):
     if PULP_CERT_PATH is None:
         auth = (PULP_USER, PULP_PWD)
     else:
@@ -44,9 +45,19 @@ def run_ubipop_tool(config_file, workers=10, dry_run=False):
         insecure=not PULP_SECURE,
         workers_count=workers,
     )
+    if capture_log:
+        logger = logging.getLogger('ubipop')
+        log_capture = io.StringIO()
+        handler = logging.StreamHandler(log_capture)
+        handler.setLevel(logging.WARNING)
+        logger.addHandler(handler)
 
     up.populate_ubi_repos()
 
+    if capture_log:
+        captured = log_capture.getvalue()
+        log_capture.close()
+        return captured
 
 def get_repos_from_cs(cs, skip_dot_version=False):
     p = Pulp(PULP_HOSTNAME, (PULP_USER, PULP_PWD), not PULP_SECURE)
@@ -159,7 +170,8 @@ def query_repo_rpms(query, repo_id, repo_url, force_refresh=True, arch_list=None
     return [pkg.split(':')[1] + '.rpm' for pkg in out.split('\n') if pkg]
 
 
-def query_repo_modules(query, repo_id, repo_url, force_refresh=True, arch_list=None):
+def query_repo_modules(query, repo_id, repo_url, force_refresh=True, arch_list=None,
+                       full_data=False):
     args = [
         'yum',
         'module',
@@ -185,9 +197,10 @@ def query_repo_modules(query, repo_id, repo_url, force_refresh=True, arch_list=N
 
     lines = out.split('\n')
     lines = lines[2:-3]
-
-    return [md.split(' ')[0] for md in lines]
-
+    if not full_data:
+        return [md.split(' ')[0] for md in lines]
+    else:
+        return lines
 
 def get_repo_url(relative_url):
     if PULP_SECURE:
@@ -212,6 +225,12 @@ def can_download_package(rpm, repo_url):
 def clean_name(name):
     return split_filename(name)[0]
 
+def separate_modules(module_list):
+    '''
+    Create a tuple consisting of module name and additional module data.
+    '''
+    return [(module[:module.find(' ')], module[module.find(' ') + 1:])
+            for module in module_list]
 
 def assert_empty_repo(repo):
     repo_id = repo['id']
@@ -239,6 +258,40 @@ def assert_empty_repos(cfg):
 
     for repo in repos:
         assert_empty_repo(repo)
+
+
+@pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason='Integration test is not set up.')
+def test_modulemd_defaults_unit_copy():
+    '''
+    Test if modulemd_defaults are copied to ubi repository.
+    '''
+    cfg = load_ubiconfig('associate-md.yaml')
+    rpm_repos = get_repos_from_cs(cfg.content_sets.rpm.output, skip_dot_version=True)
+    for repo in rpm_repos:
+        repo_url = get_repo_url(repo['url'])
+        break
+    modules = query_repo_modules(None, 'ubi', repo_url, full_data=True)
+
+    assert len(modules) == 2, 'Unexpected repo modules found.'
+    separated_modules = separate_modules(modules)
+    
+    for mod_name, mod_profile in separated_modules:
+        if mod_name == 'httpd':
+            assert '[d]' not in mod_profile, 'Module httpd shouldn\'t have defaults.'
+        elif mod_name == 'perl-FCGI':
+            assert 'common [d]' in mod_profile, \
+                   'Module perl-FCGI should have common profile as default.'
+        else:
+            raise AssertionError('Unknown module in repo.')
+    
+    run_ubipop_tool('associate-md.yaml')
+
+    modules = query_repo_modules(None, 'ubi', repo_url, full_data=True)
+    assert len(modules) == 1, 'Unexpected repo modules found.'
+    mod_name, mod_profile = separate_modules(modules)[0]
+    assert mod_name == 'httpd', 'Expected module: httpd, found module: {}'.format(mod_name)
+    assert 'common [d]' in mod_profile, \
+           'Module httpd should have common profile as default.'
 
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason='Integration test is not set up.')
@@ -453,3 +506,108 @@ def test_ubipop_can_associate_modules():
 
                 for pkg in pkgs_profile:
                     assert pkg in pkgs_found, '"{}" not in the repository.'.format(pkg)
+
+
+@pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason='Integration test is not set up.')
+def test_add_packages_multiple_arch():
+    '''
+    Test if latest packages of all architectures are added to the output repo.
+    '''
+    cfg = load_ubiconfig('associate-pkg-multi-arch.yaml')
+    rpm_repos = get_repos_from_cs(cfg.content_sets.rpm.output, skip_dot_version=True)
+    for repo in rpm_repos:
+        repo_url = get_repo_url(repo['url'])
+        break
+    repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
+    assert all('glibc' not in rpm for rpm in repo_rpms), \
+           'No glibc rpms should be in the output repo.'
+
+    run_ubipop_tool('associate-pkg-multi-arch.yaml')
+
+    repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
+    found_archs = []
+    for rpm in repo_rpms:
+        if 'glibc' in rpm:
+            found_archs.append(rpm.split('.')[-2])
+    assert set(found_archs) == set(['i686', 'x86_64']), \
+        'Found architectures are not i686, x86_64.'
+
+
+@pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason='Integration test is not set up.')
+def test_artifact_copy_if_profiles_not_speficied():
+    '''
+    Test if packages defined in a module profile and artifacts have been added to ubi repo.
+    '''
+    cfg = load_ubiconfig('associate-md-pkg.yaml')
+    rpm_repos = get_repos_from_cs(cfg.content_sets.rpm.output, skip_dot_version=True)
+    for repo in rpm_repos:
+        repo_url = get_repo_url(repo['url'])
+        break
+    repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
+    expected1 = ['httpd-2.4.6-88.el7.x86_64.rpm', 'httpd-tools-2.4.6-88.el7.x86_64.rpm',
+                 'jss-4.4.4-3.el7.x86_64.rpm', 'nuxwdog-1.0.3-8.el7.x86_64.rpm']
+    for rpm in repo_rpms:
+        assert all(new_rpm != rpm for new_rpm in expected1), \
+               'Unexpected rpm in the rpm content set.'
+
+    debug_repos = get_repos_from_cs(cfg.content_sets.debuginfo.output, skip_dot_version=True)
+    for repo in debug_repos:
+        repo_url = get_repo_url(repo['url'])
+        break
+    repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
+    expected2 = 'nuxwdog-debuginfo-1.0.3-8.el7.x86_64.rpm'
+    assert all(expected2 != rpm for repo in repo_rpms), \
+           'Unexpected rpm in srpm content set.'
+    unexpected = 'jss-debuginfo-4.5.0-1.module+el8+2656+97b10827.x86_64.rpm'
+    assert all(unexpected != rpm for repo in repo_rpms), \
+           'Unexpected rpm in srpm content set.'
+
+    srpm_rpm_repos = get_repos_from_cs(cfg.content_sets.srpm.output, skip_dot_version=True)
+    for repo in srpm_rpm_repos:
+        repo_url = get_repo_url(repo['url'])
+        break
+    repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
+    expected3 = ['httpd-2.4.6-88.el7.src.rpm',
+                 'jss-4.4.4-3.el7.src.rpm',
+                 'nuxwdog-1.0.3-8.el7.src.rpm']
+    for rpm in repo_rpms:
+        assert all(new_rpm != rpm for new_rpm in expected3), \
+               'Unexpected rpm in the debuginfo content set.'
+
+    logs = run_ubipop_tool('associate-md-pkg.yaml', capture_log=True)
+
+    rpm_repos = get_repos_from_cs(cfg.content_sets.rpm.output, skip_dot_version=True)
+    for repo in rpm_repos:
+        repo_url = get_repo_url(repo['url'])
+        break
+    repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
+    assert expected1[0] in repo_rpms and expected1[1] in repo_rpms, \
+           'Package in module profile has not been added to ubi repo.'
+    assert expected1[2] in repo_rpms, \
+           'Package in module artifacts has not been added to ubi repo.'
+    assert expected1[3] in repo_rpms, \
+           'Package in module artifacts, which is also excluded has not been added to ubi repo.'
+
+    debug_repos = get_repos_from_cs(cfg.content_sets.debuginfo.output, skip_dot_version=True)
+    for repo in debug_repos:
+        repo_url = get_repo_url(repo['url'])
+        break
+    repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
+    assert expected2 in repo_rpms, \
+           'Package in module artifacts, which is also excluded has not been added to ubi repo.'
+    assert unexpected not in repo_rpms, \
+           'Package in module artifacts, which isn\'t in source repo has been added to ubi repo.'
+    assert 'RPM {} is unavailable in input repos'.format(unexpected) in logs, \
+           'LOG warning notifying about the RPM unavailability has not been captured.'
+
+    srpm_repos = get_repos_from_cs(cfg.content_sets.srpm.output, skip_dot_version=True)
+    for repo in srpm_repos:
+        repo_url = get_repo_url(repo['url'])
+        break
+    repo_rpms = query_repo_rpms(None, 'ubi', repo_url)
+    assert expected3[0] in repo_rpms, \
+           'Package in module profile has not been added to ubi repo.'
+    assert expected3[1] in repo_rpms, \
+           'Package in module artifacts has not been added to ubi repo.'
+    assert expected3[2] in repo_rpms, \
+           'Package in module artifacts, which is also excluded has not been added to ubi repo.'
