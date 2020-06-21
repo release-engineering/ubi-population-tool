@@ -1017,8 +1017,9 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
         ],
     }
 
+    # pylint: disable=protected-access
     associations, unassociations, mdd_association, mdd_unassociation = \
-        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=protected-access
+        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
 
     # firstly, check correct associations, there should 1 unit of each type associated
     modules, rpms, srpms, debug_rpms = associations
@@ -1101,8 +1102,9 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
         ],
     }
 
+    # pylint: disable=protected-access
     associations, unassociations, mdd_association, mdd_unassociation = \
-        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=protected-access
+        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
 
     # firstly, check correct associations, there should 0 units associated
     modules, rpms, srpms, debug_rpms = associations
@@ -1192,8 +1194,9 @@ def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
         "bar_pkg": [get_test_pkg(name="bar_pkg",
                                  filename="srpm_new_next.src.rpm")]}
 
+    # pylint: disable=protected-access
     associations, _, _, _ = \
-        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft) # pylint: disable=W0212
+        mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
 
     _, _, srpms, _ = associations
     # only 5 srpm associations, no duplicates
