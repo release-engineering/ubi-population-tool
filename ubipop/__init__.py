@@ -605,7 +605,7 @@ class UbiPopulateRunner(object):
         return diff
 
     def _filter_pkgs_from_modules(self):
-        regex = r'^\d+:'
+        regex = r'\d+:'
         reg = re.compile(regex)
 
         for name_stream, packages in self.repos.pkgs_from_modules.items():
