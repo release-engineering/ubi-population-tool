@@ -604,6 +604,18 @@ class UbiPopulateRunner(object):
 
         return diff
 
+    def _filter_pkgs_from_modules(self):
+        regex = r'\d+:'
+        reg = re.compile(regex)
+
+        for name_stream, packages in self.repos.pkgs_from_modules.items():
+            # name_stream, packages == str, list of _pulp_client.Package
+
+            wanted_packages = list(chain.from_iterable([m.packages for m in self.repos.modules[name_stream]]))
+            wanted_packages = [reg.sub('', rpm_nevra) + '.rpm' for rpm_nevra in wanted_packages]
+            packages[:] = [pkg for pkg in packages if pkg.filename in wanted_packages]
+
+
     def run_ubi_population(self):
         current_modules_ft, current_module_defaults_ft, current_rpms_ft, \
             current_srpms_ft, current_debug_rpms_ft = self._get_current_content()
@@ -614,6 +626,7 @@ class UbiPopulateRunner(object):
             self._match_debug_rpms()
         self._exclude_blacklisted_packages()
         self._finalize_modules_output_set()
+        self._filter_pkgs_from_modules()
         self._finalize_rpms_output_set()
         self._finalize_debug_output_set()
         self._match_module_defaults()

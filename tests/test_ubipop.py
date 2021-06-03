@@ -1348,3 +1348,23 @@ def test_get_pkgs_from_all_modules(mock_ubipop_runner):
     assert len(pkgs) == 2
     assert "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm" in pkgs
     assert "tomcatjss-8.4.7-2.el8+1944+b6c8e16f.noarch.rpm" in pkgs
+
+
+def test_filter_pkgs_from_modules(mock_ubipop_runner):
+    mock_ubipop_runner.repos.modules['test5.30'] = [
+        get_test_mod(name="test", stream="5.30", packages=["tomcatjss-0:7.3.6-1.el8+1944+b6c8e16f.noarch"]),
+    ]
+
+    mock_ubipop_runner.repos.pkgs_from_modules['test5.30'] = [
+        get_test_pkg(
+            name="tomcatjss",
+            filename="tomcatjss-7.3.6-1.el8+1944+00000000.noarch.rpm",
+        ),
+        get_test_pkg(
+            name="tomcatjss",
+            filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
+        )]
+
+    mock_ubipop_runner._filter_pkgs_from_modules()
+    assert len(mock_ubipop_runner.repos.pkgs_from_modules['test5.30']) == 1
+    assert mock_ubipop_runner.repos.pkgs_from_modules['test5.30'][0].filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
