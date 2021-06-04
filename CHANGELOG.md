@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2021-06-04
+
+### Fixed
+- Associating only those modular rpms that are referenced by modulemd in ubi repo
+
 ## [0.3.0] - 2019-11-27
 ### Added
 - Support for using population_source repository note
@@ -26,7 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.0...0.3.1
 [0.3.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.2.0...0.3.0
 [0.2.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.1.19...v0.2.0 
 [0.1.19]: https://github.com/release-engineering/ubi-population-tool/compare/v0.1.18...v0.1.19
