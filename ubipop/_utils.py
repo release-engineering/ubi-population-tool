@@ -8,26 +8,26 @@ def split_filename(filename):
         1:bar-9-123a.ia64.rpm returns bar, 9, 123a, 1, ia64
     """
 
-    if filename[-4:] == '.rpm':
+    if filename[-4:] == ".rpm":
         filename = filename[:-4]
 
-    arch_index = filename.rfind('.')
-    arch = filename[arch_index + 1:]
+    arch_index = filename.rfind(".")
+    arch = filename[arch_index + 1 :]
 
-    rel_index = filename[:arch_index].rfind('-')
-    rel = filename[rel_index + 1:arch_index]
+    rel_index = filename[:arch_index].rfind("-")
+    rel = filename[rel_index + 1 : arch_index]
 
-    ver_index = filename[:rel_index].rfind('-')
-    ver = filename[ver_index + 1:rel_index]
+    ver_index = filename[:rel_index].rfind("-")
+    ver = filename[ver_index + 1 : rel_index]
 
-    epoch_index = filename.find(':')
+    epoch_index = filename.find(":")
 
     if epoch_index == -1:
-        epoch = ''
+        epoch = ""
     else:
         epoch = filename[:epoch_index]
 
-    name = filename[epoch_index + 1:ver_index]
+    name = filename[epoch_index + 1 : ver_index]
 
     return name, ver, rel, epoch, arch
 
@@ -68,8 +68,14 @@ class AssociateActionModules(AssociateAction):
     def get_actions(self, pulp_client_inst):
         actions = []
         for src_repo_id, units in self._map_src_repo_to_unit().items():
-            actions.append((pulp_client_inst.associate_modules, self._get_repo_obj(src_repo_id),
-                            self.dst_repo, units))
+            actions.append(
+                (
+                    pulp_client_inst.associate_modules,
+                    self._get_repo_obj(src_repo_id),
+                    self.dst_repo,
+                    units,
+                )
+            )
 
         return actions
 
@@ -87,9 +93,14 @@ class AssociateActionModuleDefaults(AssociateAction):
     def get_actions(self, pulp_client_inst):
         actions = []
         for src_repo_id, units in self._map_src_repo_to_unit().items():
-            actions.append((pulp_client_inst.associate_module_defaults,
-                            self._get_repo_obj(src_repo_id),
-                            self.dst_repo, units))
+            actions.append(
+                (
+                    pulp_client_inst.associate_module_defaults,
+                    self._get_repo_obj(src_repo_id),
+                    self.dst_repo,
+                    units,
+                )
+            )
 
         return actions
 
@@ -98,7 +109,9 @@ class UnassociateActionModuleDefaults(PulpAction):
     TYPE = "module_defaults"
 
     def get_actions(self, pulp_client_inst):
-        return [(pulp_client_inst.unassociate_module_defaults, self.dst_repo, self.units)]
+        return [
+            (pulp_client_inst.unassociate_module_defaults, self.dst_repo, self.units)
+        ]
 
 
 class AssociateActionRpms(AssociateAction):
@@ -108,8 +121,13 @@ class AssociateActionRpms(AssociateAction):
         actions = []
         for src_repo_id, units in self._map_src_repo_to_unit().items():
             actions.append(
-                (pulp_client_inst.associate_packages,  self._get_repo_obj(src_repo_id),
-                 self.dst_repo, units))
+                (
+                    pulp_client_inst.associate_packages,
+                    self._get_repo_obj(src_repo_id),
+                    self.dst_repo,
+                    units,
+                )
+            )
 
         return actions
 

@@ -18,3 +18,20 @@ Cli can be run by *ubipop* with arguments:
   - --user USER: username for authentication to Pulp
   - --password PASSWORD: password for authentication to Pulp
   - --dry-run: if True, print pulp actions only, do not execute
+
+# Development
+-----------
+
+Patches may be contributed via pull requests to
+https://github.com/release-engineering/ubi-population-tool
+
+All changes must pass the automated test suite, along with various static
+checks.
+
+The [Black](https://black.readthedocs.io/) code style is enforced.
+Enabling autoformatting via a pre-commit hook is recommended:
+
+```
+pip install -r requirements-dev.txt
+pre-commit install
+```
