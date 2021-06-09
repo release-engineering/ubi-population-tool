@@ -13,31 +13,67 @@ _LOG.setLevel(logging.DEBUG)
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument('input', action="store", nargs='*',
-                        help="path to ubi config file")
-    parser.add_argument('--content-sets', action="store", nargs='+', type=str, required=False,
-                        help="content set labels from which to source ubi config")
-    parser.add_argument('--repo-ids', action="store", nargs='+', type=str, required=False,
-                        help="repo IDs from which to source ubi config")
-    parser.add_argument('--conf-src', action="store", required=False,
-                        help="source of ubi config, directory or url")
-    parser.add_argument('--dry-run', action='store_true', default=False,
-                        help="if True, print pulp actions")
-    parser.add_argument('--pulp-hostname', action="store", required=True,
-                        help="hostname of pulp_server")
-    parser.add_argument('--insecure', action="store_true", default=False,
-                        help="use insecure connection to pulp server")
-    parser.add_argument('--user', action="store", required=False,
-                        help="pulp user")
-    parser.add_argument('--password', action="store", required=False,
-                        help="pulp password")
-    parser.add_argument('--cert', action="store", required=False,
-                        help="path to to user cert")
-    parser.add_argument('--workers', action="store", type=int, default=4,
-                        help="Number of workers for parallel execution")
-    parser.add_argument('--output-repos', action="store", required=False,
-                        help="Path to output file."
-                             "If provided, file containing repo ids of all out repos is created.",)
+    parser.add_argument(
+        "input", action="store", nargs="*", help="path to ubi config file"
+    )
+    parser.add_argument(
+        "--content-sets",
+        action="store",
+        nargs="+",
+        type=str,
+        required=False,
+        help="content set labels from which to source ubi config",
+    )
+    parser.add_argument(
+        "--repo-ids",
+        action="store",
+        nargs="+",
+        type=str,
+        required=False,
+        help="repo IDs from which to source ubi config",
+    )
+    parser.add_argument(
+        "--conf-src",
+        action="store",
+        required=False,
+        help="source of ubi config, directory or url",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="if True, print pulp actions",
+    )
+    parser.add_argument(
+        "--pulp-hostname", action="store", required=True, help="hostname of pulp_server"
+    )
+    parser.add_argument(
+        "--insecure",
+        action="store_true",
+        default=False,
+        help="use insecure connection to pulp server",
+    )
+    parser.add_argument("--user", action="store", required=False, help="pulp user")
+    parser.add_argument(
+        "--password", action="store", required=False, help="pulp password"
+    )
+    parser.add_argument(
+        "--cert", action="store", required=False, help="path to to user cert"
+    )
+    parser.add_argument(
+        "--workers",
+        action="store",
+        type=int,
+        default=4,
+        help="Number of workers for parallel execution",
+    )
+    parser.add_argument(
+        "--output-repos",
+        action="store",
+        required=False,
+        help="Path to output file."
+        "If provided, file containing repo ids of all out repos is created.",
+    )
 
     parsed = parser.parse_args(args)
 
@@ -63,9 +99,18 @@ def main(args):
 
     opts, auth = parse_args(args)
 
-    ubipop.UbiPopulate(opts.pulp_hostname, auth, opts.dry_run, opts.input, opts.conf_src,
-                       opts.insecure, opts.workers, opts.output_repos,
-                       content_sets=opts.content_sets, repo_ids=opts.repo_ids).populate_ubi_repos()
+    ubipop.UbiPopulate(
+        opts.pulp_hostname,
+        auth,
+        opts.dry_run,
+        opts.input,
+        opts.conf_src,
+        opts.insecure,
+        opts.workers,
+        opts.output_repos,
+        content_sets=opts.content_sets,
+        repo_ids=opts.repo_ids,
+    ).populate_ubi_repos()
 
 
 def entry_point():
