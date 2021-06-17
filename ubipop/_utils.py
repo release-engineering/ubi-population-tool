@@ -55,7 +55,7 @@ class AssociateAction(PulpAction):
 
     def _get_repo_obj(self, repo_id):
         for repo in self.src_repos:
-            if repo_id == repo.repo_id:
+            if repo_id == repo.id:
                 return repo
 
     def get_actions(self, pulp_client_inst):

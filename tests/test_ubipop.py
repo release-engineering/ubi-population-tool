@@ -3,17 +3,26 @@ import os
 import shutil
 import sys
 import tempfile
-
-from copy import deepcopy
-from collections import defaultdict
-
 import pytest
 import ubiconfig
 
+from copy import deepcopy
+from collections import defaultdict
+from datetime import datetime
+from pubtools.pulplib import YumRepository, FakeController, Client, Distributor
 from mock import MagicMock, patch, call
 from more_executors import Executors
-from ubipop import UbiPopulateRunner, UbiRepoSet, RepoSet, UbiPopulate, ConfigMissing
-from ubipop._pulp_client import Module, ModuleDefaults, Package, Repo
+from more_executors.futures import f_proxy, f_return
+from ubipop import (
+    UbiPopulateRunner,
+    UbiRepoSet,
+    RepoSet,
+    UbiPopulate,
+    ConfigMissing,
+    RepoMissing,
+    PopulationSourceMissing,
+)
+from ubipop._pulp_client import Module, ModuleDefaults, Package
 from ubipop._utils import (
     AssociateActionModules,
     UnassociateActionModules,
@@ -25,34 +34,78 @@ from ubipop._utils import (
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "./data")
 
 
+class FakeUbiPopulate(UbiPopulate):
+    def __init__(self, *args, **kwargs):
+        super(FakeUbiPopulate, self).__init__(*args, **kwargs)
+        self.pulp_client_controller = FakeController()
+
+    @property
+    def pulp_client(self):
+        # Super should give a Pulp client
+        assert isinstance(super(FakeUbiPopulate, self).pulp_client, Client)
+        # But we'll substitute our own
+        return self.pulp_client_controller.client
+
+
 @pytest.fixture(name="ubi_repo_set")
 def fixture_ubi_repo_set():
+    ubi_binary = get_test_repo(id="ubi-foo-rpms", ubi_config_version="7")
+    ubi_source = get_test_repo(id="ubi-foo-source", ubi_config_version="7")
+    ubi_debug = get_test_repo(id="ubi-foo-debug", ubi_config_version="7")
+
+    ubi_binary.get_source_repository = MagicMock()
+    ubi_binary.get_source_repository.return_value = ubi_source
+    ubi_binary.get_debug_repository = MagicMock()
+    ubi_binary.get_debug_repository.return_value = ubi_debug
+
+    rhel_binary = get_test_repo(id="foo-rpms", ubi_config_version="7")
+    rhel_source = get_test_repo(id="foo-source", ubi_config_version="7")
+    rhel_debug = get_test_repo(id="foo-debug", ubi_config_version="7")
+
+    rhel_binary.get_source_repository = MagicMock()
+    rhel_binary.get_source_repository.return_value = rhel_source
+    rhel_binary.get_debug_repository = MagicMock()
+    rhel_binary.get_debug_repository.return_value = rhel_debug
+
     yield UbiRepoSet(
         RepoSet(
-            [get_test_repo(repo_id="foo-rpms", ubi_config_version="7")],
-            [get_test_repo(repo_id="foo-source", ubi_config_version="7")],
-            [get_test_repo(repo_id="foo-debug", ubi_config_version="7")],
+            [rhel_binary],
+            [rhel_source],
+            [rhel_debug],
         ),
-        RepoSet(
-            get_test_repo(repo_id="ubi-foo-rpms", ubi_config_version="7"),
-            get_test_repo(repo_id="ubi-foo-source", ubi_config_version="7"),
-            get_test_repo(repo_id="ubi-foo-debug", ubi_config_version="7"),
-        ),
+        RepoSet(ubi_binary, ubi_source, ubi_debug),
     )
 
 
 @pytest.fixture(name="ubi_repo_set_no_debug")
 def fixture_ubi_repo_set_no_debug():
+    ubi_binary = get_test_repo(id="ubi-foo-rpms", ubi_config_version="7")
+    ubi_source = get_test_repo(id="ubi-foo-source", ubi_config_version="7")
+
+    ubi_binary.get_source_repository = MagicMock()
+    ubi_binary.get_source_repository.return_value = ubi_source
+    ubi_binary.get_debug_repository = MagicMock()
+    ubi_binary.get_debug_repository.return_value = f_proxy(f_return())
+
+    rhel_binary = get_test_repo(id="foo-rpms", ubi_config_version="7")
+    rhel_source = get_test_repo(id="foo-source", ubi_config_version="7")
+
+    rhel_binary.get_source_repository = MagicMock()
+    rhel_binary.get_source_repository.return_value = rhel_source
+    rhel_binary.get_debug_repository = MagicMock()
+
+    rhel_binary.get_debug_repository.return_value = f_proxy(f_return())
+
     yield UbiRepoSet(
         RepoSet(
-            [get_test_repo(repo_id="foo-rpms")],
-            [get_test_repo(repo_id="foo-source")],
-            None,
+            [rhel_binary],
+            [rhel_source],
+            f_proxy(f_return()),
         ),
         RepoSet(
-            get_test_repo(repo_id="ubi-foo-rpms"),
-            get_test_repo(repo_id="ubi-foo-source"),
-            None,
+            ubi_binary,
+            ubi_source,
+            f_proxy(f_return()),
         ),
     )
 
@@ -69,20 +122,22 @@ def fixture_executor():
 
 @pytest.fixture(name="mock_ubipop_runner")
 def fixture_mock_ubipop_runner(ubi_repo_set, test_ubiconfig, executor):
-    yield UbiPopulateRunner(MagicMock(), ubi_repo_set, test_ubiconfig, False, executor)
+    yield UbiPopulateRunner(
+        MagicMock(), MagicMock(), ubi_repo_set, test_ubiconfig, False, executor
+    )
 
 
 def get_test_repo(**kwargs):
-    return Repo(
-        kwargs.get("repo_id"),
-        kwargs.get("arch"),
-        kwargs.get("content_set"),
-        kwargs.get("platform_full_version"),
-        kwargs.get("platform_major_version"),
-        kwargs.get("distributors_ids_type_ids"),
-        kwargs.get("ubi_population"),
-        kwargs.get("population_sources"),
-        kwargs.get("ubi_config_version"),
+    return f_proxy(
+        f_return(
+            YumRepository(
+                id=kwargs.get("id"),
+                content_set=kwargs.get("content_set"),
+                ubi_population=kwargs.get("ubi_population"),
+                population_sources=kwargs.get("population_sources", []),
+                ubi_config_version=kwargs.get("ubi_config_version"),
+            )
+        )
     )
 
 
@@ -128,223 +183,151 @@ def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
     assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source"])
 
 
-@patch("ubipop.UbiPopulateRunner")
-@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
-def test_skip_outdated_dot_repos(
-    mocked_search_repo_by_cs, mocked_ubipop_runner, caplog
-):
-    # Don't actually query Pulp for repos
-    mocked_search_repo_by_cs.side_effect = [
-        # Output repos - rhel-7-server
-        [
-            get_test_repo(
-                repo_id="ubi-7-server-rpms__7_DOT_2__x86_64",
-                content_set="ubi-7-server-rpms",
-                ubi_population=False,
-                platform_full_version="7.2",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="ubi-7-server-source-rpms__7_DOT_2__x86_64",
-                content_set="ubi-7-server-source-rpms",
-                ubi_population=True,
-                # doesn't matter here, it sufficient to have ubi_population==False at rpm binary repo
-                # for skipping whole repo triplet
-                platform_full_version="7.2",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="ubi-7-server-debuginfo-rpms__7_DOT_2__x86_64",
-                content_set="ubi-7-server-debuginfo-rpms",
-                ubi_population=False,
-                platform_full_version="7.2",
-            ),
-        ],
-        # Output repos - rhel-8-for-x86_64-appstream
-        [
-            get_test_repo(
-                repo_id="ubi-8-for-x86_64-appstream-rpms",
-                content_set="ubi-8-for-x86_64-appstream-rpms",
-                ubi_population=True,
-                ubi_config_version="8",
-                platform_full_version="8",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="ubi-8-for-x86_64-appstream-source-rpms",
-                content_set="ubi-8-for-x86_64-appstream-source-rpms",
-                ubi_population=True,
-                ubi_config_version="8",
-                platform_full_version="8",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="ubi-8-for-x86_64-appstream-debug-rpms",
-                content_set="ubi-8-for-x86_64-appstream-debug-rpms",
-                ubi_population=True,
-                ubi_config_version="8",
-                platform_full_version="8",
-            ),
-        ],
-        # Input repos - rhel-8-for-x86_64-appstream
-        [
-            get_test_repo(
-                repo_id="rhel-8-for-x86_64-appstream-rpms",
-                content_set="rhel-8-for-x86_64-appstream-rpms",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="rhel-8-for-x86_64-appstream-source-rpms",
-                content_set="rhel-8-for-x86_64-appstream-source-rpms",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="rhel-8-for-x86_64-appstream-debug-rpms",
-                content_set="rhel-8-for-x86_64-appstream-debug-rpms",
-            ),
-        ],
-    ]
-
-    # Attempt to populate both invalid and valid repo sets
-    ubipop = UbiPopulate(
-        "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
-    )
-    ubipop.populate_ubi_repos()
-
-    # Should've only run once
-    assert mocked_ubipop_runner.call_count == 1
-    # For ubi-8
-    assert "ubi-8-for-x86_64-appstream-rpms" not in caplog.text
-    # Not for ubi-7-server
-    assert "ubi-7-server-rpms__7_DOT_2__x86_64" in caplog.text
-    # Used content sets won't be used again
-    assert "Skipping ubiconf_golang2.yaml, since it's been used already" in caplog.text
-
-
-@patch("ubipop.UbiPopulateRunner")
-@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
-def test_raise_config_missing(mocked_search_repo_by_cs, mocked_ubipop_runner, caplog):
-    mocked_search_repo_by_cs.side_effect = [
-        # Output repos - rhel-7-for-x86_64-appstream
-        [
-            get_test_repo(
-                repo_id="ubi-7-for-x86_64-appstream-rpms",
-                content_set="ubi-7-for-x86_64-appstream-rpms",
-                ubi_population=True,
-                platform_full_version="7",
-                platform_major_version="7",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="ubi-7-for-x86_64-appstream-source-rpms",
-                content_set="ubi-7-for-x86_64-appstream-source-rpms",
-                ubi_population=True,
-                platform_full_version="7",
-                platform_major_version="7",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="ubi-7-for-x86_64-appstream-debug-rpms",
-                content_set="ubi-7-for-x86_64-appstream-debug-rpms",
-                ubi_population=True,
-                platform_full_version="7",
-                platform_major_version="7",
-            ),
-        ],
-        # Input repos - rhel-7-for-x86_64-appstream
-        [
-            get_test_repo(
-                repo_id="rhel-7-for-x86_64-appstream-rpms",
-                content_set="rhel-7-for-x86_64-appstream-rpms",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="rhel-7-for-x86_64-appstream-source-rpms",
-                content_set="rhel-7-for-x86_64-appstream-source-rpms",
-            ),
-        ],
-        [
-            get_test_repo(
-                repo_id="rhel-7-for-x86_64-appstream-debug-rpms",
-                content_set="rhel-7-for-x86_64-appstream-debug-rpms",
-            ),
-        ],
-    ]
+def test_raise_config_missing(caplog):
     config_path = os.path.join(TEST_DATA_DIR, "ubi8")
-    ubipop = UbiPopulate(
+    ubipopulate = UbiPopulate(
         "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=config_path
     )
-    with pytest.raises(ConfigMissing):
-        ubipop.populate_ubi_repos()
 
-    assert mocked_ubipop_runner.call_count == 0
+    for config in ubipopulate.ubiconfig_list:
+        with pytest.raises(ConfigMissing):
+            ubipopulate._get_config("9.8", config)
 
     assert (
-        "Config file ubiconf_golang.yaml missing from 7 and default 7 branches"
+        "Config file ubiconf_golang.yaml missing from 9.8 and default 9 branches"
         in caplog.text
     )
 
 
-@patch("ubipop._pulp_client.Pulp.search_repo_by_id")
-def test_get_population_sources_repo_note(mocked_search_repo_by_id):
-    repo = get_test_repo(
-        repo_id="rhel-8-for-x86_64-appstream-rpms",
+def test_publish_out_repos(mock_ubipop_runner):
+    dt = datetime(2019, 9, 12, 0, 0, 0)
+
+    d1 = Distributor(
+        id="yum_distributor",
+        type_id="yum_distributor",
+        repo_id="repo",
+        last_publish=dt,
+        relative_url="content/unit/2/client",
+    )
+    repo = YumRepository(
+        id="repo",
+        eng_product_id=102,
+        distributors=[d1],
+        relative_url="content/unit/2/client",
+    )
+    fake_pulp = FakeController()
+    repo.__dict__["_client"] = fake_pulp.client
+
+    fake_pulp.insert_repository(repo)
+    # Setup output repos, leave only binary repo as the actual one
+    mock_ubipop_runner.repos.out_repos = RepoSet(
+        f_proxy(f_return(repo)), f_proxy(f_return()), f_proxy(f_return())
+    )
+
+    fts = mock_ubipop_runner._publish_out_repos()
+
+    # we should publish only one repository with one distributor
+    assert len(fts) == 1
+    assert [hist.repository.id for hist in fake_pulp.publish_history] == ["repo"]
+
+
+def test_get_population_sources():
+    repo = YumRepository(
+        id="rhel-8-for-x86_64-appstream-rpms",
         content_set="rhel-8-for-x86_64-appstream-rpms",
         population_sources=["src_1", "src_2"],
     )
-    ubipop = UbiPopulate(
+
+    fake_ubipopulate = FakeUbiPopulate(
         "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
     )
-    mocked_search_repo_by_id.side_effect = [
-        [
-            get_test_repo(
-                repo_id="src_1",
-                content_set="src_1_cs",
-            )
-        ],
-        [
-            get_test_repo(
-                repo_id="src_2",
-                content_set="src_2_cs",
-            )
-        ],
-    ]
-    repos = ubipop._get_population_sources(
-        repo, None
+
+    fake_pulp = fake_ubipopulate.pulp_client_controller
+
+    repo_1 = YumRepository(
+        id="src_1",
+        content_set="src_1_cs",
+    )
+
+    repo_2 = YumRepository(
+        id="src_2",
+        content_set="src_2_cs",
+    )
+    fake_pulp.insert_repository(repo_1)
+    fake_pulp.insert_repository(repo_2)
+
+    repos = fake_ubipopulate._get_population_sources(
+        repo
     )  # pylint: disable=protected-access
+
     assert len(repos) == 2
+    assert ["src_1", "src_2"] == sorted([repo.id for repo in repos])
 
 
-@patch("ubipop._pulp_client.Pulp.search_repo_by_cs")
-def test_get_population_sources_by_search(search_repo_by_cs):
-    repo = get_test_repo(
-        repo_id="rhel-8-for-x86_64-appstream-rpms",
+def test_get_population_sources_empty():
+    repo = YumRepository(
+        id="rhel-8-for-x86_64-appstream-rpms",
         content_set="rhel-8-for-x86_64-appstream-rpms",
     )
-    ubipop = UbiPopulate(
+
+    fake_ubipopulate = FakeUbiPopulate(
         "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
     )
-    search_repo_by_cs.side_effect = [
-        [
-            get_test_repo(
-                repo_id="src_1",
-                content_set="src_1_cs",
-            )
-        ],
-    ]
-    repos = ubipop._get_population_sources(
-        repo, None
-    )  # pylint: disable=protected-access
-    assert len(repos) == 1
+
+    with pytest.raises(PopulationSourceMissing):
+        fake_ubipopulate._get_population_sources(
+            repo
+        )  # pylint: disable=protected-access
+
+
+@patch("pubtools.pulplib.YumRepository.get_debug_repository")
+@patch("pubtools.pulplib.YumRepository.get_source_repository")
+def test_get_ubi_repo_sets(get_debug_repository, get_source_repository):
+    content_set = "rhel-8-for-x86_64-appstream-rpms"
+    repo = YumRepository(
+        id="ubi_binary",
+        content_set="rhel-8-for-x86_64-appstream-rpms",
+        population_sources=["input_binary"],
+        ubi_population=True,
+    )
+
+    input_binary_repo = YumRepository(id="input_binary")
+    input_source_repo = YumRepository(id="input_source")
+    input_debug_repo = YumRepository(id="input_debug")
+
+    debug_repo = get_test_repo(id="ubi_source", population_sources=["input_source"])
+    source_repo = get_test_repo(id="ubi_debug", population_sources=["input_debug"])
+
+    get_debug_repository.return_value = debug_repo
+    get_source_repository.return_value = source_repo
+
+    fake_ubipopulate = FakeUbiPopulate(
+        "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
+    )
+
+    fake_pulp = fake_ubipopulate.pulp_client_controller
+    fake_pulp.insert_repository(repo)
+    fake_pulp.insert_repository(input_binary_repo)
+    fake_pulp.insert_repository(input_source_repo)
+    fake_pulp.insert_repository(input_debug_repo)
+
+    ubi_repo_sets = fake_ubipopulate._get_ubi_repo_sets(content_set)
+
+    assert len(ubi_repo_sets) == 1
+    ubi_repo_set = ubi_repo_sets[0]
+    input_repos = ubi_repo_set.in_repos
+    output_repos = ubi_repo_set.out_repos
+
+    assert len(input_repos.rpm) == 1
+    assert input_repos.rpm[0].id == "input_binary"
+    assert len(input_repos.source) == 1
+    assert input_repos.source[0].id == "input_source"
+    assert len(input_repos.debug) == 1
+    assert input_repos.debug[0].id == "input_debug"
+
+    assert output_repos.rpm.id == "ubi_binary"
+    assert output_repos.source.id == "ubi_source"
+    assert output_repos.debug.id == "ubi_debug"
 
 
 def test_get_packages_from_module_by_name(mock_ubipop_runner):
@@ -586,7 +569,7 @@ def test_get_blacklisted_packages_match_arch(mock_ubipop_runner):
 
 def _get_search_rpms_side_effect(package_name_or_filename_or_list, debug_only=False):
     def _f(*args, **kwargs):
-        if debug_only and "debug" not in args[0].repo_id:
+        if debug_only and "debug" not in args[0].id:
             return
 
         if len(args) > 1 and args[1] == package_name_or_filename_or_list:
@@ -674,6 +657,7 @@ def test_match_modules(mock_ubipop_runner):
 def test_match_modules_without_profile(ubi_repo_set, executor):
     test_ubiconf = ubiconfig.get_loader(TEST_DATA_DIR).load("ubi8/ubiconf_golang.yaml")
     mocked_ubipop_runner = UbiPopulateRunner(
+        MagicMock(),
         MagicMock(),
         ubi_repo_set,
         test_ubiconf,
@@ -907,8 +891,6 @@ def test_keep_n_latest_packages_no_dupes_from_modular(mock_ubipop_runner):
     ],
 )
 def test_ubi_repo_set(rhel_repo_set, ubi_repo_set, fail, caplog):
-    from ubipop import RepoMissing
-
     if fail:
         with pytest.raises(RepoMissing):
             UbiRepoSet(rhel_repo_set, ubi_repo_set)
@@ -956,13 +938,11 @@ def test_load_ubiconfig_by_content_set_labels():
     assert ubipop.ubiconfig_list[0].content_sets.rpm.output == "ubi-7-server-rpms"
 
 
-@patch("ubipop._pulp_client.Pulp.search_repo_by_id")
-def test_load_ubiconfig_by_repo_ids(mocked_search_repo_by_id):
+def test_load_ubiconfig_by_repo_ids():
     """Ensure correct config is returned when given a repo ID"""
-    mocked_search_repo_by_id.return_value = [
-        get_test_repo(repo_id="rhel-7-server", content_set="rhel-7-server-rpms"),
-    ]
-    ubipop = UbiPopulate(
+    repo = YumRepository(id="rhel-7-server", content_set="rhel-7-server-rpms")
+
+    fake_ubipopulate = FakeUbiPopulate(
         "foo.pulp.com",
         ("foo", "foo"),
         False,
@@ -971,8 +951,15 @@ def test_load_ubiconfig_by_repo_ids(mocked_search_repo_by_id):
             "rhel-7-server",
         ],
     )
-    assert len(ubipop.ubiconfig_list) == 1
-    assert ubipop.ubiconfig_list[0].content_sets.rpm.output == "ubi-7-server-rpms"
+
+    fake_pulp = fake_ubipopulate.pulp_client_controller
+    fake_pulp.insert_repository(repo)
+
+    assert len(fake_ubipopulate.ubiconfig_list) == 1
+    assert (
+        fake_ubipopulate.ubiconfig_list[0].content_sets.rpm.output
+        == "ubi-7-server-rpms"
+    )
 
 
 @pytest.fixture(name="mocked_ubiconfig_load_all")
@@ -1161,54 +1148,54 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     modules, rpms, srpms, debug_rpms = associations
     assert len(modules.units) == 1
     assert modules.units[0].name == "test_md"
-    assert modules.dst_repo.repo_id == "ubi-foo-rpms"
+    assert modules.dst_repo.id == "ubi-foo-rpms"
     assert len(modules.src_repos) == 1
-    assert modules.src_repos[0].repo_id == "foo-rpms"
+    assert modules.src_repos[0].id == "foo-rpms"
 
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "test_rpm"
-    assert rpms.dst_repo.repo_id == "ubi-foo-rpms"
+    assert rpms.dst_repo.id == "ubi-foo-rpms"
     assert len(rpms.src_repos) == 1
-    assert rpms.src_repos[0].repo_id == "foo-rpms"
+    assert rpms.src_repos[0].id == "foo-rpms"
 
     assert len(srpms.units) == 1
     assert srpms.units[0].name == "test_srpm"
-    assert srpms.dst_repo.repo_id == "ubi-foo-source"
+    assert srpms.dst_repo.id == "ubi-foo-source"
     assert len(srpms.src_repos) == 1
-    assert srpms.src_repos[0].repo_id == "foo-source"
+    assert srpms.src_repos[0].id == "foo-source"
 
     assert len(debug_rpms.units) == 1
     assert debug_rpms.units[0].name == "test_debug_pkg"
-    assert debug_rpms.dst_repo.repo_id == "ubi-foo-debug"
+    assert debug_rpms.dst_repo.id == "ubi-foo-debug"
     assert len(debug_rpms.src_repos) == 1
-    assert debug_rpms.src_repos[0].repo_id == "foo-debug"
+    assert debug_rpms.src_repos[0].id == "foo-debug"
 
     # secondly, check correct unassociations, there should 1 unit of each type unassociated
     modules, rpms, srpms, debug_rpms = unassociations
     assert len(modules.units) == 1
     assert modules.units[0].name == "md_current"
-    assert modules.dst_repo.repo_id == "ubi-foo-rpms"
+    assert modules.dst_repo.id == "ubi-foo-rpms"
 
     assert len(rpms.units) == 1
     assert rpms.units[0].name == "rpm_current"
-    assert rpms.dst_repo.repo_id == "ubi-foo-rpms"
+    assert rpms.dst_repo.id == "ubi-foo-rpms"
 
     assert len(srpms.units) == 1
     assert srpms.units[0].name == "srpm_current"
-    assert srpms.dst_repo.repo_id == "ubi-foo-source"
+    assert srpms.dst_repo.id == "ubi-foo-source"
 
     assert len(debug_rpms.units) == 1
     assert debug_rpms.units[0].name == "debug_rpm_current"
-    assert debug_rpms.dst_repo.repo_id == "ubi-foo-debug"
+    assert debug_rpms.dst_repo.id == "ubi-foo-debug"
 
     assert len(mdd_association.units) == 1
-    assert mdd_association.dst_repo.repo_id == "ubi-foo-rpms"
+    assert mdd_association.dst_repo.id == "ubi-foo-rpms"
     assert len(mdd_association.src_repos) == 1
-    assert mdd_association.src_repos[0].repo_id == "foo-rpms"
+    assert mdd_association.src_repos[0].id == "foo-rpms"
 
     assert len(mdd_unassociation.units) == 1
     assert mdd_unassociation.units[0].name == "mdd_current"
-    assert mdd_unassociation.dst_repo.repo_id == "ubi-foo-rpms"
+    assert mdd_unassociation.dst_repo.id == "ubi-foo-rpms"
 
 
 def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft):
@@ -1275,11 +1262,11 @@ def fixture_set_logging():
 
 def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
     set_logging.addHandler(logging.StreamHandler(sys.stdout))
-    src_repo = get_test_repo(repo_id="test_src")
-    dst_repo = get_test_repo(repo_id="test_dst")
+    src_repo = get_test_repo(id="test_src")
+    dst_repo = get_test_repo(id="test_dst")
     associations = [
         AssociateActionModules(
-            [get_test_mod(name="test_assoc", src_repo_id=src_repo.repo_id)],
+            [get_test_mod(name="test_assoc", src_repo_id=src_repo.id)],
             dst_repo,
             [src_repo],
         )
@@ -1301,8 +1288,8 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
 
 def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     set_logging.addHandler(logging.StreamHandler(sys.stdout))
-    src_repo = get_test_repo(repo_id="test_src")
-    dst_repo = get_test_repo(repo_id="test_dst")
+    src_repo = get_test_repo(id="test_src")
+    dst_repo = get_test_repo(id="test_dst")
     associations = [AssociateActionModules([], dst_repo, [src_repo])]
     unassociations = [UnassociateActionModules([], dst_repo)]
 
@@ -1363,8 +1350,8 @@ def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
 
 
 def test_associate_units(mock_ubipop_runner):
-    src_repo = get_test_repo(repo_id="test_src")
-    dst_repo = get_test_repo(repo_id="test_dst")
+    src_repo = get_test_repo(id="test_src")
+    dst_repo = get_test_repo(id="test_dst")
 
     associations = [
         AssociateActionModules([get_test_mod(name="test_assoc")], dst_repo, [src_repo]),
@@ -1380,8 +1367,8 @@ def test_associate_units(mock_ubipop_runner):
 
 
 def test_associate_unassociate_md_defaults(mock_ubipop_runner):
-    src_repo = get_test_repo(repo_id="test_src")
-    dst_repo = get_test_repo(repo_id="tets_dst")
+    src_repo = get_test_repo(id="test_src")
+    dst_repo = get_test_repo(id="tets_dst")
 
     associations = AssociateActionModuleDefaults(
         [

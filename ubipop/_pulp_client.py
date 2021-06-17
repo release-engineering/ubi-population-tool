@@ -87,62 +87,10 @@ class Pulp(object):
 
         return ret
 
-    def _search_repo(self, criteria):
-        url = "repositories/search/"
-        ret = self.do_request("post", url, criteria)
-        ret.raise_for_status()
-        repos = []
-        for item in ret.json():
-            notes = item["notes"]
-            dist_info = [
-                (dist["id"], dist["distributor_type_id"])
-                for dist in item["distributors"]
-            ]
-            # Only UBI repos should have a ubi_population note, set to None for other platforms
-            # If the UBI repo does not have this note, assume it is okay to populate
-            ubi_population = (
-                notes.get("ubi_population", True)
-                if notes["platform"] == "ubi"
-                else None
-            )
-            ubi_config_version = notes.get("ubi_config_version", None)
-            repos.append(
-                Repo(
-                    repo_id=item["id"],
-                    arch=notes["arch"],
-                    content_set=notes["content_set"],
-                    platform_full_version=notes["platform_full_version"],
-                    platform_major_version=notes["platform_major_version"],
-                    dist_ids_type_ids=dist_info,
-                    ubi_population=ubi_population,
-                    population_sources=notes.get("population_sources"),
-                    ubi_config_version=ubi_config_version,
-                )
-            )
-
-        return repos
-
-    def search_repo_by_cs(self, content_set):
-        """Returns a list of Repo objects with matching content set labels"""
-
-        criteria = {
-            "criteria": {"filters": {"notes.content_set": content_set}},
-            "distributors": True,
-        }
-
-        return self._search_repo(criteria)
-
-    def search_repo_by_id(self, repo_id):
-        """Returns a list of Repo objects with matching repo IDs"""
-
-        criteria = {"criteria": {"filters": {"id": repo_id}}, "distributors": True}
-
-        return self._search_repo(criteria)
-
     def search_rpms(
         self, repo, name=None, arch=None, name_globbing=False, filename=None
     ):
-        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
+        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.id)
         criteria = {"type_ids": ["rpm", "srpm"]}
 
         filters = {"filters": {"unit": {}}}
@@ -169,14 +117,14 @@ class Pulp(object):
                 Package(
                     metadata["name"],
                     metadata["filename"],
-                    repo.repo_id,
+                    repo.id,
                     sourcerpm_filename=metadata.get("sourcerpm"),
                 )
             )
         return rpms
 
     def search_modules(self, repo, name=None, stream=None):
-        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
+        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.id)
         criteria = {"type_ids": ["modulemd"]}
         if name and stream:
             criteria.update({"filters": {"unit": {"name": name, "stream": stream}}})
@@ -197,13 +145,13 @@ class Pulp(object):
                     metadata["arch"],
                     metadata["artifacts"],
                     metadata["profiles"],
-                    repo.repo_id,
+                    repo.id,
                 )
             )
         return modules
 
     def search_module_defaults(self, repo, name=None, stream=None):
-        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.repo_id)
+        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.id)
         criteria = {"type_ids": ["modulemd_defaults"]}
         if name and stream:
             criteria.update({"filters": {"unit": {"name": name, "stream": stream}}})
@@ -219,7 +167,7 @@ class Pulp(object):
                     metadata["name"],
                     metadata["stream"],
                     metadata["profiles"],
-                    repo.repo_id,
+                    repo.id,
                 )
             )
         return module_defaults
@@ -273,9 +221,7 @@ class Pulp(object):
         return [{"filename": rpm.filename} for rpm in rpms]
 
     def unassociate_units(self, repo, units, type_ids):
-        url = "repositories/{dst_repo}/actions/unassociate/".format(
-            dst_repo=repo.repo_id
-        )
+        url = "repositories/{dst_repo}/actions/unassociate/".format(dst_repo=repo.id)
         data = {
             "criteria": {
                 "type_ids": list(type_ids),
@@ -284,17 +230,15 @@ class Pulp(object):
         }
         log_msg = "Unassociating %s from %s"
         for unit in units:
-            _LOG.info(log_msg, str(unit), repo.repo_id)
+            _LOG.info(log_msg, str(unit), repo.id)
 
         ret = self.do_request("post", url, data).json()
         return [task["task_id"] for task in ret["spawned_tasks"]]
 
     def associate_units(self, src_repo, dest_repo, units, type_ids):
-        url = "repositories/{dst_repo}/actions/associate/".format(
-            dst_repo=dest_repo.repo_id
-        )
+        url = "repositories/{dst_repo}/actions/associate/".format(dst_repo=dest_repo.id)
         data = {
-            "source_repo_id": src_repo.repo_id,
+            "source_repo_id": src_repo.id,
             "criteria": {
                 "type_ids": list(type_ids),
                 "filters": {
@@ -306,7 +250,7 @@ class Pulp(object):
         }
         log_msg = "Associating %s from %s to %s"
         for unit in units:
-            _LOG.info(log_msg, str(unit), src_repo.repo_id, dest_repo.repo_id)
+            _LOG.info(log_msg, str(unit), src_repo.id, dest_repo.id)
         ret = self.do_request("post", url, data)
         ret.raise_for_status()
         ret_json = ret.json()
@@ -343,43 +287,6 @@ class Pulp(object):
 
     def unassociate_packages(self, repo, rpms):
         return self.unassociate_units(repo, rpms, ("rpm", "srpm"))
-
-    def publish_repo(self, repo):
-        url = "repositories/{repo_id}/actions/publish/".format(repo_id=repo.repo_id)
-        task_ids = []
-        for dist_id, dist_type_id in repo.distributors_ids_type_ids_tuples:
-            _LOG.info("Publishing %s in %s", repo.repo_id, dist_id)
-            data = {"id": dist_id}
-            if dist_type_id in ("rpm_rsync_distributor", "cdn_distributor"):
-                data["override_config"] = {"delete": True}
-            ret = self.do_request("post", url, data).json()
-            task_ids.extend(task["task_id"] for task in ret["spawned_tasks"])
-
-        return task_ids
-
-
-class Repo(object):
-    def __init__(
-        self,
-        repo_id,
-        arch,
-        content_set,
-        platform_full_version,
-        platform_major_version,
-        dist_ids_type_ids,
-        ubi_population,
-        population_sources,
-        ubi_config_version,
-    ):
-        self.repo_id = repo_id
-        self.arch = arch
-        self.content_set = content_set
-        self.platform_full_version = platform_full_version
-        self.platform_major_version = platform_major_version
-        self.ubi_config_version = ubi_config_version
-        self.distributors_ids_type_ids_tuples = dist_ids_type_ids
-        self.ubi_population = ubi_population
-        self.population_sources = population_sources
 
 
 class Package(object):
