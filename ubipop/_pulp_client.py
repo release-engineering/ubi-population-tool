@@ -295,7 +295,7 @@ class Package(object):
     ):
         self.name = name
         self.filename = filename
-        self.sourcerpm_filename = sourcerpm_filename
+        self.sourcerpm = sourcerpm_filename
         self.is_modular = is_modular
         #  return name, ver, rel, epoch, arch
         _, self.version, self.release, self.epoch, _ = split_filename(self.filename)

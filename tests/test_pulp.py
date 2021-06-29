@@ -198,7 +198,7 @@ def test_search_rpms(mock_pulp, mock_search_rpms, mock_repo):
     assert len(found_rpms) == 1
     assert found_rpms[0].name == "foo-pkg"
     assert found_rpms[0].filename == "foo-pkg.rpm"
-    assert found_rpms[0].sourcerpm_filename == "foo-pkg.src.rpm"
+    assert found_rpms[0].sourcerpm == "foo-pkg.src.rpm"
     assert found_rpms[0].is_modular is False
 
 
