@@ -20,6 +20,8 @@ from ubipop._utils import (
     UnassociateActionModuleDefaults,
     UnassociateActionRpms,
 )
+from ._matcher import ModularMatcher
+
 
 _LOG = logging.getLogger("ubipop")
 
@@ -46,9 +48,8 @@ class UbiRepoSet(object):
 
         self.packages = defaultdict(list)
         self.debug_rpms = defaultdict(list)
-        self.modules = defaultdict(list)
+        self.modules = None
         self.module_defaults = defaultdict(list)
-        self.pkgs_from_modules = defaultdict(list)
         self.source_rpms = defaultdict(list)
 
         self._ensure_repos_existence()
@@ -350,71 +351,22 @@ class UbiPopulateRunner(object):
         self.dry_run = dry_run
         self._executor = executor
 
-    def _match_modules(self):
-        # Add matching modules
-        fts = {}
-        for module in self.ubiconfig.modules:
-            for in_repo_rpm in self.repos.in_repos.rpm:
-                fts[
-                    self._executor.submit(
-                        self.pulp.search_modules,
-                        in_repo_rpm,
-                        module.name,
-                        str(module.stream),
-                    )
-                ] = (module.name + str(module.stream), module.profiles)
-
-        for ft in as_completed(fts):
-            input_modules = ft.result()
-            if input_modules:
-                # fts[ft][0] == module.name + str(module.stream)
-                # fts[ft][1] == module.profiles
-                name_stream = fts[ft][0]
-                profiles = fts[ft][1]
-                self.repos.modules[name_stream].extend(input_modules)
-                if profiles:
-                    # Include packages from module profiles only.
-                    packages_names = self.get_packages_names_by_profiles(
-                        profiles, input_modules
-                    )
-                    for package_name in packages_names:
-                        module_packages = self.get_packages_from_module(
-                            input_modules, package_name
-                        )
-
-                        rpms, debug_rpms = module_packages
-                        # for reference which pkgs are from modules
-                        self.repos.pkgs_from_modules[name_stream].extend(
-                            rpms + debug_rpms
-                        )
-                        self.repos.packages[package_name].extend(rpms)
-                        self.repos.debug_rpms[package_name].extend(debug_rpms)
-                else:
-                    # Include every package from module artifacts.
-                    module_packages = self.get_packages_from_module(input_modules)
-                    rpms, debug_rpms = module_packages
-                    self.repos.pkgs_from_modules[name_stream].extend(rpms + debug_rpms)
-                    for package in rpms:
-                        self.repos.packages[package.name].append(package)
-                    for package in debug_rpms:
-                        self.repos.debug_rpms[package.name].append(package)
-
     def _match_module_defaults(self):
         """Try to find modulemd_defaults units in the same repo with the same
         name/stream of a modulemd.
         """
         fts = {}
-        for _, modules in self.repos.modules.items():
-            for md in modules:
-                for in_repo_rpm in self.repos.in_repos.rpm:
-                    fts[
-                        self._executor.submit(
-                            self.pulp.search_module_defaults,
-                            in_repo_rpm,
-                            md.name,
-                            str(md.stream),
-                        )
-                    ] = md.name + str(md.stream)
+        for module in self.repos.modules:
+            for in_repo_rpm in self.repos.in_repos.rpm:
+                fts[
+                    self._executor.submit(
+                        self.pulp.search_module_defaults,
+                        in_repo_rpm,
+                        module.name,
+                        str(module.stream),
+                    )
+                ] = module.name + str(module.stream)
+
         for ft in as_completed(fts):
             module_defaults = ft.result()
             if module_defaults:
@@ -454,9 +406,11 @@ class UbiPopulateRunner(object):
             packages = ft.result()
             if packages:
                 for pkg in packages:
+                    # skip modular packages, those are handled separately
                     if pkg.filename in modular_pkgs:
-                        pkg.is_modular = True
-                packages_dict[fts[ft]].extend(packages)
+                        continue
+
+                    packages_dict[fts[ft]].append(pkg)
 
     def _match_binary_rpms(self):
         self._match_packages(self.repos.in_repos.rpm, self.repos.packages)
@@ -511,10 +465,6 @@ class UbiPopulateRunner(object):
             if not self.repos.debug_rpms[pkg.name]:
                 self.repos.debug_rpms.pop(pkg.name, None)
 
-    def _finalize_modules_output_set(self):
-        for _, modules in self.repos.modules.items():
-            self._finalize_output_units(modules, "module")
-
     def _finalize_rpms_output_set(self):
         for _, packages in self.repos.packages.items():
             self._finalize_output_units(packages, "rpm")
@@ -529,14 +479,12 @@ class UbiPopulateRunner(object):
             self.keep_n_latest_packages(
                 units
             )  # with respect to packages referenced by modules
-        else:
-            self.sort_modules(units)
-            self.keep_n_latest_modules(units)
 
     def _create_srpms_output_set(self):
         rpms = chain.from_iterable(self.repos.packages.values())
+
         for package in rpms:
-            if package.sourcerpm_filename is None:
+            if package.sourcerpm is None:
                 _LOG.warning(
                     "Package %s doesn't reference its source rpm", package.name
                 )
@@ -552,7 +500,7 @@ class UbiPopulateRunner(object):
             self.repos.source_rpms[package.name].append(
                 Package(
                     package.name,
-                    package.sourcerpm_filename,
+                    package.sourcerpm,
                     is_modular=package.is_modular,
                     src_repo_id=associate_src_repo.id,
                 )
@@ -566,8 +514,11 @@ class UbiPopulateRunner(object):
             if not pkg.is_modular:
                 self.repos.source_rpms.pop(pkg.name, None)
 
-    def _determine_pulp_actions(self, units, current, diff_f):
-        expected = list(chain.from_iterable(units.values()))
+    def _determine_pulp_actions(self, units, current, diff_f, extra_units=None):
+        expected = list(units)
+        if extra_units:
+            expected += list(extra_units)
+
         to_associate = diff_f(expected, current)
         to_unassociate = diff_f(current, expected)
         return to_associate, to_unassociate
@@ -578,34 +529,34 @@ class UbiPopulateRunner(object):
         )
 
     def _get_pulp_actions_md_defaults(self, module_defaults, current):
+        module_defaults_list = list(chain.from_iterable(module_defaults.values()))
         return self._determine_pulp_actions(
-            module_defaults,
+            module_defaults_list,
             current,
             self._diff_md_defaults_by_profiles,
         )
 
-    def _get_pulp_actions_pkgs(self, pkgs, current):
+    def _get_pulp_actions_pkgs(self, pkgs, current, modular_pkgs):
+        pkgs_list = list(chain.from_iterable(pkgs.values()))
         return self._determine_pulp_actions(
-            pkgs, current, self._diff_packages_by_filename
+            pkgs_list, current, self._diff_packages_by_filename, modular_pkgs
         )
 
-    def _get_pulp_actions_src_pkgs(self, pkgs, current):
+    def _get_pulp_actions_src_pkgs(self, pkgs, current, modular):
         """
         Get required pulp actions to make sure existing and desired source packages are in
         match.
         """
-        src_pkgs = {}
         uniq_srpms = {}
+
+        all_pkgs = list(chain.from_iterable(pkgs.values())) + list(modular)
+
         # filter out packages that share same source rpm
-        for _, pkgs in pkgs.items():
-            for pkg in pkgs:
-                fn = pkg.filename or pkg.sourcerpm_filename
-                uniq_srpms[fn] = pkg
+        for pkg in all_pkgs:
+            fn = pkg.filename or pkg.sourcerpm
+            uniq_srpms[fn] = pkg
 
-        # remap uniq srpms to format accepted by _determine_pulp_actions
-        for _, srpm in uniq_srpms.items():
-            src_pkgs[(srpm.name, srpm.version, srpm.release)] = [srpm]
-
+        src_pkgs = list(uniq_srpms.values())
         return self._determine_pulp_actions(
             src_pkgs, current, self._diff_packages_by_filename
         )
@@ -617,6 +568,9 @@ class UbiPopulateRunner(object):
         current_rpms_ft,
         current_srpms_ft,
         current_debug_rpms_ft,
+        modular_binary,
+        modular_debug,
+        modular_source,
     ):
         """
         Determines expected pulp actions by comparing current content of output repos and
@@ -634,17 +588,17 @@ class UbiPopulateRunner(object):
         )
 
         rpms_assoc, rpms_unassoc = self._get_pulp_actions_pkgs(
-            self.repos.packages, current_rpms_ft.result()
+            self.repos.packages, current_rpms_ft.result(), modular_binary
         )
         srpms_assoc, srpms_unassoc = self._get_pulp_actions_src_pkgs(
-            self.repos.source_rpms, current_srpms_ft.result()
+            self.repos.source_rpms, current_srpms_ft.result(), modular_source
         )
 
         debug_assoc = None
         debug_unassoc = None
         if current_debug_rpms_ft is not None:
             debug_assoc, debug_unassoc = self._get_pulp_actions_pkgs(
-                self.repos.debug_rpms, current_debug_rpms_ft.result()
+                self.repos.debug_rpms, current_debug_rpms_ft.result(), modular_debug
             )
 
         associations = (
@@ -696,23 +650,6 @@ class UbiPopulateRunner(object):
 
         return diff
 
-    def _filter_pkgs_from_modules(self):
-        regex = r"\d+:"
-        reg = re.compile(regex)
-
-        for name_stream, packages in self.repos.pkgs_from_modules.items():
-            # name_stream, packages == str, list of _pulp_client.Package
-
-            wanted_packages = list(
-                chain.from_iterable(
-                    [m.packages for m in self.repos.modules[name_stream]]
-                )
-            )
-            wanted_packages = [
-                reg.sub("", rpm_nevra) + ".rpm" for rpm_nevra in wanted_packages
-            ]
-            packages[:] = [pkg for pkg in packages if pkg.filename in wanted_packages]
-
     def run_ubi_population(self):
         (
             current_modules_ft,
@@ -722,17 +659,21 @@ class UbiPopulateRunner(object):
             current_debug_rpms_ft,
         ) = self._get_current_content()
 
-        self._match_modules()
+        # start async querying for modulemds and modular packages
+        mm = ModularMatcher(self.repos.in_repos, self.ubiconfig.modules).run()
+        self.repos.modules = mm.modules
+
         self._match_binary_rpms()
         if self.repos.out_repos.debug:
             self._match_debug_rpms()
         self._exclude_blacklisted_packages()
-        self._finalize_modules_output_set()
-        self._filter_pkgs_from_modules()
+
+        # only non-modular packages
         self._finalize_rpms_output_set()
         self._finalize_debug_output_set()
-        self._match_module_defaults()
         self._create_srpms_output_set()
+
+        self._match_module_defaults()
 
         (
             associations,
@@ -745,6 +686,9 @@ class UbiPopulateRunner(object):
             current_rpms_ft,
             current_srpms_ft,
             current_debug_rpms_ft,
+            mm.binary_rpms,
+            mm.debug_rpms,
+            mm.source_rpms,
         )
 
         if self.dry_run:
@@ -929,117 +873,15 @@ class UbiPopulateRunner(object):
 
         return blacklisted_pkgs
 
-    def sort_modules(self, modules):
-        """
-        Sort modules by version
-        """
-        modules.sort(key=lambda module: module.version)
-
-    def keep_n_latest_modules(self, modules, n=1):
-        """
-        Keeps n latest modules in modules sorted list
-        """
-        modules_to_keep = []
-        versions_to_keep = sorted(set([m.version for m in modules]))[-n:]
-
-        for module in modules:
-            if module.version in versions_to_keep:
-                modules_to_keep.append(module)
-
-        modules[:] = modules_to_keep
-
     def sort_packages(self, packages):
         """
         Sort packages by vercmp
         """
         packages.sort()
 
-    def get_packages_names_by_profiles(self, profiles, modules):
-        """
-        Gather package names by module profiles, if no profiles provided, add packages from
-        all profiles
-
-        Args:
-            profiles (list of str):
-                profiles ubi config
-            modules (list of _pulp_client.Module):
-                modules to process
-
-        Returns:
-            list of str:
-                names of packages within matching modules & profiles
-        """
-        packages_names = []
-
-        for module in modules:
-            if profiles:
-                for profile in profiles:
-                    packages_names.extend(
-                        packages for packages in module.profiles.get(profile, [])
-                    )
-            else:
-                for packages in module.profiles.values():
-                    packages_names.extend(packages)
-
-        return list(set(packages_names))
-
-    def get_packages_from_module(self, input_modules, package_name=None):
-        """
-        Gathers packages from module.
-        """
-        ret_rpms = []
-        ret_debug_rpms = []
-
-        regex = r"\d+:"
-        reg = re.compile(regex)
-        for module in input_modules:
-            for rpm_nevra in module.packages:
-                rpm_without_epoch = reg.sub("", rpm_nevra)
-                name, _, _, _, arch = split_filename(rpm_without_epoch)
-                # skip source package, they are taken from pkgs metadata
-                if arch == "src":
-                    continue
-                if package_name and name != package_name:
-                    continue
-                rpm_filename = rpm_without_epoch + ".rpm"
-
-                # Check existence of rpm in binary rpm repos
-                rpms = []
-
-                for in_repo_rpm in self.repos.in_repos.rpm:
-                    res = self.pulp.search_rpms(in_repo_rpm, filename=rpm_filename)
-                    if res:
-                        rpms.extend(res)
-                if rpms:
-                    rpms[0].is_modular = True
-                    ret_rpms.append(rpms[0])
-                else:
-                    # Check existence of rpm in debug repos
-                    debug_rpms = []
-                    for in_repo_debug in self.repos.in_repos.debug:
-                        res = self.pulp.search_rpms(
-                            in_repo_debug, filename=rpm_filename
-                        )
-                        if res:
-                            debug_rpms.extend(res)
-
-                    if debug_rpms:
-                        debug_rpms[0].is_modular = True
-                        ret_debug_rpms.append(debug_rpms[0])
-                    else:
-                        _LOG.warning(
-                            "RPM %s is unavailable in input repos %s %s, skipping",
-                            rpm_filename,
-                            [r.id for r in self.repos.in_repos.rpm],
-                            [r.id for r in self.repos.in_repos.debug],
-                        )
-        return ret_rpms, ret_debug_rpms
-
     def keep_n_latest_packages(self, packages, n=1):
         """
         Keep n latest non-modular packages.
-        Modular packages are kept only if they are referenced by some of
-        remaining modules.
 
         Arguments:
             packages (List[Package]): Sorted, oldest goes first
@@ -1050,44 +892,15 @@ class UbiPopulateRunner(object):
         Returns:
             None. The packages list is changed in-place
         """
-
-        packages_to_keep = []
-        filenames_to_keep = set()  # from modular packages
-
         # Use a queue of n elements per arch
         pkgs_per_arch = defaultdict(lambda: deque(maxlen=n))
 
-        # Set of package filenames from modules. Modular packages in
-        # packages list are kept if referenced here.
-        modular_packages_filenames = set()
-        for (
-            module_name_stream,
-            packages_in_module,
-        ) in self.repos.pkgs_from_modules.items():
-            if module_name_stream in self.repos.modules:
-                modular_packages_filenames |= set(
-                    [pkg.filename for pkg in packages_in_module]
-                )
-
         for package in packages:
-            if not package.is_modular:
-                # filter non-modular pkgs per arches, there can be rpms
-                # with different arches for package in one repository
-                _, _, _, _, arch = split_filename(package.filename)
-                pkgs_per_arch[arch].append(package)
-            elif (
-                package.filename in modular_packages_filenames
-                and package.filename not in filenames_to_keep
-            ):
-                # this skips modular pkgs that are not referenced by module
-                packages_to_keep.append(package)
-                filenames_to_keep.add(package.filename)
+            _, _, _, _, arch = split_filename(package.filename)
+            pkgs_per_arch[arch].append(package)
 
-        # Packages already included from modules are skipped
         latest_pkgs_per_arch = [
-            pkg
-            for pkg in chain.from_iterable(pkgs_per_arch.values())
-            if pkg.filename not in filenames_to_keep
+            pkg for pkg in chain.from_iterable(pkgs_per_arch.values())
         ]
 
-        packages[:] = latest_pkgs_per_arch + packages_to_keep
+        packages[:] = latest_pkgs_per_arch

@@ -7,9 +7,16 @@ import pytest
 import ubiconfig
 
 from copy import deepcopy
-from collections import defaultdict
 from datetime import datetime
-from pubtools.pulplib import YumRepository, FakeController, Client, Distributor
+from operator import attrgetter
+from pubtools.pulplib import (
+    YumRepository,
+    FakeController,
+    Client,
+    Distributor,
+    ModulemdUnit,
+    RpmUnit,
+)
 from mock import MagicMock, patch, call
 from more_executors import Executors
 from more_executors.futures import f_proxy, f_return
@@ -30,6 +37,8 @@ from ubipop._utils import (
     UnassociateActionModuleDefaults,
     split_filename,
 )
+from ubipop._matcher import UbiUnit
+
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "./data")
 
@@ -152,16 +161,31 @@ def get_test_pkg(**kwargs):
 
 
 def get_test_mod(**kwargs):
-    return Module(
-        kwargs.get("name", ""),
-        kwargs.get("stream", ""),
-        kwargs.get("version", ""),
-        kwargs.get("context", ""),
-        kwargs.get("arch", ""),
-        kwargs.get("packages", ""),
-        kwargs.get("profiles", ""),
-        kwargs.get("src_repo_id"),
-    )
+    if kwargs.get("pulplib"):
+        unit = UbiUnit(
+            ModulemdUnit(
+                name=kwargs.get("name", ""),
+                stream=kwargs.get("stream", ""),
+                version=kwargs.get("version", 0),
+                context=kwargs.get("context", ""),
+                arch=kwargs.get("arch", ""),
+                artifacts=kwargs.get("packages", []),
+                profiles=kwargs.get("profiles", {}),
+            ),
+            kwargs.get("src_repo_id"),
+        )
+    else:
+        unit = Module(
+            kwargs.get("name", ""),
+            kwargs.get("stream", ""),
+            kwargs.get("version", 0),
+            kwargs.get("context", ""),
+            kwargs.get("arch", ""),
+            kwargs.get("packages", []),
+            kwargs.get("profiles", {}),
+            kwargs.get("src_repo_id"),
+        )
+    return unit
 
 
 def get_test_mod_defaults(**kwargs):
@@ -330,204 +354,6 @@ def test_get_ubi_repo_sets(get_debug_repository, get_source_repository):
     assert output_repos.debug.id == "ubi_debug"
 
 
-def test_get_packages_from_module_by_name(mock_ubipop_runner):
-    package_name = "postgresql"
-    input_modules = [
-        get_test_mod(
-            packages=[
-                "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
-                "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-                "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-            ],
-        ),
-    ]
-
-    packages_fnames = [
-        "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.src.rpm",
-        "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
-        "postgresql-contrib-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
-    ]
-
-    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(
-        packages_fnames
-    )
-    rpms, debug_rpms = mock_ubipop_runner.get_packages_from_module(
-        input_modules, package_name
-    )
-    assert len(rpms) == 1
-    assert len(debug_rpms) == 0
-    pkg = rpms[0]
-    # filename is without  epoch
-    assert pkg.filename == "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"
-    assert pkg.is_modular is True
-
-
-def test_get_packages_from_module(mock_ubipop_runner):
-    input_modules = [
-        get_test_mod(
-            packages=[
-                "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
-                "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-                "postgresql-contrib-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-            ],
-        ),
-    ]
-
-    packages_fnames = [
-        "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.src.rpm",
-        "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
-        "postgresql-contrib-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
-    ]
-
-    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(
-        packages_fnames
-    )
-
-    rpms, debug_rpms = mock_ubipop_runner.get_packages_from_module(input_modules)
-    assert len(rpms) == 2  # srpm is not included
-    assert len(debug_rpms) == 0  # no debug rpm in this testcase
-    assert all([rpm.is_modular for rpm in rpms])
-
-
-def test_get_packages_from_module_debuginfo(mock_ubipop_runner):
-    input_modules = [
-        get_test_mod(
-            packages=[
-                "postgresql-0:9.6.10-1.module+el8+2470+d1bafa0e.src",
-                "postgresql-contrib-debuginfo-0:9.6.10-1.module+el8+2470+d1bafa0e.x86_64",
-            ],
-        ),
-    ]
-
-    packages_fnames = [
-        "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.src.rpm",
-        "postgresql-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
-        "postgresql-contrib-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
-        "postgresql-contrib-debuginfo-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm",
-    ]
-
-    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(
-        packages_fnames, debug_only=True
-    )
-
-    rpms, debug_rpms = mock_ubipop_runner.get_packages_from_module(input_modules)
-    assert len(rpms) == 0  # no srpm or binary rpm are included
-    assert len(debug_rpms) == 1  # one debug rpm in this testcase
-    assert (
-        debug_rpms[0].filename
-        == "postgresql-contrib-debuginfo-9.6.10-1.module+el8+2470+d1bafa0e.x86_64.rpm"
-    )
-
-
-def test_packages_names_by_profiles(mock_ubipop_runner):
-    profiles_from_ubiconfig = ["prof2", "prof3"]
-    profiles = {"prof1": ["pkg1", "pkg2"], "prof2": ["pkg3"], "prof3": ["pkg3", "pkg4"]}
-    modules = [get_test_mod(profiles=profiles)]
-    pkg_names = mock_ubipop_runner.get_packages_names_by_profiles(
-        profiles_from_ubiconfig, modules
-    )
-
-    assert sorted(pkg_names) == ["pkg3", "pkg4"]
-
-
-def test_packages_names_by_profiles_all_profiles(mock_ubipop_runner):
-    profiles = {"prof1": ["pkg1", "pkg2"], "prof2": ["pkg3"]}
-    modules = [get_test_mod(profiles=profiles)]
-    pkg_names = mock_ubipop_runner.get_packages_names_by_profiles([], modules)
-
-    assert len(pkg_names) == 3
-    assert sorted(pkg_names) == sorted(profiles["prof1"] + profiles["prof2"])
-
-
-def test_sort_packages(mock_ubipop_runner):
-    packages = [
-        get_test_pkg(filename="rubygems-2.0.14-26.el7_1.noarch.rpm"),
-        get_test_pkg(filename="rubygems-2.0.14-25.el7_1.noarch.rpm"),
-        get_test_pkg(filename="rubygems-2.0.14.1-33.el7_6.noarch.rpm"),
-        get_test_pkg(filename="rubygems-2.0.14.1-34.1.el7_6.noarch.rpm"),
-        get_test_pkg(filename="rubygems-2.0.14.1-34.1.1.el7_6.noarch.rpm"),
-        get_test_pkg(filename="rubygems-2.0.13.1-34.el7_6.noarch.rpm"),
-        get_test_pkg(filename="rubygems-2.0.13.2-34.el7_6.noarch.rpm"),
-    ]
-
-    mock_ubipop_runner.sort_packages(packages)
-
-    assert "2.0.13.1-34.el7_6" in packages[0].filename
-    assert "2.0.13.2-34.el7_6" in packages[1].filename
-    assert "2.0.14-25.el7_1" in packages[2].filename
-    assert "2.0.14-26.el7_1" in packages[3].filename
-    assert "2.0.14.1-33.el7_6" in packages[4].filename
-    assert "2.0.14.1-34.1.el7_6" in packages[5].filename
-    assert "2.0.14.1-34.1.1.el7_6" in packages[6].filename
-
-
-@pytest.mark.parametrize(
-    "n, expected_versions_modules",
-    [(1, {3: 2}), (2, {2: 3, 3: 2}), (3, {1: 1, 2: 3, 3: 2})],
-)
-def test_keep_n_latest_module_duplicate_versions(
-    mock_ubipop_runner, n, expected_versions_modules
-):
-    # 3 modules with version 2
-    # 2 modules with version 3
-    # 1 modules with version 1
-    modules = [
-        get_test_mod(version=2, context="a"),
-        get_test_mod(version=3, context="b"),
-        get_test_mod(version=1, context="c"),
-        get_test_mod(version=3, context="d"),
-        get_test_mod(version=2, context="f"),
-        get_test_mod(version=2, context="e"),
-    ]
-
-    mock_ubipop_runner.sort_modules(modules)
-    mock_ubipop_runner.keep_n_latest_modules(modules, n)
-
-    current_versions = set([m.version for m in modules])
-    assert current_versions == set(expected_versions_modules.keys())
-
-    md_per_version = defaultdict(list)
-    for module in modules:
-        md_per_version[module.version].append(module)
-
-    for version, modules_number in expected_versions_modules.items():
-        assert len(md_per_version[version]) == modules_number
-        assert len(set([m.context for m in md_per_version[version]])) == modules_number
-
-
-@pytest.mark.parametrize(
-    "n, expected_versions", [(1, [3]), (2, [2, 3]), (3, [1, 2, 3])]
-)
-def test_keep_n_latest_modules_no_duplicate_version(
-    mock_ubipop_runner, n, expected_versions
-):
-    modules = [
-        get_test_mod(version=2),
-        get_test_mod(version=3),
-        get_test_mod(version=1),
-    ]
-
-    mock_ubipop_runner.sort_modules(modules)
-    mock_ubipop_runner.keep_n_latest_modules(modules, n)
-
-    assert len(modules) == n
-    current_versions = [m.version for m in modules]
-    assert current_versions == expected_versions
-
-
-def test_sort_modules(mock_ubipop_runner):
-    modules = [
-        get_test_mod(version=2),
-        get_test_mod(version=3),
-        get_test_mod(version=1),
-    ]
-    mock_ubipop_runner.sort_modules(modules)
-
-    assert modules[0].version == 1
-    assert modules[1].version == 2
-    assert modules[2].version == 3
-
-
 def test_get_blacklisted_packages_match_name_glob(mock_ubipop_runner):
     pkg_name = "foo-pkg"
     test_pkg_list = [
@@ -598,18 +424,38 @@ def _get_search_rpms_side_effect(package_name_or_filename_or_list, debug_only=Fa
     return _f
 
 
-@pytest.mark.parametrize("pkg, modular", [("foo-no-match", False), ("foo-pkg", True)])
-def test_match_binary_rpms(mock_ubipop_runner, pkg, modular):
+def test_match_binary_rpms_skip_modular(mock_ubipop_runner):
     mock_ubipop_runner.pulp.search_modules.return_value = [
         get_test_mod(
             name="m1",
             profiles={"prof1": ["tomcatjss"]},
-            packages=["foo-2-pkg-0:7.3.6-1.el8+1944+b6c8e16f.noarch", pkg],
+            packages=["foo-2-pkg-0:7.3.6-1.el8+1944+b6c8e16f.noarch", "foo-pkg0:"],
         ),
     ]
 
     mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(
-        "foo-pkg"
+        "foo-pkg",
+    )
+
+    mock_ubipop_runner._match_binary_rpms()  # pylint: disable=protected-access
+    # there are no packages stored, modular ones were skipped even if they match
+    # by ubi_config
+    assert len(mock_ubipop_runner.repos.packages) == 0
+
+
+def test_match_binary_rpms(mock_ubipop_runner):
+    mock_ubipop_runner.pulp.search_modules.return_value = [
+        get_test_mod(
+            name="m1",
+            profiles={"prof1": ["tomcatjss"]},
+            packages=[
+                "foo-2-pkg-0:7.3.6-1.el8+1944+b6c8e16f.noarch",
+            ],
+        ),
+    ]
+
+    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(
+        "foo-pkg",
     )
 
     mock_ubipop_runner._match_binary_rpms()  # pylint: disable=protected-access
@@ -618,7 +464,9 @@ def test_match_binary_rpms(mock_ubipop_runner, pkg, modular):
     assert len(mock_ubipop_runner.repos.packages) == 1
     assert current_pkg.name == "foo-pkg"
     assert current_pkg.filename == "foo-pkg.rpm"
-    assert current_pkg.is_modular is modular
+    # we skip handling modular packages in _match_binary_rpms() method completely
+    # by default is_modular attr is set to False
+    assert current_pkg.is_modular is False
 
 
 def test_match_debug_rpms(mock_ubipop_runner):
@@ -632,85 +480,19 @@ def test_match_debug_rpms(mock_ubipop_runner):
     assert mock_ubipop_runner.repos.debug_rpms[package_name][0].name == package_name
 
 
-def test_match_modules(mock_ubipop_runner):
-    mock_ubipop_runner.pulp.search_modules.return_value = [
-        get_test_mod(
-            name="m1",
-            profiles={"prof1": ["tomcatjss"]},
-            packages=["tomcatjss-0:7.3.6-1.el8+1944+b6c8e16f.noarch"],
-        )
-    ]
-    pkg_filename = "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
-    mock_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(
-        pkg_filename
-    )
-    mock_ubipop_runner._match_modules()  # pylint: disable=protected-access
-
-    assert len(mock_ubipop_runner.repos.modules) == 1
-    assert len(mock_ubipop_runner.repos.modules["n1s1"]) == 1
-    assert mock_ubipop_runner.repos.modules["n1s1"][0].name == "m1"
-    pkg = mock_ubipop_runner.repos.pkgs_from_modules["n1s1"][0]
-    assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
-    assert pkg.filename == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
-
-
-def test_match_modules_without_profile(ubi_repo_set, executor):
-    test_ubiconf = ubiconfig.get_loader(TEST_DATA_DIR).load("ubi8/ubiconf_golang.yaml")
-    mocked_ubipop_runner = UbiPopulateRunner(
-        MagicMock(),
-        MagicMock(),
-        ubi_repo_set,
-        test_ubiconf,
-        False,
-        executor,
-    )
-
-    mocked_ubipop_runner.pulp.search_modules.return_value = [
-        get_test_mod(
-            name="go-toolset",
-            profiles={"common": ["go-toolset"]},
-            packages=[
-                "go-toolset-0:1.11.5-1.module+el8+2774+11afa8b5.x86_64",
-                "golang-0:1.11.5-1.module+el8+2774+11afa8b5.x86_64",
-                "golang-bin-0:1.11.5-1.module+el8+2774+11afa8b5.x86_64",
-                "golang-docs-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
-                "golang-misc-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
-                "golang-race-0:1.11.5-1.module+el8+2774+11afa8b5.x86_64",
-                "golang-src-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
-                "golang-tests-0:1.11.5-1.module+el8+2774+11afa8b5.noarch",
-            ],
-        ),
-    ]
-
-    packages_fnames = [
-        "go-toolset-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm",
-        "golang-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm",
-        "golang-bin-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm",
-        "golang-docs-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
-        "golang-misc-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
-        "golang-race-1.11.5-1.module+el8+2774+11afa8b5.x86_64.rpm",
-        "golang-src-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
-        "golang-tests-1.11.5-1.module+el8+2774+11afa8b5.noarch.rpm",
-    ]
-
-    mocked_ubipop_runner.pulp.search_rpms.side_effect = _get_search_rpms_side_effect(
-        packages_fnames,
-    )  # pylint: disable=protected-access
-
-    mocked_ubipop_runner._match_modules()  # pylint: disable=protected-access
-
-    assert len(mocked_ubipop_runner.repos.modules) == 1
-    assert len(mocked_ubipop_runner.repos.modules["go-toolsetrhel8"]) == 1
-    assert mocked_ubipop_runner.repos.modules["go-toolsetrhel8"][0].name == "go-toolset"
-    assert len(mocked_ubipop_runner.repos.pkgs_from_modules["go-toolsetrhel8"]) == 8
-    assert len(mocked_ubipop_runner.repos.packages) == 8
-    assert len(mocked_ubipop_runner.repos.debug_rpms) == 0
-
-
 def test_match_module_defaults(mock_ubipop_runner):
-    mock_ubipop_runner.repos.modules["n1s1"] = [
-        get_test_mod(name="virt", profiles={"2.5": ["common"]}, stream="rhel"),
-    ]
+    unit = UbiUnit(
+        ModulemdUnit(
+            name="virt",
+            stream="rhel",
+            version=1,
+            context="abcd",
+            arch="x86_64",
+            profiles={"2.5": ["common"]},
+        ),
+        None,
+    )
+    mock_ubipop_runner.repos.modules = f_proxy(f_return(set([unit])))
     mock_ubipop_runner.pulp.search_module_defaults.return_value = [
         get_test_mod_defaults(name="virt", stream="rhel", profiles={"2.5": ["common"]}),
     ]
@@ -731,9 +513,9 @@ def test_diff_modules(mock_ubipop_runner):
         get_test_mod(name="3"),
     ]
     expected = [
-        get_test_mod(name="2"),
-        get_test_mod(name="3"),
-        get_test_mod(name="4"),
+        get_test_mod(name="2", pulplib=True),
+        get_test_mod(name="3", pulplib=True),
+        get_test_mod(name="4", pulplib=True),
     ]
 
     diff = mock_ubipop_runner._diff_modules_by_nsvca(
@@ -798,81 +580,6 @@ def test_keep_n_newest_packages_multi_arch(mock_ubipop_runner):
         arches_current.append(arch)
 
     assert sorted(arches_current) == sorted(arches_expected)
-
-
-def test_keep_n_newest_packages_with_referenced_pkg_in_module(mock_ubipop_runner):
-    packages = [
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
-            is_modular=True,
-        ),
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
-            is_modular=True,
-        ),
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.8-1.el8+1944+b6c8e16f.noarch.rpm",
-            is_modular=True,
-        ),
-    ]
-
-    mock_ubipop_runner.repos.modules["ns"] = []
-    mock_ubipop_runner.repos.pkgs_from_modules["ns"] = [
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
-            is_modular=True,
-        ),
-    ]
-
-    mock_ubipop_runner.keep_n_latest_packages(packages)
-
-    assert len(packages) == 1
-    assert "7.3.7" in packages[0].filename
-
-
-def test_keep_n_latest_packages_no_dupes_from_modular(mock_ubipop_runner):
-    """Ensure that modular packages are not duplicated in the output
-    package list.
-    Duplicates should be avoided when modular package is also present in
-    and when the there are duplicated modular packages in the input
-    package list.
-    """
-
-    packages = [
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
-            is_modular=True,
-        ),
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
-            is_modular=True,
-        ),
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
-            is_modular=False,
-        ),
-    ]
-
-    mock_ubipop_runner.repos.modules["ns"] = []
-    mock_ubipop_runner.repos.pkgs_from_modules["ns"] = [
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.7-1.el8+1944+b6c8e16f.noarch.rpm",
-            is_modular=True,
-        ),
-    ]
-
-    mock_ubipop_runner.keep_n_latest_packages(packages)
-
-    assert len(packages) == 1
-    assert packages[0].is_modular
 
 
 @pytest.mark.parametrize(
@@ -1108,11 +815,10 @@ def fixture_mock_current_content_ft():
 
 
 def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
-    mock_ubipop_runner.repos.modules = {
-        "test": [
-            get_test_mod(name="test_md"),
-        ],
-    }
+    mock_ubipop_runner.repos.modules = f_proxy(
+        f_return(set([get_test_mod(name="test_md", pulplib=True)]))
+    )
+
     mock_ubipop_runner.repos.module_defaults = {
         "test": [
             get_test_mod_defaults(
@@ -1136,13 +842,37 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
         ],
     }
 
+    modular_binary = UbiUnit(
+        RpmUnit(name="modular_binary", version="1.0", release="1", arch="x86_64"),
+        "foo-rpms",
+    )
+    modular_debug = UbiUnit(
+        RpmUnit(name="modular_debug", version="1.0", release="1", arch="x86_64"),
+        "foo-debug",
+    )
+    modular_source = UbiUnit(
+        RpmUnit(
+            name="modular_source",
+            version="1.0",
+            release="1",
+            arch="src",
+            content_type_id="srpm",
+        ),
+        "foo-source",
+    )
+
     # pylint: disable=protected-access
     (
         associations,
         unassociations,
         mdd_association,
         mdd_unassociation,
-    ) = mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
+    ) = mock_ubipop_runner._get_pulp_actions(
+        *mock_current_content_ft,
+        modular_binary=f_proxy(f_return(set([modular_binary]))),
+        modular_debug=f_proxy(f_return(set([modular_debug]))),
+        modular_source=f_proxy(f_return(set([modular_source])))
+    )
 
     # firstly, check correct associations, there should 1 unit of each type associated
     modules, rpms, srpms, debug_rpms = associations
@@ -1152,20 +882,39 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
     assert len(modules.src_repos) == 1
     assert modules.src_repos[0].id == "foo-rpms"
 
-    assert len(rpms.units) == 1
-    assert rpms.units[0].name == "test_rpm"
+    # there should be 2 rpms, one modular, one non-modular
+    assert len(rpms.units) == 2
+    rpms.units.sort(key=attrgetter("name"))
+    assert rpms.units[0].name == "modular_binary"
     assert rpms.dst_repo.id == "ubi-foo-rpms"
     assert len(rpms.src_repos) == 1
     assert rpms.src_repos[0].id == "foo-rpms"
 
-    assert len(srpms.units) == 1
-    assert srpms.units[0].name == "test_srpm"
+    assert rpms.units[1].name == "test_rpm"
+    assert rpms.dst_repo.id == "ubi-foo-rpms"
+    assert len(rpms.src_repos) == 1
+    assert rpms.src_repos[0].id == "foo-rpms"
+
+    srpms.units.sort(key=attrgetter("name"))
+    assert len(srpms.units) == 2
+    assert srpms.units[0].name == "modular_source"
     assert srpms.dst_repo.id == "ubi-foo-source"
     assert len(srpms.src_repos) == 1
     assert srpms.src_repos[0].id == "foo-source"
 
-    assert len(debug_rpms.units) == 1
-    assert debug_rpms.units[0].name == "test_debug_pkg"
+    assert srpms.units[1].name == "test_srpm"
+    assert srpms.dst_repo.id == "ubi-foo-source"
+    assert len(srpms.src_repos) == 1
+    assert srpms.src_repos[0].id == "foo-source"
+
+    debug_rpms.units.sort(key=attrgetter("name"))
+    assert len(debug_rpms.units) == 2
+    assert debug_rpms.units[0].name == "modular_debug"
+    assert debug_rpms.dst_repo.id == "ubi-foo-debug"
+    assert len(debug_rpms.src_repos) == 1
+    assert debug_rpms.src_repos[0].id == "foo-debug"
+
+    assert debug_rpms.units[1].name == "test_debug_pkg"
     assert debug_rpms.dst_repo.id == "ubi-foo-debug"
     assert len(debug_rpms.src_repos) == 1
     assert debug_rpms.src_repos[0].id == "foo-debug"
@@ -1199,11 +948,9 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
 
 
 def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft):
-    mock_ubipop_runner.repos.modules = {
-        "test": [
-            get_test_mod(name="md_current"),
-        ],
-    }
+    mock_ubipop_runner.repos.modules = f_proxy(
+        f_return(set([get_test_mod(name="md_current", pulplib=True)]))
+    )
     mock_ubipop_runner.repos.module_defaults = {
         "test": [
             get_test_mod_defaults(
@@ -1233,7 +980,9 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
         unassociations,
         mdd_association,
         mdd_unassociation,
-    ) = mock_ubipop_runner._get_pulp_actions(*mock_current_content_ft)
+    ) = mock_ubipop_runner._get_pulp_actions(
+        *mock_current_content_ft, modular_binary=[], modular_debug=[], modular_source=[]
+    )
 
     # firstly, check correct associations, there should 0 units associated
     modules, rpms, srpms, debug_rpms = associations
@@ -1266,13 +1015,15 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
     dst_repo = get_test_repo(id="test_dst")
     associations = [
         AssociateActionModules(
-            [get_test_mod(name="test_assoc", src_repo_id=src_repo.id)],
+            [get_test_mod(name="test_assoc", src_repo_id=src_repo.id, pulplib=True)],
             dst_repo,
             [src_repo],
         )
     ]
     unassociations = [
-        UnassociateActionModules([get_test_mod(name="test_unassoc")], dst_repo)
+        UnassociateActionModules(
+            [get_test_mod(name="test_unassoc", pulplib=True)], dst_repo
+        )
     ]
 
     mock_ubipop_runner.log_pulp_actions(associations, unassociations)
@@ -1281,9 +1032,13 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
 
     assert err == ""
     assert (
-        assoc_line.strip() == "Would associate test_assoc:::: from test_src to test_dst"
+        assoc_line.strip()
+        == "Would associate ModulemdUnit(name='test_assoc', stream='', version=0, context='', arch='', content_type_id='modulemd', repository_memberships=None, artifacts=[], profiles={}) from test_src to test_dst"
     )
-    assert unassoc_line.strip() == "Would unassociate test_unassoc:::: from test_dst"
+    assert (
+        unassoc_line.strip()
+        == "Would unassociate ModulemdUnit(name='test_unassoc', stream='', version=0, context='', arch='', content_type_id='modulemd', repository_memberships=None, artifacts=[], profiles={}) from test_dst"
+    )
 
 
 def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
@@ -1307,7 +1062,9 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
 
 def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
 
-    mock_ubipop_runner.repos.modules = {"test": [get_test_mod(name="md_current")]}
+    mock_ubipop_runner.repos.modules = f_proxy(
+        f_return(set([get_test_mod(name="md_current", pulplib=True)]))
+    )
     mock_ubipop_runner.repos.module_defaults = {
         "test": [
             get_test_mod_defaults(
@@ -1341,7 +1098,7 @@ def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
 
     # pylint: disable=protected-access
     associations, _, _, _ = mock_ubipop_runner._get_pulp_actions(
-        *mock_current_content_ft
+        *mock_current_content_ft, modular_binary=[], modular_debug=[], modular_source=[]
     )
 
     _, _, srpms, _ = associations
@@ -1446,20 +1203,6 @@ def test_finalize_debug_output_set(mock_ubipop_runner):
     assert out_packages[0].filename == expected_filename
 
 
-def test_finalize_finalize_modules_output_set(mock_ubipop_runner):
-    expected_nsvca = "::3::"
-    mock_ubipop_runner.repos.modules["test:module"] = [
-        get_test_mod(version=2),
-        get_test_mod(version=3),
-    ]
-
-    mock_ubipop_runner._finalize_modules_output_set()  # pylint: disable=protected-access
-
-    out_modules = mock_ubipop_runner.repos.modules["test:module"]
-    assert len(out_modules) == 1
-    assert out_modules[0].nsvca == expected_nsvca
-
-
 def test_exclude_blacklisted_packages(mock_ubipop_runner):
     mock_ubipop_runner.repos.packages["kernel-blacklisted"] = [
         get_test_pkg(
@@ -1513,31 +1256,3 @@ def test_get_pkgs_from_all_modules(mock_ubipop_runner):
     assert len(pkgs) == 2
     assert "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm" in pkgs
     assert "tomcatjss-8.4.7-2.el8+1944+b6c8e16f.noarch.rpm" in pkgs
-
-
-def test_filter_pkgs_from_modules(mock_ubipop_runner):
-    mock_ubipop_runner.repos.modules["test5.30"] = [
-        get_test_mod(
-            name="test",
-            stream="5.30",
-            packages=["tomcatjss-0:7.3.6-1.el8+1944+b6c8e16f.noarch"],
-        ),
-    ]
-
-    mock_ubipop_runner.repos.pkgs_from_modules["test5.30"] = [
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.6-1.el8+1944+00000000.noarch.rpm",
-        ),
-        get_test_pkg(
-            name="tomcatjss",
-            filename="tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm",
-        ),
-    ]
-
-    mock_ubipop_runner._filter_pkgs_from_modules()
-    assert len(mock_ubipop_runner.repos.pkgs_from_modules["test5.30"]) == 1
-    assert (
-        mock_ubipop_runner.repos.pkgs_from_modules["test5.30"][0].filename
-        == "tomcatjss-7.3.6-1.el8+1944+b6c8e16f.noarch.rpm"
-    )
