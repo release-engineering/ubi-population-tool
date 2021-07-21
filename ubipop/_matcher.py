@@ -240,7 +240,7 @@ class ModularMatcher(Matcher):
             # get rpm names from the modulemd profiles
             for profile in config_map.get(key) or []:
                 if module.profiles:
-                    pkgs_names.extend(module.profiles[profile])
+                    pkgs_names.extend(module.profiles.get(profile) or [])
 
             for filename in module.artifacts_filenames:
                 # skip source rpms

@@ -328,6 +328,42 @@ def test_modular_rpms_filenames_per_profiles(ubi_config):
     )
 
 
+def test_modular_rpms_filenames_per_profiles_missing_profile(ubi_config):
+    """Test getting filename from module artifacts, request for non-existing profile in modulemd"""
+    matcher = ModularMatcher(None, ubi_config.modules)
+    unit = UbiUnit(
+        ModulemdUnit(
+            name="fake_name",
+            stream="fake_stream",
+            version=100,
+            context="abcd",
+            arch="x86_64",
+            artifacts=[
+                "perl-version-7:0.99.24-441.module+el8.3.0+6718+7f269185.src",
+                "perl-7:0.99.24-441.module+el8.3.0+6718+7f269185.x86_64",
+                "bash-7:10.5-el6.x86_64",
+                "bash-devel-7:0.99.24-441.module+el8.3.0+6718+7f269185.x86_64",
+            ],
+            profiles={"another": ["bash"]},
+        ),
+        None,
+    )
+    modules = f_proxy(f_return(set([unit])))
+    filenames = matcher._modular_rpms_filenames(modules)
+
+    # all non-src pkgs are in result
+    # this result is driven by ubi_config that force to use only profile called "test"
+    # but we don't have this profile in the testing modulemd, so we take all non-src artifacts
+    assert len(filenames) == 3
+    assert filenames == set(
+        [
+            "bash-10.5-el6.x86_64.rpm",
+            "bash-devel-0.99.24-441.module+el8.3.0+6718+7f269185.x86_64.rpm",
+            "perl-0.99.24-441.module+el8.3.0+6718+7f269185.x86_64.rpm",
+        ]
+    )
+
+
 def test_keep_n_latest_modules():
     """Test keeping only the latest version of modulemd"""
     unit_1 = UbiUnit(
