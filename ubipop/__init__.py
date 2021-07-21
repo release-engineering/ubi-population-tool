@@ -482,7 +482,7 @@ class UbiPopulateRunner(object):
 
     def _create_srpms_output_set(self):
         rpms = chain.from_iterable(self.repos.packages.values())
-
+        binary_source_repo_map = {}
         for package in rpms:
             if package.sourcerpm is None:
                 _LOG.warning(
@@ -495,7 +495,10 @@ class UbiPopulateRunner(object):
                 if r.id == package.associate_source_repo_id
             ][0]
 
-            associate_src_repo = in_repo.get_source_repository()
+            if in_repo.id not in binary_source_repo_map:
+                binary_source_repo_map[in_repo.id] = in_repo.get_source_repository()
+
+            associate_src_repo = binary_source_repo_map[in_repo.id]
 
             self.repos.source_rpms[package.name].append(
                 Package(
