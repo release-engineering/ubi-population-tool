@@ -9,7 +9,7 @@ from pubtools.pulplib import Client, Criteria, PublishOptions
 import ubiconfig
 
 from more_executors import Executors
-from more_executors.futures import f_sequence
+from more_executors.futures import f_sequence, f_proxy, f_return
 from ubipop._pulp_client import Pulp, Package
 from ubipop._utils import (
     split_filename,
@@ -314,7 +314,13 @@ class UbiPopulate(object):
             in_source_repos = self._get_population_sources(out_source_repo)
             in_debug_repos = self._get_population_sources(out_debug_repo)
 
-            out_repos = (out_rpm_repo, out_source_repo, out_debug_repo)
+            # we need to apply f_proxy(f_return()) for out_rpm_repo for keeping consistency
+            # that all objects in out|in_repos are futures
+            out_repos = (
+                f_proxy(f_return(out_rpm_repo)),
+                out_source_repo,
+                out_debug_repo,
+            )
             in_repos = (in_rpm_repos, in_source_repos, in_debug_repos)
 
             ubi_repo_sets.append(UbiRepoSet(RepoSet(*in_repos), RepoSet(*out_repos)))
