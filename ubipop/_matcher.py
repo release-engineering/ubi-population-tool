@@ -196,7 +196,6 @@ class ModularMatcher(Matcher):
         return or_criteria
 
     def _get_modulemd_output_set(self, modules):
-        ### napsat typy k pararmetrum!!!!
         name_stream_modules_map = {}
         # create internal dict structure for easier sorting
         # mapping "name + stream": list of modules

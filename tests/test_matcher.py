@@ -412,7 +412,7 @@ def test_keep_n_latest_modules_different_context():
         None,
     )
 
-    matcher = ModularMatcher(None, None)  ## TODO do fixtures
+    matcher = ModularMatcher(None, None)
     modules = [unit_1, unit_2, unit_3]
     matcher._keep_n_latest_modules(modules)
     expected_contexts = ["abcd", "xyz"]
