@@ -45,6 +45,18 @@ from .conftest import (
     get_modulemd_defaults_unit,
 )
 
+if sys.version_info <= (
+    2,
+    7,
+):
+    import requests_mock as rm
+
+    @pytest.fixture(name="requests_mock")
+    def fixture_requests_mock():
+        with rm.Mocker() as m:
+            yield m
+
+
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "./data")
 
 
@@ -1233,3 +1245,141 @@ def test_get_current_content(mock_ubipop_runner, pulp, skip_debug_repo):
     source_rpms = list(content.source_rpms)
     assert len(source_rpms) == 1
     assert source_rpms[0].name == "test-srpm"
+
+
+@patch("pubtools.pulplib.YumRepository.get_debug_repository")
+@patch("pubtools.pulplib.YumRepository.get_source_repository")
+def test_populate_ubi_repos(get_debug_repository, get_source_repository, requests_mock):
+    """Test run of populate_ubi_repos that check correct number of repo publication. It's simplified to
+    contain only actions on RPM packages."""
+    dt = datetime(2019, 9, 12, 0, 0, 0)
+
+    d1 = Distributor(
+        id="yum_distributor",
+        type_id="yum_distributor",
+        repo_id="ubi_binary",
+        last_publish=dt,
+        relative_url="content/unit/2/client",
+    )
+
+    d2 = Distributor(
+        id="yum_distributor",
+        type_id="yum_distributor",
+        repo_id="ubi_source",
+        last_publish=dt,
+        relative_url="content/unit/3/client",
+    )
+
+    d3 = Distributor(
+        id="yum_distributor",
+        type_id="yum_distributor",
+        repo_id="ubi_debug",
+        last_publish=dt,
+        relative_url="content/unit/4/client",
+    )
+
+    output_binary_repo = YumRepository(
+        id="ubi_binary",
+        content_set="ubi-8-for-x86_64-appstream-rpms",
+        population_sources=["input_binary"],
+        ubi_population=True,
+        ubi_config_version="8",
+        eng_product_id=102,
+        distributors=[d1],
+        relative_url="content/unit/2/client",
+    )
+    input_binary_repo = YumRepository(id="input_binary")
+    input_source_repo = YumRepository(id="input_source")
+    input_debug_repo = YumRepository(id="input_debug")
+
+    output_source_repo = YumRepository(
+        id="ubi_source",
+        population_sources=["input_source"],
+        eng_product_id=102,
+        distributors=[d2],
+        relative_url="content/unit/2/client",
+    )
+    output_debug_repo = YumRepository(
+        id="ubi_debug",
+        population_sources=["input_debug"],
+        eng_product_id=102,
+        distributors=[d3],
+        relative_url="content/unit/2/client",
+    )
+
+    ubi_populate = FakeUbiPopulate(
+        "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
+    )
+
+    fake_pulp = ubi_populate.pulp_client_controller
+    fake_pulp.insert_repository(input_binary_repo)
+    fake_pulp.insert_repository(input_source_repo)
+    fake_pulp.insert_repository(input_debug_repo)
+
+    fake_pulp.insert_repository(output_binary_repo)
+    fake_pulp.insert_repository(output_source_repo)
+    fake_pulp.insert_repository(output_debug_repo)
+
+    get_debug_repository.return_value = fake_pulp.client.get_repository("ubi_debug")
+    get_source_repository.return_value = fake_pulp.client.get_repository("ubi_source")
+
+    old_rpm = RpmUnit(
+        name="golang",
+        version="1",
+        release="a",
+        arch="x86_64",
+        filename="golang-1.a.x86_64.rpm",
+        sourcerpm="golang-1.a.x86_64.src.rpm",
+    )
+    new_rpm = RpmUnit(
+        name="golang",
+        version="2",
+        release="a",
+        arch="x86_64",
+        filename="golang-2.a.x86_64.rpm",
+        sourcerpm="golang-2.a.x86_64.src.rpm",
+    )
+
+    fake_pulp.insert_units(output_binary_repo, [old_rpm])
+    fake_pulp.insert_units(input_binary_repo, [new_rpm])
+
+    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/".format(
+        dst_repo="ubi_binary"
+    )
+
+    requests_mock.register_uri(
+        "POST", url, json={"spawned_tasks": [{"task_id": "foo_task_id"}]}
+    )
+
+    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/".format(
+        dst_repo="ubi_binary"
+    )
+    requests_mock.register_uri(
+        "POST", url, json={"spawned_tasks": [{"task_id": "foo_task_id"}]}
+    )
+
+    url = "/pulp/api/v2/tasks/{task_id}/".format(task_id="foo_task_id")
+    requests_mock.register_uri(
+        "GET", url, json={"state": "finished", "task_id": "foo_task_id"}
+    )
+
+    # let's run actual population
+    ubi_populate.populate_ubi_repos()
+    history = fake_pulp.publish_history
+
+    # there should be 3 repositories succesfully published
+    assert len(history) == 3
+    expected_published_repo_ids = set(["ubi_binary", "ubi_debug", "ubi_source"])
+    repo_ids_published = set()
+    for publish in history:
+        assert publish.repository.id in expected_published_repo_ids
+        repo_ids_published.add(publish.repository.id)
+
+        assert len(publish.tasks) == 1
+        assert publish.tasks[0].completed
+        assert publish.tasks[0].succeeded
+
+    assert repo_ids_published == expected_published_repo_ids
+    # unfortunately we can't check actual content od repos because
+    # un/associate calls are using custom client not the pubtools-pulplib Client
+    # TODO add check for actual content after we move to pubtools-pulplib Client

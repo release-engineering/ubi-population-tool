@@ -278,6 +278,8 @@ class UbiPopulate(object):
         # multiple times, to avoid that, cache the content sets already used and skip the config
         # whose content sets are all in the cache
 
+        awaited_repos_publishes = []
+
         for config in sorted(self.ubiconfig_list, key=str):
             content_sets = [
                 config.content_sets.rpm.output,
@@ -306,7 +308,8 @@ class UbiPopulate(object):
                 right_config = self._get_config(
                     repo_set.out_repos.rpm.ubi_config_version, config
                 )
-                UbiPopulateRunner(
+
+                repos_publishes = UbiPopulateRunner(
                     self.pulp,
                     self.pulp_client,
                     repo_set,
@@ -316,6 +319,13 @@ class UbiPopulate(object):
                 ).run_ubi_population()
 
                 out_repos.update(repo_set.get_output_repo_ids())
+                # in case of dry-run there are no publications expected
+                if repos_publishes:
+                    awaited_repos_publishes.extend(repos_publishes)
+
+        # wait until publication of all repos is finished
+        if awaited_repos_publishes:
+            f_sequence(awaited_repos_publishes).result()
 
         if self.output_repos:
             with open(self.output_repos, "w") as f:
@@ -525,6 +535,7 @@ class UbiPopulateRunner(object):
         return diff
 
     def run_ubi_population(self):
+
         current_content = self._get_current_content()
         # start async querying for modulemds and modular and non-modular packages
         mm = ModularMatcher(self.repos.in_repos, self.ubiconfig.modules).run()
@@ -564,8 +575,8 @@ class UbiPopulateRunner(object):
                 (mdd_association,), (mdd_unassociation,)
             )
 
-            # wait repo publication
-            f_sequence(self._publish_out_repos()).result()
+            # return list of futures with repo publishes
+            return self._publish_out_repos()
 
     def _associate_unassociate_units(self, action_list):
         fts = []
@@ -698,7 +709,6 @@ class UbiPopulateRunner(object):
             self.repos.out_repos.debug,
             self.repos.out_repos.source,
         )
-
         options = PublishOptions(clean=True)
         for repo in repos_to_publish:
             if repo.result():
