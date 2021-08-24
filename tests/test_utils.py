@@ -1,7 +1,7 @@
 import pytest
 
 from mock import MagicMock
-from pubtools.pulplib import YumRepository
+from pubtools.pulplib import YumRepository, RpmUnit
 from ubipop._utils import (
     AssociateAction,
     AssociateActionModuleDefaults,
@@ -11,7 +11,9 @@ from ubipop._utils import (
     UnassociateActionModuleDefaults,
     UnassociateActionModules,
     UnassociateActionRpms,
+    vercmp_sort,
 )
+from ubipop._matcher import UbiUnit
 
 
 def test_raise_not_implemented_pulp_action():
@@ -81,3 +83,41 @@ def test_get_action_unassociate(klass, method):
     assert "mock." + method in str(associate_action)
     assert current_units == units
     assert dst_repo_current.id == dst_repo.id
+
+
+def test_vercmp_sort():
+    """Tests all comparison methods for vercmp sort used for RPM packages comparison"""
+    vercmp_klass = vercmp_sort()
+
+    unit_1 = vercmp_klass(
+        UbiUnit(
+            RpmUnit(
+                name="test",
+                version="10",
+                release="20",
+                epoch="1",
+                arch="x86_64",
+            ),
+            None,
+        )
+    )
+
+    unit_2 = vercmp_klass(
+        UbiUnit(
+            RpmUnit(
+                name="test",
+                version="10",
+                release="200",
+                epoch="1",
+                arch="x86_64",
+            ),
+            None,
+        )
+    )
+
+    assert (unit_1 < unit_2) is True
+    assert (unit_1 <= unit_2) is True
+    assert (unit_1 == unit_2) is False
+    assert (unit_1 >= unit_2) is False
+    assert (unit_1 > unit_2) is False
+    assert (unit_1 != unit_2) is True

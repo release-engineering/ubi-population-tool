@@ -1,3 +1,5 @@
+from rpm import labelCompare as label_compare  # pylint: disable=no-name-in-module
+
 # borrowed from https://github.com/rpm-software-management/yum
 def split_filename(filename):
     """
@@ -137,3 +139,29 @@ class UnassociateActionRpms(PulpAction):
 
     def get_actions(self, pulp_client_inst):
         return [(pulp_client_inst.unassociate_packages, self.dst_repo, self.units)]
+
+
+def vercmp_sort():
+    class Klass(object):
+        def __init__(self, package):
+            self.evr_tuple = (package.epoch, package.version, package.release)
+
+        def __lt__(self, other):
+            return label_compare(self.evr_tuple, other.evr_tuple) < 0
+
+        def __gt__(self, other):
+            return label_compare(self.evr_tuple, other.evr_tuple) > 0
+
+        def __eq__(self, other):
+            return label_compare(self.evr_tuple, other.evr_tuple) == 0
+
+        def __le__(self, other):
+            return label_compare(self.evr_tuple, other.evr_tuple) <= 0
+
+        def __ge__(self, other):
+            return label_compare(self.evr_tuple, other.evr_tuple) >= 0
+
+        def __ne__(self, other):
+            return label_compare(self.evr_tuple, other.evr_tuple) != 0
+
+    return Klass

@@ -12,8 +12,6 @@ except ImportError:
     from urlparse import urljoin
 
 import requests
-from rpm import labelCompare as label_compare  # pylint: disable=no-name-in-module
-
 
 _LOG = logging.getLogger("ubipop")
 
@@ -299,26 +297,7 @@ class Package(object):
         self.is_modular = is_modular
         #  return name, ver, rel, epoch, arch
         _, self.version, self.release, self.epoch, _ = split_filename(self.filename)
-        self.evr_tuple = (self.epoch, self.version, self.release)
         self.associate_source_repo_id = src_repo_id
-
-    def __lt__(self, other):
-        return label_compare(self.evr_tuple, other.evr_tuple) < 0
-
-    def __gt__(self, other):
-        return label_compare(self.evr_tuple, other.evr_tuple) > 0
-
-    def __eq__(self, other):
-        return label_compare(self.evr_tuple, other.evr_tuple) == 0
-
-    def __le__(self, other):
-        return label_compare(self.evr_tuple, other.evr_tuple) <= 0
-
-    def __ge__(self, other):
-        return label_compare(self.evr_tuple, other.evr_tuple) >= 0
-
-    def __ne__(self, other):
-        return label_compare(self.evr_tuple, other.evr_tuple) != 0
 
     def __str__(self):
         return self.filename

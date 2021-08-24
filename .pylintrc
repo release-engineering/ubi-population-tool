@@ -99,4 +99,6 @@ disable=print-statement,
         # skip linting Python 3 features
         super-with-arguments,
         raise-missing-from,
+        # skip check for non-snake_case names
+        invalid-name,
 
