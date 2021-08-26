@@ -1,12 +1,21 @@
 import os
+import logging
 
+from itertools import chain
+from collections import defaultdict, deque
+from concurrent.futures import as_completed
 from pubtools.pulplib import Criteria
+from pubtools.pulplib import Matcher as PulpLibMatcher
 from more_executors.futures import f_flat_map, f_return, f_sequence, f_proxy
 from more_executors import Executors
-from ubipop._utils import split_filename
-
+from ubipop._utils import split_filename, vercmp_sort
 
 BATCH_SIZE = int(os.getenv("UBIPOP_BATCH_SIZE", "250"))
+# need to set significantly lower batches for general rpm search
+# otherwise db may very likely hit OOM error.
+BATCH_SIZE_RPM = int(os.getenv("UBIPOP_BATCH_SIZE_RPM", "15"))
+
+_LOG = logging.getLogger("ubipop.matcher")
 
 
 class UbiUnit(object):
@@ -45,6 +54,10 @@ class Matcher(object):
         # we use executor from pulplib
         self._executor = Executors.thread_pool(max_workers=workers)
 
+        self.binary_rpms = None
+        self.debug_rpms = None
+        self.source_rpms = None
+
     def run(self):
         """
         This method needs to be implemented in subclasses and should
@@ -53,11 +66,14 @@ class Matcher(object):
         """
         raise NotImplementedError
 
-    def _search_units(self, repo, criteria_list, content_type_id):
+    def _search_units(
+        self, repo, criteria_list, content_type_id, batch_size_override=None
+    ):
         """
         Search for units of one content type associated with given repository by criteria.
         """
         units = set()
+        batch_size = batch_size_override or BATCH_SIZE
 
         def handle_results(page):
             for unit in page.data:
@@ -69,8 +85,8 @@ class Matcher(object):
 
         criteria_split = []
 
-        for start in range(0, len(criteria_list), BATCH_SIZE):
-            criteria_split.append(criteria_list[start : start + BATCH_SIZE])
+        for start in range(0, len(criteria_list), batch_size):
+            criteria_split.append(criteria_list[start : start + batch_size])
         fts = []
 
         for criteria_batch in criteria_split:
@@ -99,40 +115,71 @@ class Matcher(object):
             if len(val_tuple) != len(fields):
                 raise ValueError
             for index, field in enumerate(fields):
+
                 inner_and_criteria.append(Criteria.with_field(field, val_tuple[index]))
 
             or_criteria.append(Criteria.and_(*inner_and_criteria))
 
         return or_criteria
 
-    def _search_units_per_repos(self, or_criteria, repos, content_type):
+    def _search_units_per_repos(
+        self, or_criteria, repos, content_type, batch_size_override=None
+    ):
         units = []
         for repo in repos:
-            units.append(self._search_units(repo, or_criteria, content_type))
+            units.append(
+                self._search_units(
+                    repo,
+                    or_criteria,
+                    content_type,
+                    batch_size_override=batch_size_override,
+                )
+            )
 
         return f_proxy(f_flat_map(f_sequence(units), flatten_list_of_sets))
 
-    def _search_rpms(self, or_criteria, repos):
-        return self._search_units_per_repos(or_criteria, repos, content_type="rpm")
+    def _search_rpms(self, or_criteria, repos, batch_size_override=None):
+        return self._search_units_per_repos(
+            or_criteria,
+            repos,
+            content_type="rpm",
+            batch_size_override=batch_size_override,
+        )
 
-    def _search_srpms(self, or_criteria, repos):
-        return self._search_units_per_repos(or_criteria, repos, content_type="srpm")
+    def _search_srpms(self, or_criteria, repos, batch_size_override=None):
+        return self._search_units_per_repos(
+            or_criteria,
+            repos,
+            content_type="srpm",
+            batch_size_override=batch_size_override,
+        )
 
     def _search_moludemds(self, or_criteria, repos):
         return self._search_units_per_repos(or_criteria, repos, content_type="modulemd")
+
+    def _get_srpms_criteria(self):
+        filenames = []
+        for rpms_list in as_completed([self.binary_rpms, self.debug_rpms]):
+            for pkg in rpms_list:
+                if pkg.sourcerpm is None:
+                    _LOG.warning(
+                        "Package %s doesn't reference its source rpm", pkg.name
+                    )
+                    continue
+                filenames.append((pkg.sourcerpm,))
+
+        pkgs_or_criteria = self._create_or_criteria(("filename",), filenames)
+        return pkgs_or_criteria
 
 
 class ModularMatcher(Matcher):
     def __init__(self, input_repos, ubi_config):
         super(ModularMatcher, self).__init__(input_repos, ubi_config)
         self.modules = None
-        self.binary_rpms = None
-        self.debug_rpms = None
-        self.source_rpms = None
 
     def run(self):
         """Asynchronously creates criteria for pulp queries and
-        calls non-blocking search queries to pulp.
+        calls non-blocking search queries to pulp for ModularMatcher.
         Method immediately returns self, results of queries are
         stored as futures in public attributes of this class. Those
         can be accessed when they're needed.
@@ -159,9 +206,7 @@ class ModularMatcher(Matcher):
                 self._search_rpms, rpms_criteria, self._input_repos.debug
             )
         )
-        srpms_criteria = f_proxy(
-            self._executor.submit(self._get_modular_srpms_criteria)
-        )
+        srpms_criteria = f_proxy(self._executor.submit(self._get_srpms_criteria))
         self.source_rpms = f_proxy(
             self._executor.submit(
                 self._search_srpms, srpms_criteria, self._input_repos.source
@@ -173,12 +218,6 @@ class ModularMatcher(Matcher):
         filenames_to_search = self._modular_rpms_filenames(self.modules)
         filenames_to_search = [(filename,) for filename in filenames_to_search]
         pkgs_or_criteria = self._create_or_criteria(("filename",), filenames_to_search)
-        return pkgs_or_criteria
-
-    def _get_modular_srpms_criteria(self):
-        non_source_pkg = list(self.binary_rpms) + list(self.debug_rpms)
-        filenames = [(pkg.sourcerpm,) for pkg in non_source_pkg]
-        pkgs_or_criteria = self._create_or_criteria(("filename",), filenames)
         return pkgs_or_criteria
 
     def _get_modulemds_criteria(self):
@@ -204,7 +243,7 @@ class ModularMatcher(Matcher):
             name_stream_modules_map.setdefault(key, []).append(modulemd)
 
         out = []
-        # sort modulemds and keep N latest versions of them
+        # sort rpms and keep N latest versions of them
         for module_list in name_stream_modules_map.values():
             module_list.sort(key=lambda module: module.version)
             self._keep_n_latest_modules(module_list)
@@ -255,6 +294,182 @@ class ModularMatcher(Matcher):
                 filenames.add(filename)
 
         return filenames
+
+
+class RpmMatcher(Matcher):
+    def __init__(self, input_repos, ubi_config):
+        super(RpmMatcher, self).__init__(input_repos, ubi_config)
+
+    def run(self):
+        """Asynchronously creates criteria for pulp queries and
+        calls non-blocking search queries to pulp for RpmMatcher.
+        Method immediately returns self, results of queries are
+        stored as futures in public attributes of this class. Those
+        can be accessed when they're needed.
+        """
+        # overriding the normal batch size for queries
+        # general queries for RPMs have extreme consumtion of RAM
+        # and can easily cause OOM on production-size databases
+        batch_size_override = BATCH_SIZE_RPM
+
+        modular_rpm_filenames = f_proxy(self._get_pkgs_from_all_modules())
+        rpms_criteria = f_proxy(self._executor.submit(self._get_rpms_criteria))
+
+        binary_rpms = f_proxy(
+            self._executor.submit(
+                self._search_rpms,
+                rpms_criteria,
+                self._input_repos.rpm,
+                batch_size_override,
+            )
+        )
+
+        debug_rpms = f_proxy(
+            self._executor.submit(
+                self._search_rpms,
+                rpms_criteria,
+                self._input_repos.debug,
+                batch_size_override,
+            )
+        )
+
+        self.binary_rpms = f_proxy(
+            self._executor.submit(
+                self._get_rpm_output_set, binary_rpms, modular_rpm_filenames
+            )
+        )
+        self.debug_rpms = f_proxy(
+            self._executor.submit(
+                self._get_rpm_output_set, debug_rpms, modular_rpm_filenames
+            )
+        )
+
+        srpms_criteria = f_proxy(self._executor.submit(self._get_srpms_criteria))
+        source_rpms = f_proxy(
+            self._executor.submit(
+                self._search_srpms,
+                srpms_criteria,
+                self._input_repos.source,
+                batch_size_override,
+            )
+        )
+
+        self.source_rpms = f_proxy(
+            self._executor.submit(
+                self._get_rpm_output_set, source_rpms, modular_rpm_filenames
+            )
+        )
+
+        return self
+
+    def _get_rpms_criteria(self):
+        criteria_values = []
+
+        for package_pattern in self._ubi_config.packages.whitelist:
+            # skip src packages, they are searched seprately
+            if package_pattern.arch == "src":
+                continue
+            arch = (
+                PulpLibMatcher.exists()
+                if package_pattern.arch in ("*", None)
+                else package_pattern.arch
+            )
+            criteria_values.append((package_pattern.name, arch))
+
+        fields = ("name", "arch")
+        or_criteria = self._create_or_criteria(fields, criteria_values)
+        return or_criteria
+
+    def _get_pkgs_from_all_modules(self):
+        # search for modulesmds in all input repos
+        # and extract filenames only
+        def extract_modular_filenames():
+            modular_rpm_filenames = set()
+            for module in modules:
+                modular_rpm_filenames |= set(module.artifacts_filenames)
+
+            return modular_rpm_filenames
+
+        modules = self._search_moludemds([Criteria.true()], self._input_repos.rpm)
+        return self._executor.submit(extract_modular_filenames)
+
+    def _get_rpm_output_set(self, rpms, modular_rpm_filenames):
+        blacklist_parsed = self._parse_blacklist_config()
+        name_rpms_maps = {}
+
+        def is_blacklisted(rpm):
+            for name, globbing, arch in blacklist_parsed:
+                blacklisted = False
+                if globbing:
+                    if rpm.name.startswith(name):
+                        blacklisted = True
+                else:
+                    if rpm.name == name:
+                        blacklisted = True
+                if arch:
+                    if rpm.arch != arch:
+                        blacklisted = False
+
+                if blacklisted:
+                    return blacklisted
+
+        for rpm in rpms:
+            # skip modular rpms
+            if rpm.filename in modular_rpm_filenames:
+                continue
+            # skip blacklisted rpms
+            if is_blacklisted(rpm):
+                continue
+
+            name_rpms_maps.setdefault(rpm.name, []).append(rpm)
+
+        out = []
+        # sort rpms and keep N latest versions of them
+        for rpm_list in name_rpms_maps.values():
+            rpm_list.sort(key=vercmp_sort())
+            self._keep_n_latest_rpms(rpm_list)
+            out.extend(rpm_list)
+
+        return out
+
+    def _keep_n_latest_rpms(self, rpms, n=1):
+        """
+        Keep n latest non-modular rpms.
+
+        Arguments:
+            rpms (List[Rpm]): Sorted, oldest goes first
+
+        Keyword arguments:
+            n (int): Number of non-modular package versions to keep
+
+        Returns:
+            None. The packages list is changed in-place
+        """
+        # Use a queue of n elements per arch
+        pkgs_per_arch = defaultdict(lambda: deque(maxlen=n))
+
+        for rpm in rpms:
+            pkgs_per_arch[rpm.arch].append(rpm)
+
+        latest_pkgs_per_arch = [
+            pkg for pkg in chain.from_iterable(pkgs_per_arch.values())
+        ]
+
+        rpms[:] = latest_pkgs_per_arch
+
+    def _parse_blacklist_config(self):
+        packages_to_exclude = []
+        for package_pattern in self._ubi_config.packages.blacklist:
+            globbing = package_pattern.name.endswith("*")
+            if globbing:
+                name = package_pattern.name[:-1]
+            else:
+                name = package_pattern.name
+            arch = None if package_pattern.arch in ("*", None) else package_pattern.arch
+
+            packages_to_exclude.append((name, globbing, arch))
+
+        return packages_to_exclude
 
 
 def flatten_list_of_sets(list_of_sets):

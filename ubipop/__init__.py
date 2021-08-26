@@ -1,3 +1,4 @@
+from datetime import date
 import logging
 import re
 
@@ -20,7 +21,7 @@ from ubipop._utils import (
     UnassociateActionModuleDefaults,
     UnassociateActionRpms,
 )
-from ._matcher import ModularMatcher
+from ._matcher import ModularMatcher, RpmMatcher
 
 
 _LOG = logging.getLogger("ubipop")
@@ -378,151 +379,6 @@ class UbiPopulateRunner(object):
             if module_defaults:
                 self.repos.module_defaults[fts[ft]].extend(module_defaults)
 
-    def _get_pkgs_from_all_modules(self):
-        modules = []
-        for in_repo_rpm in self.repos.in_repos.rpm:
-            modules.extend(self.pulp.search_modules(in_repo_rpm))
-        pkgs = set()
-        regex = r"\d+:"
-        reg = re.compile(regex)
-        for module in modules:
-            for pkg in module.packages:
-                rpm_without_epoch = reg.sub("", pkg)
-                rpm_filename = rpm_without_epoch + ".rpm"
-                pkgs.add(rpm_filename)
-
-        return pkgs
-
-    def _match_packages(self, input_repos, packages_dict):
-        """
-        Add matching packages from whitelist
-        Globbing package name is not supported
-        """
-        modular_pkgs = self._get_pkgs_from_all_modules()
-        fts = {}
-        for package_pattern in self.ubiconfig.packages.whitelist:
-            name = package_pattern.name
-            arch = None if package_pattern.arch in ("*", None) else package_pattern.arch
-            for repo in input_repos:
-                fts[
-                    (self._executor.submit(self.pulp.search_rpms, repo, name, arch))
-                ] = name
-
-        for ft in as_completed(fts):
-            packages = ft.result()
-            if packages:
-                for pkg in packages:
-                    # skip modular packages, those are handled separately
-                    if pkg.filename in modular_pkgs:
-                        continue
-
-                    packages_dict[fts[ft]].append(pkg)
-
-    def _match_binary_rpms(self):
-        self._match_packages(self.repos.in_repos.rpm, self.repos.packages)
-
-    def _match_debug_rpms(self):
-        self._match_packages(self.repos.in_repos.debug, self.repos.debug_rpms)
-
-    def _parse_blacklist_config(self):
-        packages_to_exclude = []
-        for package_pattern in self.ubiconfig.packages.blacklist:
-            name_to_parse = package_pattern.name
-            globbing = "*" in name_to_parse
-            if globbing:
-                name = package_pattern.name[:-1]
-            else:
-                name = package_pattern.name
-            arch = None if package_pattern.arch in ("*", None) else package_pattern.arch
-
-            packages_to_exclude.append((name, globbing, arch))
-
-        return packages_to_exclude
-
-    def _exclude_blacklisted_packages(self):
-        blacklisted_binary = self.get_blacklisted_packages(
-            list(chain.from_iterable(self.repos.packages.values()))
-        )
-        blacklisted_debug = self.get_blacklisted_packages(
-            list(chain.from_iterable(self.repos.debug_rpms.values()))
-        )
-
-        for pkg in blacklisted_binary:
-            # blacklist only non-modular pkgs
-            self.repos.packages[pkg.name][:] = [
-                _pkg
-                for _pkg in self.repos.packages.get(pkg.name, [])
-                if _pkg.is_modular
-            ]
-
-            # if there is nothing left, remove whole entry for package
-            if not self.repos.packages[pkg.name]:
-                self.repos.packages.pop(pkg.name, None)
-
-        for pkg in blacklisted_debug:
-            # blacklist only non-modular debug pkgs
-            self.repos.debug_rpms[pkg.name][:] = [
-                _pkg
-                for _pkg in self.repos.debug_rpms.get(pkg.name, [])
-                if _pkg.is_modular
-            ]
-
-            # if there is nothing left, remove whole entry for debug package
-            if not self.repos.debug_rpms[pkg.name]:
-                self.repos.debug_rpms.pop(pkg.name, None)
-
-    def _finalize_rpms_output_set(self):
-        for _, packages in self.repos.packages.items():
-            self._finalize_output_units(packages, "rpm")
-
-    def _finalize_debug_output_set(self):
-        for _, packages in self.repos.debug_rpms.items():
-            self._finalize_output_units(packages, "rpm")
-
-    def _finalize_output_units(self, units, type_id):
-        if type_id == "rpm":
-            self.sort_packages(units)
-            self.keep_n_latest_packages(
-                units
-            )  # with respect to packages referenced by modules
-
-    def _create_srpms_output_set(self):
-        rpms = chain.from_iterable(self.repos.packages.values())
-        binary_source_repo_map = {}
-        for package in rpms:
-            if package.sourcerpm is None:
-                _LOG.warning(
-                    "Package %s doesn't reference its source rpm", package.name
-                )
-                continue
-            in_repo = [
-                r
-                for r in self.repos.in_repos.rpm
-                if r.id == package.associate_source_repo_id
-            ][0]
-
-            if in_repo.id not in binary_source_repo_map:
-                binary_source_repo_map[in_repo.id] = in_repo.get_source_repository()
-
-            associate_src_repo = binary_source_repo_map[in_repo.id]
-
-            self.repos.source_rpms[package.name].append(
-                Package(
-                    package.name,
-                    package.sourcerpm,
-                    is_modular=package.is_modular,
-                    src_repo_id=associate_src_repo.id,
-                )
-            )
-
-        blacklisted_srpms = self.get_blacklisted_packages(
-            list(chain.from_iterable(self.repos.source_rpms.values()))
-        )
-
-        for pkg in blacklisted_srpms:
-            if not pkg.is_modular:
-                self.repos.source_rpms.pop(pkg.name, None)
-
     def _determine_pulp_actions(self, units, current, diff_f, extra_units=None):
         expected = list(units)
         if extra_units:
@@ -546,9 +402,8 @@ class UbiPopulateRunner(object):
         )
 
     def _get_pulp_actions_pkgs(self, pkgs, current, modular_pkgs):
-        pkgs_list = list(chain.from_iterable(pkgs.values()))
         return self._determine_pulp_actions(
-            pkgs_list, current, self._diff_packages_by_filename, modular_pkgs
+            pkgs, current, self._diff_packages_by_filename, modular_pkgs
         )
 
     def _get_pulp_actions_src_pkgs(self, pkgs, current, modular):
@@ -558,7 +413,7 @@ class UbiPopulateRunner(object):
         """
         uniq_srpms = {}
 
-        all_pkgs = list(chain.from_iterable(pkgs.values())) + list(modular)
+        all_pkgs = list(pkgs) + list(modular)
 
         # filter out packages that share same source rpm
         for pkg in all_pkgs:
@@ -589,6 +444,7 @@ class UbiPopulateRunner(object):
         Content that needs unassociation: unit is in current but not in expected
         No action: unit is in current and in expected
         """
+
         modules_assoc, modules_unassoc = self._get_pulp_actions_mds(
             self.repos.modules, current_modules_ft.result()
         )
@@ -668,19 +524,14 @@ class UbiPopulateRunner(object):
             current_debug_rpms_ft,
         ) = self._get_current_content()
 
-        # start async querying for modulemds and modular packages
+        # start async querying for modulemds and modular and non-modular packages
         mm = ModularMatcher(self.repos.in_repos, self.ubiconfig.modules).run()
+        rm = RpmMatcher(self.repos.in_repos, self.ubiconfig).run()
+
         self.repos.modules = mm.modules
-
-        self._match_binary_rpms()
-        if self.repos.out_repos.debug:
-            self._match_debug_rpms()
-        self._exclude_blacklisted_packages()
-
-        # only non-modular packages
-        self._finalize_rpms_output_set()
-        self._finalize_debug_output_set()
-        self._create_srpms_output_set()
+        self.repos.packages = rm.binary_rpms
+        self.repos.debug_rpms = rm.debug_rpms
+        self.repos.source_rpms = rm.source_rpms
 
         self._match_module_defaults()
 
@@ -856,60 +707,3 @@ class UbiPopulateRunner(object):
             if repo.result():
                 fts.append(repo.publish(options))
         return fts
-
-    def get_blacklisted_packages(self, package_list):
-        """
-        Finds blacklisted packages in output sets
-        """
-        blacklisted_pkgs = []
-        for pattern_name, globbing, pattern_arch in self._parse_blacklist_config():
-            for package in package_list:
-                name, _, _, _, arch = split_filename(package.filename)
-                blacklisted = False
-                if globbing:
-                    if name.startswith(pattern_name):
-                        blacklisted = True
-                else:
-                    if name == pattern_name:
-                        blacklisted = True
-
-                if pattern_arch:
-                    if arch != pattern_arch:
-                        blacklisted = False
-
-                if blacklisted:
-                    blacklisted_pkgs.append(package)
-
-        return blacklisted_pkgs
-
-    def sort_packages(self, packages):
-        """
-        Sort packages by vercmp
-        """
-        packages.sort()
-
-    def keep_n_latest_packages(self, packages, n=1):
-        """
-        Keep n latest non-modular packages.
-
-        Arguments:
-            packages (List[Package]): Sorted, oldest goes first
-
-        Keyword arguments:
-            n (int): Number of non-modular package versions to keep
-
-        Returns:
-            None. The packages list is changed in-place
-        """
-        # Use a queue of n elements per arch
-        pkgs_per_arch = defaultdict(lambda: deque(maxlen=n))
-
-        for package in packages:
-            _, _, _, _, arch = split_filename(package.filename)
-            pkgs_per_arch[arch].append(package)
-
-        latest_pkgs_per_arch = [
-            pkg for pkg in chain.from_iterable(pkgs_per_arch.values())
-        ]
-
-        packages[:] = latest_pkgs_per_arch
