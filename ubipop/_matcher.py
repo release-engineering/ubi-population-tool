@@ -289,7 +289,7 @@ class ModularMatcher(Matcher):
     def _modular_rpms_filenames(self, modules):
         config_map = {}
 
-        for module_config in self._ubi_config:
+        for module_config in self._ubi_config.modules:
             key = module_config.name + module_config.stream
             config_map[key] = module_config.profiles
 

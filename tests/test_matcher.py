@@ -314,7 +314,7 @@ def test_search_moludemd_defaults(pulp):
 
 def test_modular_rpms_filenames(ubi_config):
     """Test getting filename from module artifacts, srpms are skipped."""
-    matcher = ModularMatcher(None, ubi_config.modules)
+    matcher = ModularMatcher(None, ubi_config)
     unit = UbiUnit(
         ModulemdUnit(
             name="test",
@@ -343,7 +343,7 @@ def test_modular_rpms_filenames(ubi_config):
 
 def test_modular_rpms_filenames_per_profiles(ubi_config):
     """Test getting filename from module artifacts, limited by profiles"""
-    matcher = ModularMatcher(None, ubi_config.modules)
+    matcher = ModularMatcher(None, ubi_config)
     unit = UbiUnit(
         ModulemdUnit(
             name="fake_name",
@@ -377,7 +377,7 @@ def test_modular_rpms_filenames_per_profiles(ubi_config):
 
 def test_modular_rpms_filenames_per_profiles_missing_profile(ubi_config):
     """Test getting filename from module artifacts, request for non-existing profile in modulemd"""
-    matcher = ModularMatcher(None, ubi_config.modules)
+    matcher = ModularMatcher(None, ubi_config)
     unit = UbiUnit(
         ModulemdUnit(
             name="fake_name",
@@ -512,7 +512,7 @@ def test_get_modulemd_output_set():
 
 def test_get_modulemds_criteria(ubi_config):
     """Test proper creation of criteria for modulemds query"""
-    matcher = ModularMatcher(None, ubi_config.modules)
+    matcher = ModularMatcher(None, ubi_config)
     criteria = matcher._get_modulemds_criteria()
     # there should be 1 criterium created based on ubi config
     assert len(criteria) == 1
@@ -543,7 +543,7 @@ def test_get_modulemd_defaults_criteria():
 
 def test_get_modular_srpms_criteria(ubi_config):
     """Testing creation of criteria for srpms query"""
-    matcher = ModularMatcher(None, ubi_config.modules)
+    matcher = ModularMatcher(None, ubi_config)
     unit_1 = UbiUnit(
         RpmUnit(
             name="test",
@@ -581,7 +581,7 @@ def test_get_modular_srpms_criteria(ubi_config):
 
 def test_get_modular_rpms_criteria(ubi_config):
     """Test creation of criteria for rpms query"""
-    matcher = ModularMatcher(None, ubi_config.modules)
+    matcher = ModularMatcher(None, ubi_config)
     unit = UbiUnit(
         ModulemdUnit(
             name="test",
@@ -679,7 +679,7 @@ def test_modular_matcher_run(pulp, ubi_config):
     pulp.insert_units(repo_3, [unit_3])
 
     repos_set = RepoSet(rpm=[repo_1], debug=[repo_2], source=[repo_3])
-    matcher = ModularMatcher(repos_set, ubi_config.modules)
+    matcher = ModularMatcher(repos_set, ubi_config)
     matcher.run()
 
     # each public attribute is properly set with one unit

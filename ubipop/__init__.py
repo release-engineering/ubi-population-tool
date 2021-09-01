@@ -529,7 +529,7 @@ class UbiPopulateRunner(object):
         ) = self._get_current_content()
 
         # start async querying for modulemds and modular and non-modular packages
-        mm = ModularMatcher(self.repos.in_repos, self.ubiconfig.modules).run()
+        mm = ModularMatcher(self.repos.in_repos, self.ubiconfig).run()
         rm = RpmMatcher(self.repos.in_repos, self.ubiconfig).run()
 
         self.repos.modules = mm.modules
