@@ -668,8 +668,7 @@ def test_parse_blacklist_config(ubi_config):
 
 
 def test_keep_n_latest_rpms():
-
-    """Test keeping only the latest version of modulemd"""
+    """Test keeping only the latest version of rpm"""
     unit_1 = UbiUnit(
         RpmUnit(
             name="test",
@@ -695,15 +694,15 @@ def test_keep_n_latest_rpms():
     rpms.sort(key=vercmp_sort())
     matcher._keep_n_latest_rpms(rpms)
 
-    # there should only one modulemd
+    # there should only one rpm
     assert len(rpms) == 1
     # with the highest number of version
     assert rpms[0].version == "11"
 
 
 def test_keep_n_latest_rpms_multiple_arches():
+    """Test keeping only the latest version of rpm for multiple arches"""
 
-    """Test keeping only the latest version of modulemd"""
     unit_1 = UbiUnit(
         RpmUnit(
             name="test",
@@ -713,7 +712,6 @@ def test_keep_n_latest_rpms_multiple_arches():
         ),
         None,
     )
-
     unit_2 = UbiUnit(
         RpmUnit(
             name="test",
@@ -732,21 +730,34 @@ def test_keep_n_latest_rpms_multiple_arches():
         ),
         None,
     )
+    unit_4 = UbiUnit(
+        RpmUnit(
+            name="test",
+            version="9",
+            release="20",
+            arch="i686",
+        ),
+        None,
+    )
 
     matcher = RpmMatcher(None, None)
-    rpms = [unit_1, unit_2, unit_3]
+    rpms = [unit_1, unit_2, unit_3, unit_4]
     rpms.sort(key=vercmp_sort())
     matcher._keep_n_latest_rpms(rpms)
 
-    # there should only one modulemd
-    assert len(rpms) == 2
-    # with the highest number of version
-    assert rpms[0].version == "11"
-    assert rpms[0].arch == "x86_64"
+    # sort by version, the order after _keep_n_latest_rpms() is not guaranteed in this case
+    rpms.sort(key=lambda x: x.version)
 
-    # with the highest number of version
-    assert rpms[1].version == "10"
-    assert rpms[1].arch == "i686"
+    # there should be 2 rpms
+    assert len(rpms) == 2
+
+    # i686 rpm goes with its highest version
+    assert rpms[0].version == "10"
+    assert rpms[0].arch == "i686"
+
+    # x86_64 rpm goes with its highest version
+    assert rpms[1].version == "11"
+    assert rpms[1].arch == "x86_64"
 
 
 def test_get_rpm_output_set(ubi_config):
