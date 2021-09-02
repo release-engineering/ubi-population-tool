@@ -1,15 +1,15 @@
-name: trigger jenkins job
+name: Run Jenkins Job 
 on: [push, pull_request]
 jobs:
-
   build:
-    name: Build
+    name: Trigger Jenkins build
     runs-on: ubuntu-latest
     steps:
-    - name: trigger single Job
-      uses: appleboy/jenkins-action@master
+    - name: Triggering build
+      uses: Gympass/jenkins-job-action@0.0.5
       with:
-        url: "https://master-jenkins-csb-distribution.apps.ocp4.prod.psi.redhat.com"
-        user: "dajain"
-        token: ${{ secrets.TOKEN }}
-        job: "ubipop-pulp-integration"
+        jenkins_url: "https://master-jenkins-csb-distribution.apps.ocp4.prod.psi.redhat.com/"
+        jenkins_user: "dajain"
+        jenkins_token: "${ secrets.TOKEN}"
+        job_name: "ubipop-pulp-integration"
+        #jenkins_params: '{"any_build_param_or_none": "value", "branch": "${GITHUB_SHA}"}'
