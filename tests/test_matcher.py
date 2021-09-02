@@ -751,7 +751,7 @@ def test_keep_n_latest_rpms_multiple_arches():
     # there should be 2 rpms
     assert len(rpms) == 2
 
-    # i686 gpes with its highest version
+    # i686 rpm goes with its highest version
     assert rpms[0].version == "10"
     assert rpms[0].arch == "i686"
 
