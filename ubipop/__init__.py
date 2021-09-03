@@ -297,6 +297,11 @@ class UbiPopulate(object):
                 right_config = self._get_config(
                     repo_set.out_repos.rpm.ubi_config_version, config
                 )
+                _LOG.info("Started population of repos:")
+                _LOG.info("\t%s", repo_set.out_repos.rpm.id)
+                _LOG.info("\t%s", repo_set.out_repos.source.id)
+                _LOG.info("\t%s", repo_set.out_repos.debug.id)
+
                 UbiPopulateRunner(
                     self.pulp,
                     self.pulp_client,
