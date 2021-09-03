@@ -1,0 +1,34 @@
+sudo: false
+language: python
+before_install:
+  # for rpm-py-installer
+  - sudo apt-get install -y rpm
+
+install: pip install tox
+matrix:
+  include:
+  - python: '2.7'
+    env: TOX_ENV=py27
+  - python: '3.8'
+    env: TOX_ENV=py38
+  - python: '3.9'
+    env: TOX_ENV=py39
+  - python: '3.9'
+    env: TOX_ENV=static
+  - python: '3.9'
+    env: TOX_ENV=cov-travis DEPLOY=1
+  - python: '3.9'
+    env: TOX_ENV=docs
+script: tox -e $TOX_ENV
+after_success:
+- test $TOX_ENV = docs && scripts/push-docs
+
+deploy:
+  provider: pypi
+  user: __token__
+  password:
+    secure: ZhBu41J0qumZJKGDyHBQqZI7vAO6SqZzeWT5W1gcT58x573o+87iOHxmwCgE9SWysJNmkFVqoGAM0NIkHuZKGF8gWYaV483qSWvv6epi/G7Uev8lFwGpO8X+NXc1FW8cD7VVj0nG9M+J8NyxXw+wE8PZPTi532/SuT9xzr2U5LVSnq5NhKfhXYSKeuloAaIM1wx71EIkf+qGeknCMAi9tbPYYfqeSzTwqQF9nEOcKWXwxUFuedt/l6W1DG2LSIL37XhsMt3mFH0NkpSX+nO99zcAQb0StGo8ycXlBxJCKHx5VLzOkdVctCLmvMHrDnlWZaNkK0VunhXQ/3z1zPrBJ95yyznHpjWRb0J0EmxX070SbxCRwpYZ0k3V9lImJtpilnaVqnaO0C/ZI95dz2e8ck1g3GqXuir87e6gBVoov4xKbGf18sOQEds7cJKsojS/em/apKQsBHLYwH9RlMV/1/nm/4TYecbbz6ZJuqD1JtYZwsVLdQvlos1O8or9cm5hBZeJbVApK85kzXMca4o7ccgmNIjUPt3599szlYOtbJmVhbFygzr7IpgUNgoNRiX9XL/FZ0oTuIDg0ESd32LJAhGBZH2God262QHxpTZKa49spMO+m64qFjwQx5HwLHhZEg8ZrayPNCK3bhYOEKkv+UMRmeHnEeSu1BMTKPw42TA=
+  on:
+    tags: true
+    condition: "$DEPLOY = 1"
+  skip_existing: true

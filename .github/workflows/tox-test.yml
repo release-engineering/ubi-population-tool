@@ -74,7 +74,6 @@ jobs:
       - name: Install RPM
         run: |
           sudo apt-get install -y rpm
-          # sudo apt-get install -y libkrb5-dev
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
