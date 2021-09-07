@@ -354,9 +354,15 @@ class RpmMatcher(Matcher):
             )
         )
 
+        # the output set of source rpms is almost ready at this point
+        # because it was created from final output set of binary and debug rpm
+        # so just need to apply blacklist and nothing else
         self.source_rpms = f_proxy(
             self._executor.submit(
-                self._get_rpm_output_set, source_rpms, modular_rpm_filenames
+                self._get_rpm_output_set,
+                source_rpms,
+                modular_rpm_filenames=None,
+                keep_all_versions=True,
             )
         )
 
@@ -393,7 +399,9 @@ class RpmMatcher(Matcher):
         modules = self._search_moludemds([Criteria.true()], self._input_repos.rpm)
         return self._executor.submit(extract_modular_filenames)
 
-    def _get_rpm_output_set(self, rpms, modular_rpm_filenames):
+    def _get_rpm_output_set(
+        self, rpms, modular_rpm_filenames=None, keep_all_versions=False
+    ):
         blacklist_parsed = self._parse_blacklist_config()
         name_rpms_maps = {}
 
@@ -414,9 +422,10 @@ class RpmMatcher(Matcher):
                     return blacklisted
 
         for rpm in rpms:
-            # skip modular rpms
-            if rpm.filename in modular_rpm_filenames:
-                continue
+            if modular_rpm_filenames:
+                # skip modular rpms
+                if rpm.filename in modular_rpm_filenames:
+                    continue
             # skip blacklisted rpms
             if is_blacklisted(rpm):
                 continue
@@ -426,8 +435,9 @@ class RpmMatcher(Matcher):
         out = []
         # sort rpms and keep N latest versions of them
         for rpm_list in name_rpms_maps.values():
-            rpm_list.sort(key=vercmp_sort())
-            self._keep_n_latest_rpms(rpm_list)
+            if not keep_all_versions:
+                rpm_list.sort(key=vercmp_sort())
+                self._keep_n_latest_rpms(rpm_list)
             out.extend(rpm_list)
 
         return out
