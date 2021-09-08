@@ -825,6 +825,82 @@ def test_get_rpm_output_set(ubi_config):
     assert output[0].version == "11"
 
 
+def test_get_rpm_output_set_include_modular_and_all_versions(ubi_config):
+    """tests getting rpm output set from RpmMatcher, modular packages included
+    as well as all version of given package, only blacklist is applied"""
+    matcher = RpmMatcher(None, ubi_config)
+    # This unit will be in the output set - we allow all versions
+    unit_1 = UbiUnit(
+        RpmUnit(
+            name="test",
+            version="10",
+            release="20",
+            arch="x86_64",
+        ),
+        None,
+    )
+    # this one will be excluded using blacklist
+    unit_2 = UbiUnit(
+        RpmUnit(
+            name="excluded_with_globbing123456789",
+            version="11",
+            release="20",
+            arch="x86_64",
+        ),
+        None,
+    )
+    # this one will be excluded using blacklist
+    unit_3 = UbiUnit(
+        RpmUnit(
+            name="excluded_package",
+            version="10",
+            release="20",
+            arch="x86_64",
+        ),
+        None,
+    )
+    # this is another unit that will be in the output set
+    unit_4 = UbiUnit(
+        RpmUnit(
+            name="test",
+            version="11",
+            release="20",
+            arch="x86_64",
+        ),
+        None,
+    )
+    # this one is included, we don't exclude modular packages this time
+    unit_5 = UbiUnit(
+        RpmUnit(
+            name="modular_package",
+            version="12",
+            release="20",
+            arch="x86_64",
+            filename="modular_package.rpm",
+        ),
+        None,
+    )
+
+    rpms = [unit_1, unit_2, unit_3, unit_4, unit_5]
+    output = matcher._get_rpm_output_set(
+        rpms, modular_rpm_filenames=None, keep_all_versions=True
+    )
+
+    # in the output set there should be three units
+    assert len(output) == 3
+    # let's sort the output, order is not guranteed
+    output.sort(key=lambda x: x.version)
+
+    assert output[0].name == "test"
+    assert output[0].version == "10"
+
+    assert output[1].name == "test"
+    assert output[1].version == "11"
+
+    assert output[2].name == "modular_package"
+    assert output[2].version == "12"
+
+
 def test_get_pkgs_from_all_modules(pulp):
     """tests getting pkgs filenames from all available modulemd units"""
     repo = YumRepository(
