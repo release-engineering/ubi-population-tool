@@ -117,24 +117,9 @@ class UbiPopulate(object):
         self._ubiconfig_dir_or_url = ubiconfig_dir_or_url
         self._content_sets = kwargs.get("content_sets", None)
         self._repo_ids = kwargs.get("repo_ids", None)
+        self._version = kwargs.get("version", None)
+        self._content_set_regex = kwargs.get("content_set_regex", None)
         self._ubiconfig_map = None
-
-    @property
-    def ubiconfig_list(self):
-        if self._ubiconfig_list is None:
-            self._ubiconfig_list = self._load_ubiconfig(
-                self._ubiconfig_filename_list,
-                self._ubiconfig_dir_or_url,
-                self._content_sets,
-                self._repo_ids,
-            )
-        return self._ubiconfig_list
-
-    @property
-    def ubiconfig_map(self):
-        if self._ubiconfig_map is None:
-            self._ubiconfig_map = self._create_config_map()
-        return self._ubiconfig_map
 
     @property
     def pulp_client(self):
@@ -147,9 +132,15 @@ class UbiPopulate(object):
     def _make_pulp_client(self, url, auth, insecure):
         return Client("https://" + url, auth=auth, verify=not insecure)
 
-    def _load_ubiconfig(
-        self, filenames, ubiconfig_dir_or_url, content_sets=None, repo_ids=None
-    ):
+    @property
+    def ubiconfig_list(self):
+        if self._ubiconfig_list is None:
+            self._ubiconfig_list = self._load_ubiconfig()
+        return self._ubiconfig_list
+
+    def _load_ubiconfig(self):
+        ubiconfig_dir_or_url = self._ubiconfig_dir_or_url
+        filenames = self._ubiconfig_filename_list
         loader = ubiconfig.get_loader(ubiconfig_dir_or_url)
         ubi_conf_list = []
 
@@ -158,21 +149,37 @@ class UbiPopulate(object):
         else:
             ubi_conf_list.extend(loader.load_all())
 
-        return self._filter_ubi_conf_list(ubi_conf_list, content_sets, repo_ids)
+        return self._filter_ubi_conf_list(ubi_conf_list)
 
-    def _filter_ubi_conf_list(self, config_list, content_sets, repo_ids):
+    @property
+    def ubiconfig_map(self):
+        if self._ubiconfig_map is None:
+            self._ubiconfig_map = self._create_config_map()
+        return self._ubiconfig_map
+
+    def _filter_ubi_conf_list(self, config_list):
         """
         Reduces the list of UBI configurations to only those matching
-        provided content sets and/or repo IDs.
+        provided content sets and/or repo IDs. Config can be further filter
+        by major version of or content_set_regex.
         """
+
+        content_sets = self._content_sets
+        repo_ids = self._repo_ids
+        version = self._version
+        content_set_regex = self._content_set_regex
 
         filtered_conf_list = []
 
         content_sets = content_sets or []
         repo_ids = repo_ids or []
 
-        if not content_sets and not repo_ids:
+        if not any([content_sets, repo_ids, version, content_set_regex]):
+            # no filtering requested, return complete list of ubi config
             return config_list
+
+        if content_set_regex:
+            content_set_regex = re.compile(content_set_regex)
 
         if repo_ids:
             repos = [self.pulp_client.get_repository(repo_id) for repo_id in repo_ids]
@@ -181,6 +188,10 @@ class UbiPopulate(object):
                 content_sets.append(repo.content_set)
 
         for conf in config_list:
+            # if requested, filter config by major version
+            if version and not conf.version.startswith(version):
+                continue
+
             for label in [
                 conf.content_sets.rpm.input,
                 conf.content_sets.rpm.output,
@@ -189,7 +200,16 @@ class UbiPopulate(object):
                 conf.content_sets.debuginfo.input,
                 conf.content_sets.debuginfo.output,
             ]:
-                if label in content_sets:
+
+                # matching by specific content sets takes precedence
+                # or if empty content_set, content_set_regex - take the config immediately
+                # we don't have any other filter to use
+                if (
+                    not any([content_sets, content_set_regex])
+                    or label in content_sets
+                    or (content_set_regex and re.search(content_set_regex, label))
+                ):
+
                     filtered_conf_list.append(conf)
                     break
 

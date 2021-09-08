@@ -74,6 +74,18 @@ def parse_args(args):
         help="Path to output file."
         "If provided, file containing repo ids of all out repos is created.",
     )
+    parser.add_argument(
+        "--version",
+        action="store",
+        required=False,
+        help="Major version of ubi content set to be populated.",
+    )
+    parser.add_argument(
+        "--content-set-regex",
+        action="store",
+        required=False,
+        help="Regular expression of ubi content set to be populated.",
+    )
 
     parsed = parser.parse_args(args)
 
@@ -110,6 +122,8 @@ def main(args):
         opts.output_repos,
         content_sets=opts.content_sets,
         repo_ids=opts.repo_ids,
+        version=opts.version,
+        content_set_regex=opts.content_set_regex,
     ).populate_ubi_repos()
 
 
