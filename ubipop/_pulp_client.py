@@ -17,6 +17,7 @@ _LOG = logging.getLogger("ubipop")
 
 HTTP_TOTAL_RETRIES = int(os.environ.get("UBIPOP_HTTP_TOTAL_RETRIES", 10))
 HTTP_RETRY_BACKOFF = float(os.environ.get("UBIPOP_HTTP_RETRY_BACKOFF", 1))
+HTTP_TIMEOUT = int(os.environ.get("UBIPOP_HTTP_TIMEOUT", 120))
 
 
 class UnsupportedTypeId(Exception):
@@ -77,9 +78,13 @@ class Pulp(object):
         req_url = urljoin(self.base_url, url)
 
         if req_type == "post":
-            ret = self.local.session.post(req_url, json=data, verify=not self.insecure)
+            ret = self.local.session.post(
+                req_url, json=data, verify=not self.insecure, timeout=HTTP_TIMEOUT
+            )
         elif req_type == "get":
-            ret = self.local.session.get(req_url, verify=not self.insecure)
+            ret = self.local.session.get(
+                req_url, verify=not self.insecure, timeout=HTTP_TIMEOUT
+            )
         else:
             ret = None
 
