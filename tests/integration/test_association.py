@@ -673,9 +673,6 @@ def test_artifact_copy_if_profiles_not_speficied():
     assert (
         unexpected not in repo_rpms
     ), "Package in module artifacts, which isn't in source repo has been added to ubi repo."
-    assert (
-        "RPM {} is unavailable in input repos".format(unexpected) in logs
-    ), "LOG warning notifying about the RPM unavailability has not been captured."
 
     srpm_repos = get_repos_from_cs(cfg.content_sets.srpm.output, skip_dot_version=True)
     for repo in srpm_repos:
