@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 - n/a
+
+## [0.7.0]
+
+### Added
+- Customizable timeout for requests
+
+### Fixed
+- Creation of SRPM output set
+
 ## [0.6.0] - 2021-09-06
 ### Changed
 - Queries for rpm units reimplemented in more efficient way
@@ -49,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.6.0...0.7.0
 [0.6.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.5.0...0.6.0
 [0.5.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.4.0...0.5.0
 [0.4.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.1...0.4.0
