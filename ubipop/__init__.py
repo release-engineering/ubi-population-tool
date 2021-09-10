@@ -5,6 +5,7 @@ import re
 from collections import defaultdict, deque, namedtuple
 from concurrent.futures import as_completed
 from itertools import chain
+from attr import attr
 from pubtools.pulplib import Client, Criteria, PublishOptions
 
 import ubiconfig
@@ -20,6 +21,7 @@ from ubipop._utils import (
     UnassociateActionModules,
     UnassociateActionModuleDefaults,
     UnassociateActionRpms,
+    flatten_md_defaults_name_profiles,
 )
 from ._matcher import ModularMatcher, RpmMatcher
 
@@ -394,9 +396,8 @@ class UbiPopulateRunner(object):
         )
 
     def _get_pulp_actions_md_defaults(self, module_defaults, current):
-        module_defaults_list = list(chain.from_iterable(module_defaults.values()))
         return self._determine_pulp_actions(
-            module_defaults_list,
+            module_defaults,
             current,
             self._diff_md_defaults_by_profiles,
         )
@@ -503,15 +504,20 @@ class UbiPopulateRunner(object):
 
     def _diff_md_defaults_by_profiles(self, module_defaults_1, module_defaults_2):
         return self._diff_lists_by_attr(
-            module_defaults_1, module_defaults_2, "name_profiles"
+            module_defaults_1, module_defaults_2, flatten_md_defaults_name_profiles
         )
 
     def _diff_packages_by_filename(self, packages_1, packages_2):
         return self._diff_lists_by_attr(packages_1, packages_2, "filename")
 
-    def _diff_lists_by_attr(self, list_1, list_2, attr):
-        attrs_list_2 = [getattr(obj, attr) for obj in list_2]
-        diff = [obj for obj in list_1 if getattr(obj, attr) not in attrs_list_2]
+    def _diff_lists_by_attr(self, list_1, list_2, attr_or_func):
+        def diff_attr(obj):
+            if callable(attr_or_func):
+                return attr_or_func(obj)
+            return getattr(obj, attr_or_func)
+
+        attrs_list_2 = [diff_attr(obj) for obj in list_2]
+        diff = [obj for obj in list_1 if diff_attr(obj) not in attrs_list_2]
 
         return diff
 
@@ -529,11 +535,10 @@ class UbiPopulateRunner(object):
         rm = RpmMatcher(self.repos.in_repos, self.ubiconfig).run()
 
         self.repos.modules = mm.modules
+        self.repos.module_defaults = mm.module_defaults
         self.repos.packages = rm.binary_rpms
         self.repos.debug_rpms = rm.debug_rpms
         self.repos.source_rpms = rm.source_rpms
-
-        self._match_module_defaults()
 
         (
             associations,

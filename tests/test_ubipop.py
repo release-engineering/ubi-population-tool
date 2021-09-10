@@ -16,6 +16,7 @@ from pubtools.pulplib import (
     Distributor,
     ModulemdUnit,
     RpmUnit,
+    ModulemdDefaultsUnit,
 )
 from mock import MagicMock, patch, call
 from more_executors import Executors
@@ -408,7 +409,6 @@ def test_match_module_defaults(mock_ubipop_runner):
     md_d = mock_ubipop_runner.repos.module_defaults["virtrhel"]
     assert len(md_d) == 1
     assert md_d[0].name == "virt"
-    assert md_d[0].name_profiles == "virt:[2.5:common]"
 
 
 def test_diff_modules(mock_ubipop_runner):
@@ -608,13 +608,18 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content_ft):
         f_return(set([get_test_mod(name="test_md", pulplib=True)]))
     )
 
-    mock_ubipop_runner.repos.module_defaults = {
-        "test": [
-            get_test_mod_defaults(
-                name="test_mdd", stream="rhel", profiles={"2.5": "uncommon"}
+    mock_ubipop_runner.repos.module_defaults = [
+        UbiUnit(
+            ModulemdDefaultsUnit(
+                name="test_mdd",
+                stream="rhel",
+                profiles={"2.5": "uncommon"},
+                repo_id="foo-rpms",
+                content_type_id="modulemd_defaults",
             ),
-        ],
-    }
+            "foo-rpms",
+        )
+    ]
 
     binary_rpms = [
         UbiUnit(
@@ -766,13 +771,19 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content_ft
     mock_ubipop_runner.repos.modules = f_proxy(
         f_return(set([get_test_mod(name="md_current", pulplib=True)]))
     )
-    mock_ubipop_runner.repos.module_defaults = {
-        "test": [
-            get_test_mod_defaults(
-                name="mdd_current", stream="rhel", profiles={"2.5": "common"}
+
+    mock_ubipop_runner.repos.module_defaults = [
+        UbiUnit(
+            ModulemdDefaultsUnit(
+                name="mdd_current",
+                stream="rhel",
+                profiles={"2.5": "common"},
+                repo_id="foo-rpms",
+                content_type_id="modulemd_defaults",
             ),
-        ],
-    }
+            "foo-rpms",
+        )
+    ]
 
     binary_rpms = [
         UbiUnit(
@@ -906,13 +917,19 @@ def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content_ft):
     mock_ubipop_runner.repos.modules = f_proxy(
         f_return(set([get_test_mod(name="md_current", pulplib=True)]))
     )
-    mock_ubipop_runner.repos.module_defaults = {
-        "test": [
-            get_test_mod_defaults(
-                name="mdd_current", stream="rhel", profiles={"2.5": "common"}
-            )
-        ]
-    }
+
+    mock_ubipop_runner.repos.module_defaults = [
+        UbiUnit(
+            ModulemdDefaultsUnit(
+                name="mdd_current",
+                stream="rhel",
+                profiles={"2.5": "common"},
+                repo_id="foo-rpms",
+                content_type_id="modulemd_defaults",
+            ),
+            "foo-rpms",
+        )
+    ]
 
     binary_rpms = [
         UbiUnit(

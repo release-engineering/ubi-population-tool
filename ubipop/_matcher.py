@@ -157,6 +157,11 @@ class Matcher(object):
     def _search_moludemds(self, or_criteria, repos):
         return self._search_units_per_repos(or_criteria, repos, content_type="modulemd")
 
+    def _search_modulemd_defaults(self, or_criteria, repos):
+        return self._search_units_per_repos(
+            or_criteria, repos, content_type="modulemd_defaults"
+        )
+
     def _get_srpms_criteria(self):
         filenames = []
         for rpms_list in as_completed([self.binary_rpms, self.debug_rpms]):
@@ -176,6 +181,7 @@ class ModularMatcher(Matcher):
     def __init__(self, input_repos, ubi_config):
         super(ModularMatcher, self).__init__(input_repos, ubi_config)
         self.modules = None
+        self.module_defaults = None
 
     def run(self):
         """Asynchronously creates criteria for pulp queries and
@@ -212,6 +218,16 @@ class ModularMatcher(Matcher):
                 self._search_srpms, srpms_criteria, self._input_repos.source
             )
         )
+        modulemd_defaults_criteria = f_proxy(
+            self._executor.submit(self._get_modulemd_defaults_criteria)
+        )
+        self.module_defaults = f_proxy(
+            self._executor.submit(
+                self._search_modulemd_defaults,
+                modulemd_defaults_criteria,
+                self._input_repos.rpm,
+            )
+        )
         return self
 
     def _get_modular_rpms_criteria(self):
@@ -221,8 +237,14 @@ class ModularMatcher(Matcher):
         return pkgs_or_criteria
 
     def _get_modulemds_criteria(self):
+        return self._get_criteria_for_modules(self._ubi_config)
+
+    def _get_modulemd_defaults_criteria(self):
+        return self._get_criteria_for_modules(self.modules)
+
+    def _get_criteria_for_modules(self, modules):
         criteria_values = []
-        for module in self._ubi_config:
+        for module in modules:
             criteria_values.append(
                 (
                     module.name,

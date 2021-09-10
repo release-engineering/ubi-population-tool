@@ -355,15 +355,3 @@ class ModuleDefaults(object):
 
     def __str__(self):
         return self.name
-
-    @property
-    def name_profiles(self):
-        """
-        flatten the profles and prepend name
-        format: name:[key:profile,profile]:[key:profile]
-        'ruby:[2.5:common,unique]'
-        """
-        result = self.name
-        for key in sorted(self.profiles):
-            result += ":[%s:%s]" % (key, ",".join(sorted(self.profiles[key])))
-        return result
