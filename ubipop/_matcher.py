@@ -66,8 +66,9 @@ class Matcher(object):
         """
         raise NotImplementedError
 
+    @classmethod
     def _search_units(
-        self, repo, criteria_list, content_type_id, batch_size_override=None
+        cls, repo, criteria_list, content_type_id, batch_size_override=None
     ):
         """
         Search for units of one content type associated with given repository by criteria.
@@ -122,13 +123,14 @@ class Matcher(object):
 
         return or_criteria
 
+    @classmethod
     def _search_units_per_repos(
-        self, or_criteria, repos, content_type, batch_size_override=None
+        cls, or_criteria, repos, content_type, batch_size_override=None
     ):
         units = []
         for repo in repos:
             units.append(
-                self._search_units(
+                cls._search_units(
                     repo,
                     or_criteria,
                     content_type,
@@ -138,24 +140,33 @@ class Matcher(object):
 
         return f_proxy(f_flat_map(f_sequence(units), flatten_list_of_sets))
 
-    def _search_rpms(self, or_criteria, repos, batch_size_override=None):
-        return self._search_units_per_repos(
+    @classmethod
+    def search_rpms(cls, or_criteria, repos, batch_size_override=None):
+        return cls._search_units_per_repos(
             or_criteria,
             repos,
             content_type="rpm",
             batch_size_override=batch_size_override,
         )
 
-    def _search_srpms(self, or_criteria, repos, batch_size_override=None):
-        return self._search_units_per_repos(
+    @classmethod
+    def search_srpms(cls, or_criteria, repos, batch_size_override=None):
+        return cls._search_units_per_repos(
             or_criteria,
             repos,
             content_type="srpm",
             batch_size_override=batch_size_override,
         )
 
-    def _search_moludemds(self, or_criteria, repos):
-        return self._search_units_per_repos(or_criteria, repos, content_type="modulemd")
+    @classmethod
+    def search_modulemds(cls, or_criteria, repos):
+        return cls._search_units_per_repos(or_criteria, repos, content_type="modulemd")
+
+    @classmethod
+    def search_modulemd_defaults(cls, or_criteria, repos):
+        return cls._search_units_per_repos(
+            or_criteria, repos, content_type="modulemd_defaults"
+        )
 
     def _search_modulemd_defaults(self, or_criteria, repos):
         return self._search_units_per_repos(
@@ -195,7 +206,7 @@ class ModularMatcher(Matcher):
         )
         modules = f_proxy(
             self._executor.submit(
-                self._search_moludemds, modulemds_criteria, self._input_repos.rpm
+                self.search_modulemds, modulemds_criteria, self._input_repos.rpm
             )
         )
         self.modules = f_proxy(
@@ -204,18 +215,28 @@ class ModularMatcher(Matcher):
         rpms_criteria = f_proxy(self._executor.submit(self._get_modular_rpms_criteria))
         self.binary_rpms = f_proxy(
             self._executor.submit(
-                self._search_rpms, rpms_criteria, self._input_repos.rpm
+                self.search_rpms, rpms_criteria, self._input_repos.rpm
             )
         )
         self.debug_rpms = f_proxy(
             self._executor.submit(
-                self._search_rpms, rpms_criteria, self._input_repos.debug
+                self.search_rpms, rpms_criteria, self._input_repos.debug
             )
         )
         srpms_criteria = f_proxy(self._executor.submit(self._get_srpms_criteria))
         self.source_rpms = f_proxy(
             self._executor.submit(
-                self._search_srpms, srpms_criteria, self._input_repos.source
+                self.search_srpms, srpms_criteria, self._input_repos.source
+            )
+        )
+        modulemd_defaults_criteria = f_proxy(
+            self._executor.submit(self._get_modulemd_defaults_criteria)
+        )
+        self.modulemd_defaults = f_proxy(
+            self._executor.submit(
+                self.search_modulemd_defaults,
+                modulemd_defaults_criteria,
+                self._input_repos.rpm,
             )
         )
         modulemd_defaults_criteria = f_proxy(
@@ -339,7 +360,7 @@ class RpmMatcher(Matcher):
 
         binary_rpms = f_proxy(
             self._executor.submit(
-                self._search_rpms,
+                self.search_rpms,
                 rpms_criteria,
                 self._input_repos.rpm,
                 batch_size_override,
@@ -348,7 +369,7 @@ class RpmMatcher(Matcher):
 
         debug_rpms = f_proxy(
             self._executor.submit(
-                self._search_rpms,
+                self.search_rpms,
                 rpms_criteria,
                 self._input_repos.debug,
                 batch_size_override,
@@ -369,7 +390,7 @@ class RpmMatcher(Matcher):
         srpms_criteria = f_proxy(self._executor.submit(self._get_srpms_criteria))
         source_rpms = f_proxy(
             self._executor.submit(
-                self._search_srpms,
+                self.search_srpms,
                 srpms_criteria,
                 self._input_repos.source,
                 batch_size_override,
@@ -418,7 +439,7 @@ class RpmMatcher(Matcher):
 
             return modular_rpm_filenames
 
-        modules = self._search_moludemds([Criteria.true()], self._input_repos.rpm)
+        modules = self.search_modulemds([Criteria.true()], self._input_repos.rpm)
         return self._executor.submit(extract_modular_filenames)
 
     def _get_rpm_output_set(
