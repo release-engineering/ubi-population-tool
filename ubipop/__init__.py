@@ -20,6 +20,7 @@ from ubipop._utils import (
     UnassociateActionModules,
     UnassociateActionModuleDefaults,
     UnassociateActionRpms,
+    flatten_md_defaults_name_profiles,
 )
 from ._matcher import ModularMatcher, RpmMatcher
 
@@ -378,27 +379,6 @@ class UbiPopulateRunner(object):
         self.dry_run = dry_run
         self._executor = executor
 
-    def _match_module_defaults(self):
-        """Try to find modulemd_defaults units in the same repo with the same
-        name/stream of a modulemd.
-        """
-        fts = {}
-        for module in self.repos.modules:
-            for in_repo_rpm in self.repos.in_repos.rpm:
-                fts[
-                    self._executor.submit(
-                        self.pulp.search_module_defaults,
-                        in_repo_rpm,
-                        module.name,
-                        str(module.stream),
-                    )
-                ] = module.name + str(module.stream)
-
-        for ft in as_completed(fts):
-            module_defaults = ft.result()
-            if module_defaults:
-                self.repos.module_defaults[fts[ft]].extend(module_defaults)
-
     def _determine_pulp_actions(self, units, current, diff_f, extra_units=None):
         expected = list(units)
         if extra_units:
@@ -414,9 +394,8 @@ class UbiPopulateRunner(object):
         )
 
     def _get_pulp_actions_md_defaults(self, module_defaults, current):
-        module_defaults_list = list(chain.from_iterable(module_defaults.values()))
         return self._determine_pulp_actions(
-            module_defaults_list,
+            module_defaults,
             current,
             self._diff_md_defaults_by_profiles,
         )
@@ -523,15 +502,20 @@ class UbiPopulateRunner(object):
 
     def _diff_md_defaults_by_profiles(self, module_defaults_1, module_defaults_2):
         return self._diff_lists_by_attr(
-            module_defaults_1, module_defaults_2, "name_profiles"
+            module_defaults_1, module_defaults_2, flatten_md_defaults_name_profiles
         )
 
     def _diff_packages_by_filename(self, packages_1, packages_2):
         return self._diff_lists_by_attr(packages_1, packages_2, "filename")
 
-    def _diff_lists_by_attr(self, list_1, list_2, attr):
-        attrs_list_2 = [getattr(obj, attr) for obj in list_2]
-        diff = [obj for obj in list_1 if getattr(obj, attr) not in attrs_list_2]
+    def _diff_lists_by_attr(self, list_1, list_2, attr_or_func):
+        def diff_attr(obj):
+            if callable(attr_or_func):
+                return attr_or_func(obj)
+            return getattr(obj, attr_or_func)
+
+        attrs_list_2 = [diff_attr(obj) for obj in list_2]
+        diff = [obj for obj in list_1 if diff_attr(obj) not in attrs_list_2]
 
         return diff
 
@@ -549,11 +533,10 @@ class UbiPopulateRunner(object):
         rm = RpmMatcher(self.repos.in_repos, self.ubiconfig).run()
 
         self.repos.modules = mm.modules
+        self.repos.module_defaults = mm.modulemd_defaults
         self.repos.packages = rm.binary_rpms
         self.repos.debug_rpms = rm.debug_rpms
         self.repos.source_rpms = rm.source_rpms
-
-        self._match_module_defaults()
 
         (
             associations,

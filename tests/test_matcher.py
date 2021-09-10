@@ -8,6 +8,7 @@ from pubtools.pulplib import (
     YumRepository,
     FakeController,
     ModulemdUnit,
+    ModulemdDefaultsUnit,
 )
 from ubiconfig import UbiConfig
 
@@ -280,6 +281,37 @@ def test_search_moludemds(pulp):
     assert result.pop().nsvca == "test:10:100:abcdef:x86_64"
 
 
+def test_search_moludemd_defaults(pulp):
+    """Test convenient method for searching modulemd_defaults"""
+    repo = YumRepository(
+        id="test_repo_1",
+    )
+    repo.__dict__["_client"] = pulp.client
+    unit_1 = ModulemdDefaultsUnit(
+        name="test",
+        stream="10",
+        repo_id="test_repo_1",
+    )
+    unit_2 = ModulemdDefaultsUnit(
+        name="test",
+        stream="20",
+        repo_id="test_repo_1",
+    )
+
+    pulp.insert_repository(repo)
+    pulp.insert_units(repo, [unit_1, unit_2])
+
+    matcher = Matcher(None, None)
+    criteria = matcher._create_or_criteria(["name", "stream"], [("test", "10")])
+    # let Future return result
+    result = matcher._search_modulemd_defaults(criteria, [repo]).result()
+    # there should be be only one unit in the result set according to criteria
+    assert len(result) == 1
+    found_unit = result.pop()
+    assert found_unit.name == "test"
+    assert found_unit.stream == "10"
+
+
 def test_modular_rpms_filenames(ubi_config):
     """Test getting filename from module artifacts, srpms are skipped."""
     matcher = ModularMatcher(None, ubi_config.modules)
@@ -490,6 +522,25 @@ def test_get_modulemds_criteria(ubi_config):
     # let's not test internal structure of criteria, that's responsibility of pulplib
 
 
+def test_get_modulemd_defaults_criteria():
+    """Test proper creation of criteria for modulemd_defaults query"""
+    matcher = ModularMatcher(None, None)
+    unit = UbiUnit(
+        ModulemdUnit(
+            name="test", stream="10", version=100, context="abcd", arch="x86_64"
+        ),
+        None,
+    )
+    matcher.modules = [unit]
+    criteria = matcher._get_modulemd_defaults_criteria()
+    # there should be 1 criterium created based on modules list of Matcher obj.
+    assert len(criteria) == 1
+    # it should be instance of Criteria
+    for crit in criteria:
+        assert isinstance(crit, Criteria)
+    # let's not test internal structure of criteria, that's responsibility of pulplib
+
+
 def test_get_modular_srpms_criteria(ubi_config):
     """Testing creation of criteria for srpms query"""
     matcher = ModularMatcher(None, ubi_config.modules)
@@ -614,10 +665,16 @@ def test_modular_matcher_run(pulp, ubi_config):
             "test-7:1.0-1.x86_64.src",
         ],
     )
+
+    modulemd_defaults = ModulemdDefaultsUnit(
+        name="fake_name",
+        stream="fake_stream",
+        repo_id="binary_repo",
+    )
     pulp.insert_repository(repo_1)
     pulp.insert_repository(repo_2)
     pulp.insert_repository(repo_3)
-    pulp.insert_units(repo_1, [unit_1, modulemd])
+    pulp.insert_units(repo_1, [unit_1, modulemd, modulemd_defaults])
     pulp.insert_units(repo_2, [unit_2])
     pulp.insert_units(repo_3, [unit_3])
 
@@ -627,6 +684,7 @@ def test_modular_matcher_run(pulp, ubi_config):
 
     # each public attribute is properly set with one unit
     assert len(matcher.modules) == 1
+    assert len(matcher.modulemd_defaults) == 1
     assert len(matcher.binary_rpms) == 1
     assert len(matcher.debug_rpms) == 1
     assert len(matcher.source_rpms) == 1
@@ -635,6 +693,10 @@ def test_modular_matcher_run(pulp, ubi_config):
     output_module = matcher.modules.pop()
     assert output_module.nsvca == "fake_name:fake_stream:100:abcd:x86_64"
     assert output_module.associate_source_repo_id == "binary_repo"
+
+    output_modulemd_defaults = matcher.modulemd_defaults.pop()
+    assert output_modulemd_defaults.name == "fake_name"
+    assert output_modulemd_defaults.stream == "fake_stream"
 
     rpm = matcher.binary_rpms.pop()
     assert rpm.filename == "test-1.0-1.x86_64.x86_64.rpm"

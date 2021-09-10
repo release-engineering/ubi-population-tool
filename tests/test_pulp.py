@@ -229,7 +229,6 @@ def test_search_module_defaults(mock_pulp, mock_search_module_defaults, mock_rep
     assert len(found_module_defaults) == 1
     assert found_module_defaults[0].name == "virt"
     assert found_module_defaults[0].stream == "rhel"
-    assert found_module_defaults[0].name_profiles == "virt:[rhel:common,default]"
 
 
 @pytest.fixture(name="search_task_response")
