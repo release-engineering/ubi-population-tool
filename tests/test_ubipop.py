@@ -30,13 +30,11 @@ from ubipop import (
     RepoMissing,
     PopulationSourceMissing,
 )
-from ubipop._pulp_client import Module, ModuleDefaults, Package
 from ubipop._utils import (
     AssociateActionModules,
     UnassociateActionModules,
     AssociateActionModuleDefaults,
     UnassociateActionModuleDefaults,
-    split_filename,
 )
 from ubipop._matcher import UbiUnit
 
@@ -151,51 +149,22 @@ def get_test_repo(**kwargs):
     )
 
 
-def get_test_pkg(**kwargs):
-    return Package(
-        kwargs.get("name"),
-        kwargs.get("filename"),
-        kwargs.get("src_repo_id"),
-        sourcerpm_filename=kwargs.get("sourcerpm_filename"),
-        is_modular=kwargs.get("is_modular", False),
-    )
-
-
 def get_test_mod(**kwargs):
-    if kwargs.get("pulplib"):
-        unit = UbiUnit(
-            ModulemdUnit(
-                name=kwargs.get("name", ""),
-                stream=kwargs.get("stream", ""),
-                version=kwargs.get("version", 0),
-                context=kwargs.get("context", ""),
-                arch=kwargs.get("arch", ""),
-                artifacts=kwargs.get("packages", []),
-                profiles=kwargs.get("profiles", {}),
-            ),
-            kwargs.get("src_repo_id"),
-        )
-    else:
-        unit = Module(
-            kwargs.get("name", ""),
-            kwargs.get("stream", ""),
-            kwargs.get("version", 0),
-            kwargs.get("context", ""),
-            kwargs.get("arch", ""),
-            kwargs.get("packages", []),
-            kwargs.get("profiles", {}),
-            kwargs.get("src_repo_id"),
-        )
-    return unit
-
-
-def get_test_mod_defaults(**kwargs):
-    return ModuleDefaults(
-        kwargs["name"],
-        kwargs["stream"],
-        kwargs["profiles"],
+    # mozna se na toto vysrat
+    unit = UbiUnit(
+        ModulemdUnit(
+            name=kwargs.get("name", ""),
+            stream=kwargs.get("stream", ""),
+            version=kwargs.get("version", 0),
+            context=kwargs.get("context", ""),
+            arch=kwargs.get("arch", ""),
+            artifacts=kwargs.get("packages", []),
+            profiles=kwargs.get("profiles", {}),
+        ),
         kwargs.get("src_repo_id"),
     )
+
+    return unit
 
 
 def test_get_output_repo_ids(ubi_repo_set):
@@ -353,62 +322,6 @@ def test_get_ubi_repo_sets(get_debug_repository, get_source_repository):
     assert output_repos.rpm.id == "ubi_binary"
     assert output_repos.source.id == "ubi_source"
     assert output_repos.debug.id == "ubi_debug"
-
-
-def _get_search_rpms_side_effect(package_name_or_filename_or_list, debug_only=False):
-    def _f(*args, **kwargs):
-        if debug_only and "debug" not in args[0].id:
-            return
-
-        if len(args) > 1 and args[1] == package_name_or_filename_or_list:
-            return [get_test_pkg(name=args[1], filename=args[1] + ".rpm")]
-
-        if isinstance(package_name_or_filename_or_list, list):
-            if kwargs["filename"] in package_name_or_filename_or_list:
-                return [
-                    get_test_pkg(
-                        name=split_filename(kwargs["filename"])[0],
-                        filename=kwargs["filename"],
-                    ),
-                ]
-
-        if (
-            "filename" in kwargs
-            and package_name_or_filename_or_list == kwargs["filename"]
-        ):
-            return [
-                get_test_pkg(
-                    name=split_filename(kwargs["filename"])[0],
-                    filename=kwargs["filename"],
-                ),
-            ]
-
-    return _f
-
-
-def test_match_module_defaults(mock_ubipop_runner):
-    unit = UbiUnit(
-        ModulemdUnit(
-            name="virt",
-            stream="rhel",
-            version=1,
-            context="abcd",
-            arch="x86_64",
-            profiles={"2.5": ["common"]},
-        ),
-        None,
-    )
-    mock_ubipop_runner.repos.modules = f_proxy(f_return(set([unit])))
-    mock_ubipop_runner.pulp.search_module_defaults.return_value = [
-        get_test_mod_defaults(name="virt", stream="rhel", profiles={"2.5": ["common"]}),
-    ]
-
-    mock_ubipop_runner._match_module_defaults()  # pylint: disable=protected-access
-
-    assert len(mock_ubipop_runner.repos.module_defaults) == 1
-    md_d = mock_ubipop_runner.repos.module_defaults["virtrhel"]
-    assert len(md_d) == 1
-    assert md_d[0].name == "virt"
 
 
 def test_diff_modules(mock_ubipop_runner):
