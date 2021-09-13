@@ -71,6 +71,8 @@ def test_default_config_source(mock_ubipopulate):
         None,
         content_sets=None,
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -98,6 +100,8 @@ def test_custom_config_source(mock_ubipopulate):
         None,
         content_sets=None,
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -123,6 +127,8 @@ def test_crt(mock_ubipopulate):
         None,
         content_sets=None,
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -152,6 +158,8 @@ def test_specified_filenames(mock_ubipopulate):
         None,
         content_sets=None,
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -181,6 +189,8 @@ def test_specified_content_sets(mock_ubipopulate):
             "test_repo1-rpms",
         ],
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -210,6 +220,8 @@ def test_specified_repo_ids(mock_ubipopulate):
         repo_ids=[
             "test_repo1",
         ],
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -240,6 +252,8 @@ def test_dry_run(mock_ubipopulate):
         None,
         content_sets=None,
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -271,6 +285,8 @@ def test_custom_workers_number(mock_ubipopulate):
         None,
         content_sets=None,
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -303,6 +319,8 @@ def test_insecure(mock_ubipopulate):
         None,
         content_sets=None,
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
     )
 
 
@@ -330,4 +348,64 @@ def test_output_file(mock_ubipopulate):
         "/foo/out/repos.txt",
         content_sets=None,
         repo_ids=None,
+        version=None,
+        content_set_regex=None,
+    )
+
+
+@mock.patch("ubipop.UbiPopulate")
+def test_version(mock_ubipopulate):
+    args = [
+        "--pulp-hostname",
+        "foo.pulp.com",
+        "--user",
+        "foo",
+        "--pass",
+        "foo",
+        "--version",
+        "100",
+    ]
+    main(args)
+    mock_ubipopulate.assert_called_once_with(
+        "foo.pulp.com",
+        ("foo", "foo"),
+        False,
+        [],
+        None,
+        False,
+        4,
+        None,
+        content_sets=None,
+        repo_ids=None,
+        version="100",
+        content_set_regex=None,
+    )
+
+
+@mock.patch("ubipop.UbiPopulate")
+def test_content_set_regex(mock_ubipopulate):
+    args = [
+        "--pulp-hostname",
+        "foo.pulp.com",
+        "--user",
+        "foo",
+        "--pass",
+        "foo",
+        "--content-set-regex",
+        "test-regex.*",
+    ]
+    main(args)
+    mock_ubipopulate.assert_called_once_with(
+        "foo.pulp.com",
+        ("foo", "foo"),
+        False,
+        [],
+        None,
+        False,
+        4,
+        None,
+        content_sets=None,
+        repo_ids=None,
+        version=None,
+        content_set_regex="test-regex.*",
     )

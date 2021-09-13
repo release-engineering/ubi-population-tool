@@ -518,6 +518,112 @@ def test_load_ubiconfig_by_repo_ids():
     )
 
 
+def test_load_ubiconfig_by_version():
+    """Ensure correct config is returned when given a major version of ubi"""
+    repo = YumRepository(id="rhel-7-server", content_set="rhel-7-server-rpms")
+
+    fake_ubipopulate = FakeUbiPopulate(
+        "foo.pulp.com",
+        ("foo", "foo"),
+        False,
+        ubiconfig_dir_or_url=TEST_DATA_DIR,
+        version="7",
+    )
+
+    fake_pulp = fake_ubipopulate.pulp_client_controller
+    fake_pulp.insert_repository(repo)
+
+    assert len(fake_ubipopulate.ubiconfig_list) == 1
+    assert (
+        fake_ubipopulate.ubiconfig_list[0].content_sets.rpm.output
+        == "ubi-7-server-rpms"
+    )
+
+
+def test_load_ubiconfig_by_version_no_match():
+    """Ensure no config is returned when given a major version of ubi that doesn't exist in data"""
+    repo = YumRepository(id="rhel-7-server", content_set="rhel-7-server-rpms")
+
+    fake_ubipopulate = FakeUbiPopulate(
+        "foo.pulp.com",
+        ("foo", "foo"),
+        False,
+        ubiconfig_dir_or_url=TEST_DATA_DIR,
+        version="10",
+    )
+
+    fake_pulp = fake_ubipopulate.pulp_client_controller
+    fake_pulp.insert_repository(repo)
+
+    # no config should match
+    assert len(fake_ubipopulate.ubiconfig_list) == 0
+
+
+def test_load_ubiconfig_by_content_set_regex():
+    """Ensure correct config is returned when given a content set regex"""
+    repo = YumRepository(
+        id="ubi-8-for-x86_64-appstream-rpms__8",
+        content_set="ubi-8-for-x86_64-appstream-rpms",
+    )
+
+    fake_ubipopulate = FakeUbiPopulate(
+        "foo.pulp.com",
+        ("foo", "foo"),
+        False,
+        ubiconfig_dir_or_url=TEST_DATA_DIR,
+        content_set_regex="ubi-8.*",
+    )
+
+    fake_pulp = fake_ubipopulate.pulp_client_controller
+    fake_pulp.insert_repository(repo)
+
+    # two config files are matched according to testdata
+    assert len(fake_ubipopulate.ubiconfig_list) == 2
+
+    fake_ubipopulate.ubiconfig_list.sort(key=lambda x: x.file_name)
+    conf_1 = fake_ubipopulate.ubiconfig_list[0]
+    conf_2 = fake_ubipopulate.ubiconfig_list[1]
+
+    assert conf_1.file_name == "ubiconf_golang.yaml"
+    assert conf_1.content_sets.rpm.output == "ubi-8-for-x86_64-appstream-rpms"
+
+    assert conf_2.file_name == "ubiconf_golang2.yaml"
+    assert conf_2.content_sets.rpm.output == "ubi-8-for-x86_64-appstream-rpms"
+
+
+def test_load_ubiconfig_by_content_set_regex_and_version():
+    """Ensure correct config is returned when given a content set regex and version"""
+    repo = YumRepository(
+        id="ubi-8-for-x86_64-appstream-rpms__8",
+        content_set="ubi-8-for-x86_64-appstream-rpms",
+    )
+
+    fake_ubipopulate = FakeUbiPopulate(
+        "foo.pulp.com",
+        ("foo", "foo"),
+        False,
+        ubiconfig_dir_or_url=TEST_DATA_DIR,
+        version="8",
+        content_set_regex="x86_64",
+    )
+
+    fake_pulp = fake_ubipopulate.pulp_client_controller
+    fake_pulp.insert_repository(repo)
+
+    # two config files are matched according to testdata
+    assert len(fake_ubipopulate.ubiconfig_list) == 2
+
+    fake_ubipopulate.ubiconfig_list.sort(key=lambda x: x.file_name)
+    conf_1 = fake_ubipopulate.ubiconfig_list[0]
+    conf_2 = fake_ubipopulate.ubiconfig_list[1]
+
+    assert conf_1.file_name == "ubiconf_golang.yaml"
+    assert conf_1.content_sets.rpm.output == "ubi-8-for-x86_64-appstream-rpms"
+
+    assert conf_2.file_name == "ubiconf_golang2.yaml"
+    assert conf_2.content_sets.rpm.output == "ubi-8-for-x86_64-appstream-rpms"
+
+
 @pytest.fixture(name="mocked_ubiconfig_load_all")
 def fixture_mocked_ubiconfig_load_all():
     with patch("ubiconfig.get_loader") as get_loader:
