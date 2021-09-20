@@ -4,7 +4,6 @@ import threading
 import time
 
 from urllib3.util.retry import Retry
-from ubipop._utils import split_filename
 
 try:
     from urllib.parse import urljoin
@@ -89,91 +88,6 @@ class Pulp(object):
             ret = None
 
         return ret
-
-    def search_rpms(
-        self, repo, name=None, arch=None, name_globbing=False, filename=None
-    ):
-        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.id)
-        criteria = {"type_ids": ["rpm", "srpm"]}
-
-        filters = {"filters": {"unit": {}}}
-        if name:
-            if name_globbing:
-                filters["filters"]["unit"]["name"] = {"$regex": name + ".*"}
-            else:
-                filters["filters"]["unit"]["name"] = name
-
-        if arch:
-            filters["filters"]["unit"]["arch"] = arch
-
-        if filename:
-            filters["filters"]["unit"]["filename"] = filename
-
-        criteria.update(filters)
-        payload = {"criteria": criteria}
-        ret = self.do_request("post", url, payload)
-        rpms = []
-        ret.raise_for_status()
-        for item in ret.json():
-            metadata = item["metadata"]
-            rpms.append(
-                Package(
-                    metadata["name"],
-                    metadata["filename"],
-                    repo.id,
-                    sourcerpm_filename=metadata.get("sourcerpm"),
-                )
-            )
-        return rpms
-
-    def search_modules(self, repo, name=None, stream=None):
-        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.id)
-        criteria = {"type_ids": ["modulemd"]}
-        if name and stream:
-            criteria.update({"filters": {"unit": {"name": name, "stream": stream}}})
-        payload = {"criteria": criteria}
-
-        ret = self.do_request("post", url, payload)
-        modules = []
-        ret.raise_for_status()
-        for item in ret.json():
-
-            metadata = item["metadata"]
-            modules.append(
-                Module(
-                    metadata["name"],
-                    metadata["stream"],
-                    metadata["version"],
-                    metadata["context"],
-                    metadata["arch"],
-                    metadata["artifacts"],
-                    metadata["profiles"],
-                    repo.id,
-                )
-            )
-        return modules
-
-    def search_module_defaults(self, repo, name=None, stream=None):
-        url = "repositories/{REPO_ID}/search/units/".format(REPO_ID=repo.id)
-        criteria = {"type_ids": ["modulemd_defaults"]}
-        if name and stream:
-            criteria.update({"filters": {"unit": {"name": name, "stream": stream}}})
-        payload = {"criteria": criteria}
-
-        ret = self.do_request("post", url, payload)
-        ret.raise_for_status()
-        module_defaults = []
-        for item in ret.json():
-            metadata = item["metadata"]
-            module_defaults.append(
-                ModuleDefaults(
-                    metadata["name"],
-                    metadata["stream"],
-                    metadata["profiles"],
-                    repo.id,
-                )
-            )
-        return module_defaults
 
     def wait_for_tasks(self, task_id_list, delay=5.0):
         results = {}
@@ -290,68 +204,3 @@ class Pulp(object):
 
     def unassociate_packages(self, repo, rpms):
         return self.unassociate_units(repo, rpms, ("rpm", "srpm"))
-
-
-class Package(object):
-    def __init__(
-        self, name, filename, src_repo_id, sourcerpm_filename=None, is_modular=False
-    ):
-        self.name = name
-        self.filename = filename
-        self.sourcerpm = sourcerpm_filename
-        self.is_modular = is_modular
-        #  return name, ver, rel, epoch, arch
-        _, self.version, self.release, self.epoch, _ = split_filename(self.filename)
-        self.associate_source_repo_id = src_repo_id
-
-    def __str__(self):
-        return self.filename
-
-
-class Module(object):
-    def __init__(
-        self, name, stream, version, context, arch, packages, profiles, src_repo_id
-    ):
-        self.name = name
-        self.stream = stream
-        self.version = version
-        self.context = context
-        self.arch = arch
-        self.packages = packages
-        self.profiles = profiles
-        self.associate_source_repo_id = src_repo_id
-
-    @property
-    def nsvca(self):
-        return ":".join(
-            (self.name, self.stream, str(self.version), self.context, self.arch)
-        )
-
-    def __str__(self):
-        return self.nsvca
-
-
-class ModuleDefaults(object):
-    """
-    module_defaults unit, defines which profiles are enabled by default when activating
-    a module. For example:
-    {...,
-     "name": "ruby",
-     "profiles": {
-        "2.5": [
-            "common"]
-        },
-    ...
-    }
-    if someone asks to enable 'ruby:2.5' for some repo without specifing profiles, will
-    get 'common' profile by defualt
-    """
-
-    def __init__(self, name, stream, profiles, src_repo_id):
-        self.name = name
-        self.stream = stream
-        self.profiles = profiles  # a dict such as {'4.046':['common']}
-        self.associate_source_repo_id = src_repo_id
-
-    def __str__(self):
-        return self.name

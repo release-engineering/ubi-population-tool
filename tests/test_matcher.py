@@ -6,7 +6,6 @@ from pubtools.pulplib import (
     RpmUnit,
     Criteria,
     YumRepository,
-    FakeController,
     ModulemdUnit,
     ModulemdDefaultsUnit,
 )
@@ -21,11 +20,6 @@ from ubipop._matcher import (
 )
 from ubipop import RepoSet
 from ubipop._utils import vercmp_sort
-
-
-@pytest.fixture(name="pulp")
-def fake_pulp():
-    yield FakeController()
 
 
 @pytest.fixture(name="ubi_config")
@@ -207,7 +201,7 @@ def test_search_rpms(pulp):
     matcher = Matcher(None, None)
     criteria = matcher._create_or_criteria(["filename"], [("test.x86_64.rpm",)])
     # let Future return result
-    result = matcher._search_rpms(criteria, [repo]).result()
+    result = matcher.search_rpms(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
     assert len(result) == 1
     assert result.pop().filename == "test.x86_64.rpm"
@@ -242,7 +236,7 @@ def test_search_srpms(pulp):
     matcher = Matcher(None, None)
     criteria = matcher._create_or_criteria(["filename"], [("test.src.rpm",)])
     # let Future return result
-    result = matcher._search_srpms(criteria, [repo]).result()
+    result = matcher.search_srpms(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
     assert len(result) == 1
     assert result.pop().filename == "test.src.rpm"
@@ -275,7 +269,7 @@ def test_search_moludemds(pulp):
     matcher = Matcher(None, None)
     criteria = matcher._create_or_criteria(["name", "stream"], [("test", "10")])
     # let Future return result
-    result = matcher._search_moludemds(criteria, [repo]).result()
+    result = matcher.search_modulemds(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
     assert len(result) == 1
     assert result.pop().nsvca == "test:10:100:abcdef:x86_64"
@@ -304,7 +298,7 @@ def test_search_moludemd_defaults(pulp):
     matcher = Matcher(None, None)
     criteria = matcher._create_or_criteria(["name", "stream"], [("test", "10")])
     # let Future return result
-    result = matcher._search_modulemd_defaults(criteria, [repo]).result()
+    result = matcher.search_modulemd_defaults(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
     assert len(result) == 1
     found_unit = result.pop()
