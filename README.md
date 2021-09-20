@@ -1,7 +1,10 @@
 # **ubi-population-tool**
-[![Build Status](https://travis-ci.org/release-engineering/ubi-population-tool.svg?branch=master)](https://travis-ci.org/release-engineering/ubi-population-tool)
-[![Coverage Status](https://coveralls.io/repos/github/release-engineering/ubi-population-tool/badge.svg?branch=master)](https://coveralls.io/github/release-engineering/ubi-population-tool?branch=master)
+[![Build Status](https://github.com/release-engineering/ubi-population-tool/actions/workflows/tox-test.yml/badge.svg)](https://github.com/release-engineering/ubi-population-tool/actions/workflows/tox-test.yml)
+[![codecov](https://codecov.io/gh/release-engineering/ubi-population-tool/branch/master/graph/badge.svg?token=APniN2wa2U)](https://codecov.io/gh/release-engineering/ubi-population-tool/)
 
+- [Source](https://github.com/release-engineering/ubi-population-tool/)
+- [Documentation](https://release-engineering.github.io/ubi-population-tool/)
+- [PyPI](https://pypi.org/project/ubi-population-tool/)
 
 A command-line tool for populating ubi repositories.
 
