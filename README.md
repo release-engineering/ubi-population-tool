@@ -1,10 +1,9 @@
 # **ubi-population-tool**
 [![Build Status](https://github.com/release-engineering/ubi-population-tool/actions/workflows/tox-test.yml/badge.svg)](https://github.com/release-engineering/ubi-population-tool/actions/workflows/tox-test.yml)
 [![codecov](https://codecov.io/gh/release-engineering/ubi-population-tool/branch/master/graph/badge.svg?token=APniN2wa2U)](https://codecov.io/gh/release-engineering/ubi-population-tool/)
-
-- [Source](https://github.com/release-engineering/ubi-population-tool/)
-- [Documentation](https://release-engineering.github.io/ubi-population-tool/)
-- [PyPI](https://pypi.org/project/ubi-population-tool/)
+[![Source](https://badgen.net/badge/icon/source?icon=github&label](https://github.com/release-engineering/ubi-population-tool/)
+[![Documentation](https://github.com/release-engineering/ubi-population-tool/actions/workflows/docs.yml/badge.svg)](https://release-engineering.github.io/ubi-population-tool/)
+[![PyPI version](https://badgen.net/pypi/v/ubi-population-tool?color=blue](https://pypi.org/project/ubi-population-tool/)
 
 A command-line tool for populating ubi repositories.
 
