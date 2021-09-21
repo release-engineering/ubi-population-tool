@@ -1,4 +1,5 @@
-name: Push docs
+name: Documentation
+# triggers docs push to gh-pages
 
 on: [push, pull_request]
 
