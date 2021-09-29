@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
-## [0.9.0]
+## [0.9.0] - 2021-09-29
 
 ### Changed
 - Publishing UBI repositories is now non-blocking
