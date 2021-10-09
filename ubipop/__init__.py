@@ -251,10 +251,13 @@ class UbiPopulate(object):
 
         return config_map
 
-    def _get_config(self, ubi_config_version, config):
+    def _get_config(self, repo, config):
         # get the right config file by ubi_config_version attr of a repository
         # if not found, try to fallback to the default version (major version)
-        _ubi_config_version = ubi_config_version
+        if not repo.ubi_config_version:
+            raise ValueError("Repo: %s does not have ubi_config_version" % repo.id)
+
+        _ubi_config_version = repo.ubi_config_version
         if _ubi_config_version not in self.ubiconfig_map:
             # if the config is missing, we need to use the default config branch
             _ubi_config_version = _ubi_config_version.split(".")[0]
@@ -264,8 +267,8 @@ class UbiPopulate(object):
             _LOG.error(
                 "Config file %s missing from %s and default %s branches",
                 config.file_name,
-                ubi_config_version,
-                ubi_config_version.split(".")[0],
+                repo.ubi_config_version,
+                repo.ubi_config_version.split(".")[0],
             )
             raise ConfigMissing()
 
@@ -305,9 +308,7 @@ class UbiPopulate(object):
                 continue
 
             for repo_set in repo_pairs:
-                right_config = self._get_config(
-                    repo_set.out_repos.rpm.ubi_config_version, config
-                )
+                right_config = self._get_config(repo_set.out_repos.rpm, config)
 
                 repos_publishes = UbiPopulateRunner(
                     self.pulp,

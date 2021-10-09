@@ -182,15 +182,32 @@ def test_raise_config_missing(caplog):
     ubipopulate = UbiPopulate(
         "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=config_path
     )
-
+    repo = YumRepository(
+        id="repo",
+        ubi_config_version="9.8",
+    )
     for config in ubipopulate.ubiconfig_list:
         with pytest.raises(ConfigMissing):
-            ubipopulate._get_config("9.8", config)
+            ubipopulate._get_config(repo, config)
 
     assert (
         "Config file ubiconf_golang.yaml missing from 9.8 and default 9 branches"
         in caplog.text
     )
+
+
+def test_raise_error_for_missing_ubi_config_version():
+    config_path = os.path.join(TEST_DATA_DIR, "ubi8")
+    ubipopulate = UbiPopulate(
+        "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=config_path
+    )
+    repo = YumRepository(
+        id="repo",
+        ubi_config_version="",
+    )
+    for config in ubipopulate.ubiconfig_list:
+        with pytest.raises(ValueError):
+            ubipopulate._get_config(repo, config)
 
 
 def test_publish_out_repos(mock_ubipop_runner):
