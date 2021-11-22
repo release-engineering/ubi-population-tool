@@ -36,7 +36,7 @@ def fake_ubi_config():
             ]
         },
         "packages": {
-            "include": ["test.*", "something_else.src"],
+            "include": ["test.*", "test-debug.*", "something_else.src"],
             "exclude": [
                 "excluded_with_globbing*",
                 "excluded_package.*",
@@ -285,15 +285,11 @@ def test_search_moludemd_defaults(pulp):
         name="test",
         stream="10",
         repo_id="test_repo_1",
-    )
-    unit_2 = ModulemdDefaultsUnit(
-        name="test",
-        stream="20",
-        repo_id="test_repo_1",
+        repository_memberships=["test_repo_1"],
     )
 
     pulp.insert_repository(repo)
-    pulp.insert_units(repo, [unit_1, unit_2])
+    pulp.insert_units(repo, [unit_1])
 
     matcher = Matcher(None, None)
     criteria = matcher._create_or_criteria(["name", "stream"], [("test", "10")])
@@ -1011,9 +1007,9 @@ def test_get_rpms_criteria(ubi_config):
 
     matcher = RpmMatcher(None, ubi_config)
     criteria = matcher._get_rpms_criteria()
-    # there should be 1 criterium created based on ubi config
+    # there should be 2 criteria created based on ubi config
     # we skip package with src "arch", those are queried separately
-    assert len(criteria) == 1
+    assert len(criteria) == 2
     # it should be instance of Criteria
     for crit in criteria:
         assert isinstance(crit, Criteria)
@@ -1050,15 +1046,16 @@ def test_rpm_matcher_run(pulp, ubi_config):
     )
     # debug - will be in output set
     unit_2 = RpmUnit(
-        name="test",
+        name="test-debug",
         version="1.0",
         release="1",
         arch="x86_64",
         filename="test-debug-1.0-1.x86_64.rpm",
+        sourcerpm="test-1.0-1.src.rpm",
     )
     # source - will be in output set
     unit_3 = RpmUnit(
-        name="test-src",
+        name="test",
         version="1.0",
         release="1",
         arch="src",
