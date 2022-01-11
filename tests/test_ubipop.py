@@ -987,11 +987,11 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
     assert err == ""
     assert (
         assoc_line.strip()
-        == "Would associate ModulemdUnit(name='test_assoc', stream='fake-stream', version=1, context='fake-context', arch='x86_64', content_type_id='modulemd', repository_memberships=None, artifacts=None, profiles=None) from test_src to test_dst"
+        == "Would associate ModulemdUnit(name='test_assoc', stream='fake-stream', version=1, context='fake-context', arch='x86_64', content_type_id='modulemd', repository_memberships=None, unit_id=None, artifacts=None, profiles=None, dependencies=None) from test_src to test_dst"
     )
     assert (
         unassoc_line.strip()
-        == "Would unassociate ModulemdUnit(name='test_unassoc', stream='fake-stream', version=1, context='fake-context', arch='x86_64', content_type_id='modulemd', repository_memberships=None, artifacts=None, profiles=None) from test_dst"
+        == "Would unassociate ModulemdUnit(name='test_unassoc', stream='fake-stream', version=1, context='fake-context', arch='x86_64', content_type_id='modulemd', repository_memberships=None, unit_id=None, artifacts=None, profiles=None, dependencies=None) from test_dst"
     )
 
 
