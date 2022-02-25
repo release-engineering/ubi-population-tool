@@ -165,3 +165,15 @@ def vercmp_sort():
             return label_compare(self.evr_tuple, other.evr_tuple) != 0
 
     return Klass
+
+
+def flatten_md_defaults_name_profiles(obj):
+    """
+    flatten the profiles of md_defaults unit and prepend name
+    format: name:[key:profile,profile]:[key:profile]
+    'ruby:[2.5:common,unique]'
+    """
+    result = obj.name
+    for key in sorted(obj.profiles):
+        result += ":[%s:%s]" % (key, ",".join(sorted(obj.profiles[key])))
+    return result

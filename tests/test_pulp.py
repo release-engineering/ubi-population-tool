@@ -16,7 +16,12 @@ from requests.exceptions import HTTPError
 
 from pubtools.pulplib import YumRepository
 from ubipop import _pulp_client as pulp_client
-from ubipop._pulp_client import Package, ModuleDefaults, Pulp, PulpRetryAdapter
+from ubipop._pulp_client import Pulp, PulpRetryAdapter
+
+from .conftest import (
+    get_rpm_unit,
+    get_modulemd_defaults_unit,
+)
 
 ORIG_HTTP_TOTAL_RETRIES = pulp_client.HTTP_TOTAL_RETRIES
 ORIG_HTTP_RETRY_BACKOFF = pulp_client.HTTP_RETRY_BACKOFF
@@ -51,101 +56,30 @@ def fixture_mock_repo():
 
 @pytest.fixture(name="mock_package")
 def fixture_mock_package():
-    yield Package("foo-pkg", "foo-pkg.rpm", "src_repo_id")
+    yield get_rpm_unit(
+        name="foo-pkg",
+        version="10",
+        release="1",
+        arch="x86_64",
+        filename="foo-pkg.rpm",
+        src_repo_id="src_repo_id",
+    )
 
 
 @pytest.fixture(name="mock_mdd")
 def fixture_mock_mdd():
-    yield ModuleDefaults("virt", "rhel", {"2.6": ["common"]}, "src_repo_id")
+    yield get_modulemd_defaults_unit(
+        name="virt",
+        stream="rhel",
+        profiles={"2.6": ["common"]},
+        repo_id="src_repo_id",
+        src_repo_id="src_repo_id",
+    )
 
 
 @pytest.fixture(name="mock_response_for_async_req")
 def fixture_mock_response_for_async_req():
     yield {"spawned_tasks": [{"task_id": "foo_task_id"}]}
-
-
-@pytest.fixture(name="search_rpms_response")
-def fixture_search_rpms_response(request):
-    try:
-        pkg_number = request.param
-    except AttributeError:
-        pkg_number = 1
-
-    yield [
-        {
-            "metadata": {
-                "name": "foo-pkg",
-                "filename": "foo-pkg.rpm",
-                "sourcerpm": "foo-pkg.src.rpm",
-                "is_modular": False,
-            }
-        }
-        for _ in range(pkg_number)
-    ]
-
-
-@pytest.fixture(name="search_modules_response")
-def fixture_search_modules_response():
-    yield [
-        {
-            "metadata": {
-                "name": "foo-module",
-                "stream": "9.6",
-                "version": 1111,
-                "context": "foo-context",
-                "arch": "x86_64",
-                "artifacts": ["foo-pkg"],
-                "profiles": {"foo-prof": ["pkg-name"]},
-            },
-        }
-    ]
-
-
-@pytest.fixture(name="search_module_defaults_response")
-def fixture_search_module_defaults_response():
-    yield [
-        {
-            "metadata": {
-                "name": "virt",
-                "stream": "rhel",
-                "profiles": {"rhel": ["default", "common"]},
-            },
-        }
-    ]
-
-
-@pytest.fixture(name="mock_search_rpms")
-def fixture_mock_search_rpms(requests_mock, mock_repo, search_rpms_response):
-    url = "/pulp/api/v2/repositories/{REPO_ID}/search/units/".format(
-        REPO_ID=mock_repo.id
-    )
-    requests_mock.register_uri("POST", url, json=search_rpms_response)
-
-
-@pytest.fixture(name="mock_search_modules")
-def fixture_mock_search_modules(requests_mock, mock_repo, search_modules_response):
-    url = "/pulp/api/v2/repositories/{REPO_ID}/search/units/".format(
-        REPO_ID=mock_repo.id
-    )
-    requests_mock.register_uri("POST", url, json=search_modules_response)
-
-
-@pytest.fixture(name="mock_search_module_defaults")
-def fixture_mock_search_module_defaults(
-    requests_mock, mock_repo, search_module_defaults_response
-):
-    url = "/pulp/api/v2/repositories/{REPO_ID}/search/units/".format(
-        REPO_ID=mock_repo.id
-    )
-    requests_mock.register_uri("POST", url, json=search_module_defaults_response)
-
-
-@pytest.fixture(name="mock_publish")
-def fixture_mock_publish(requests_mock, mock_repo, mock_response_for_async_req):
-    url = "/pulp/api/v2/repositories/{repo_id}/actions/publish/".format(
-        repo_id=mock_repo.id
-    )
-    requests_mock.register_uri("POST", url, json=mock_response_for_async_req)
 
 
 @pytest.fixture(name="mock_associate")
@@ -190,46 +124,6 @@ def test_unassociate_module_defaults(mock_pulp, mock_unassociate, mock_repo, moc
     task_ids = mock_pulp.unassociate_module_defaults(mock_repo, [mock_mdd])
     assert task_ids
     assert task_ids[0] == "foo_task_id"
-
-
-def test_search_rpms(mock_pulp, mock_search_rpms, mock_repo):
-    # pylint: disable=unused-argument
-    found_rpms = mock_pulp.search_rpms(mock_repo)
-    assert len(found_rpms) == 1
-    assert found_rpms[0].name == "foo-pkg"
-    assert found_rpms[0].filename == "foo-pkg.rpm"
-    assert found_rpms[0].sourcerpm == "foo-pkg.src.rpm"
-    assert found_rpms[0].is_modular is False
-
-
-@pytest.mark.parametrize("search_rpms_response", [0, 1, 2], indirect=True)
-def test_search_rpms_by_filename(
-    mock_pulp, mock_search_rpms, mock_repo, search_rpms_response
-):
-    # pylint: disable=unused-argument
-    found_rpms = mock_pulp.search_rpms(mock_repo, filename="foo-pkg.rpm")
-    assert len(search_rpms_response) == len(found_rpms)
-
-
-def test_search_modules(mock_pulp, mock_search_modules, mock_repo):
-    # pylint: disable=unused-argument
-    found_modules = mock_pulp.search_modules(mock_repo)
-    assert len(found_modules) == 1
-
-    assert found_modules[0].nsvca == "foo-module:9.6:1111:foo-context:x86_64"
-    assert found_modules[0].packages == ["foo-pkg"]
-    assert found_modules[0].profiles == {"foo-prof": ["pkg-name"]}
-
-
-def test_search_module_defaults(mock_pulp, mock_search_module_defaults, mock_repo):
-    # pylint: disable=unused-argument
-    found_module_defaults = mock_pulp.search_module_defaults(
-        mock_repo, name="virt", stream="rhel"
-    )
-    assert len(found_module_defaults) == 1
-    assert found_module_defaults[0].name == "virt"
-    assert found_module_defaults[0].stream == "rhel"
-    assert found_module_defaults[0].name_profiles == "virt:[rhel:common,default]"
 
 
 @pytest.fixture(name="search_task_response")
@@ -280,24 +174,6 @@ def make_mock_response(status, text):
             True,
             500,
             None,
-            "search_rpms",
-            (MagicMock(id="fake_id"),),
-            "[]",
-            pulp_client.HTTP_TOTAL_RETRIES,
-        ),
-        (
-            True,
-            500,
-            None,
-            "search_modules",
-            (MagicMock(id="fake_id"),),
-            "[]",
-            pulp_client.HTTP_TOTAL_RETRIES,
-        ),
-        (
-            True,
-            500,
-            None,
             "wait_for_tasks",
             (["fake-tid"],),
             '{"state":"finished","task_id":"fake-tid"}',
@@ -336,9 +212,35 @@ def make_mock_response(status, text):
             pulp_client.HTTP_TOTAL_RETRIES,
         ),
         # test custom number of retries
-        (True, 500, 3, "search_rpms", (MagicMock(id="fake_id"),), "{}", 3),
+        (
+            True,
+            500,
+            3,
+            "associate_units",
+            (
+                MagicMock(id="fake_id"),
+                MagicMock(id="fake_id"),
+                MagicMock(),
+                ["rpm"],
+            ),
+            '{"spawned_tasks":[]}',
+            3,
+        ),
         # test 400 status is not retryable
-        (False, 400, 3, "search_rpms", (MagicMock(id="fake_id"),), "{}", 3),
+        (
+            False,
+            400,
+            3,
+            "associate_units",
+            (
+                MagicMock(id="fake_id"),
+                MagicMock(id="fake_id"),
+                MagicMock(),
+                ["rpm"],
+            ),
+            '{"spawned_tasks":[]}',
+            3,
+        ),
     ],
 )
 def test_retries(

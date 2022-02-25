@@ -4,3 +4,4 @@ ubi-config>=2.2.0
 rpm-py-installer
 pyrsistent<0.17; python_version < '3'
 pubtools-pulplib>=2.9.0
+attrs

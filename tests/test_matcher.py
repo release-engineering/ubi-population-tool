@@ -6,8 +6,8 @@ from pubtools.pulplib import (
     RpmUnit,
     Criteria,
     YumRepository,
-    FakeController,
     ModulemdUnit,
+    ModulemdDefaultsUnit,
 )
 from ubiconfig import UbiConfig
 
@@ -20,11 +20,6 @@ from ubipop._matcher import (
 )
 from ubipop import RepoSet
 from ubipop._utils import vercmp_sort
-
-
-@pytest.fixture(name="pulp")
-def fake_pulp():
-    yield FakeController()
 
 
 @pytest.fixture(name="ubi_config")
@@ -41,7 +36,7 @@ def fake_ubi_config():
             ]
         },
         "packages": {
-            "include": ["test.*", "something_else.src"],
+            "include": ["test.*", "test-debug.*", "something_else.src"],
             "exclude": [
                 "excluded_with_globbing*",
                 "excluded_package.*",
@@ -206,7 +201,7 @@ def test_search_rpms(pulp):
     matcher = Matcher(None, None)
     criteria = matcher._create_or_criteria(["filename"], [("test.x86_64.rpm",)])
     # let Future return result
-    result = matcher._search_rpms(criteria, [repo]).result()
+    result = matcher.search_rpms(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
     assert len(result) == 1
     assert result.pop().filename == "test.x86_64.rpm"
@@ -241,7 +236,7 @@ def test_search_srpms(pulp):
     matcher = Matcher(None, None)
     criteria = matcher._create_or_criteria(["filename"], [("test.src.rpm",)])
     # let Future return result
-    result = matcher._search_srpms(criteria, [repo]).result()
+    result = matcher.search_srpms(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
     assert len(result) == 1
     assert result.pop().filename == "test.src.rpm"
@@ -274,10 +269,37 @@ def test_search_moludemds(pulp):
     matcher = Matcher(None, None)
     criteria = matcher._create_or_criteria(["name", "stream"], [("test", "10")])
     # let Future return result
-    result = matcher._search_moludemds(criteria, [repo]).result()
+    result = matcher.search_modulemds(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
     assert len(result) == 1
     assert result.pop().nsvca == "test:10:100:abcdef:x86_64"
+
+
+def test_search_moludemd_defaults(pulp):
+    """Test convenient method for searching modulemd_defaults"""
+    repo = YumRepository(
+        id="test_repo_1",
+    )
+    repo.__dict__["_client"] = pulp.client
+    unit_1 = ModulemdDefaultsUnit(
+        name="test",
+        stream="10",
+        repo_id="test_repo_1",
+        repository_memberships=["test_repo_1"],
+    )
+
+    pulp.insert_repository(repo)
+    pulp.insert_units(repo, [unit_1])
+
+    matcher = Matcher(None, None)
+    criteria = matcher._create_or_criteria(["name", "stream"], [("test", "10")])
+    # let Future return result
+    result = matcher.search_modulemd_defaults(criteria, [repo]).result()
+    # there should be be only one unit in the result set according to criteria
+    assert len(result) == 1
+    found_unit = result.pop()
+    assert found_unit.name == "test"
+    assert found_unit.stream == "10"
 
 
 def test_modular_rpms_filenames(ubi_config):
@@ -490,6 +512,25 @@ def test_get_modulemds_criteria(ubi_config):
     # let's not test internal structure of criteria, that's responsibility of pulplib
 
 
+def test_get_modulemd_defaults_criteria():
+    """Test proper creation of criteria for modulemd_defaults query"""
+    matcher = ModularMatcher(None, None)
+    unit = UbiUnit(
+        ModulemdUnit(
+            name="test", stream="10", version=100, context="abcd", arch="x86_64"
+        ),
+        None,
+    )
+    matcher.modules = [unit]
+    criteria = matcher._get_modulemd_defaults_criteria()
+    # there should be 1 criterium created based on modules list of Matcher obj.
+    assert len(criteria) == 1
+    # it should be instance of Criteria
+    for crit in criteria:
+        assert isinstance(crit, Criteria)
+    # let's not test internal structure of criteria, that's responsibility of pulplib
+
+
 def test_get_modular_srpms_criteria(ubi_config):
     """Testing creation of criteria for srpms query"""
     matcher = ModularMatcher(None, ubi_config.modules)
@@ -614,10 +655,16 @@ def test_modular_matcher_run(pulp, ubi_config):
             "test-7:1.0-1.x86_64.src",
         ],
     )
+
+    modulemd_defaults = ModulemdDefaultsUnit(
+        name="fake_name",
+        stream="fake_stream",
+        repo_id="binary_repo",
+    )
     pulp.insert_repository(repo_1)
     pulp.insert_repository(repo_2)
     pulp.insert_repository(repo_3)
-    pulp.insert_units(repo_1, [unit_1, modulemd])
+    pulp.insert_units(repo_1, [unit_1, modulemd, modulemd_defaults])
     pulp.insert_units(repo_2, [unit_2])
     pulp.insert_units(repo_3, [unit_3])
 
@@ -627,6 +674,7 @@ def test_modular_matcher_run(pulp, ubi_config):
 
     # each public attribute is properly set with one unit
     assert len(matcher.modules) == 1
+    assert len(matcher.modulemd_defaults) == 1
     assert len(matcher.binary_rpms) == 1
     assert len(matcher.debug_rpms) == 1
     assert len(matcher.source_rpms) == 1
@@ -635,6 +683,10 @@ def test_modular_matcher_run(pulp, ubi_config):
     output_module = matcher.modules.pop()
     assert output_module.nsvca == "fake_name:fake_stream:100:abcd:x86_64"
     assert output_module.associate_source_repo_id == "binary_repo"
+
+    output_modulemd_defaults = matcher.modulemd_defaults.pop()
+    assert output_modulemd_defaults.name == "fake_name"
+    assert output_modulemd_defaults.stream == "fake_stream"
 
     rpm = matcher.binary_rpms.pop()
     assert rpm.filename == "test-1.0-1.x86_64.x86_64.rpm"
@@ -825,6 +877,82 @@ def test_get_rpm_output_set(ubi_config):
     assert output[0].version == "11"
 
 
+def test_get_rpm_output_set_include_modular_and_all_versions(ubi_config):
+    """tests getting rpm output set from RpmMatcher, modular packages included
+    as well as all version of given package, only blacklist is applied"""
+    matcher = RpmMatcher(None, ubi_config)
+    # This unit will be in the output set - we allow all versions
+    unit_1 = UbiUnit(
+        RpmUnit(
+            name="test",
+            version="10",
+            release="20",
+            arch="x86_64",
+        ),
+        None,
+    )
+    # this one will be excluded using blacklist
+    unit_2 = UbiUnit(
+        RpmUnit(
+            name="excluded_with_globbing123456789",
+            version="11",
+            release="20",
+            arch="x86_64",
+        ),
+        None,
+    )
+    # this one will be excluded using blacklist
+    unit_3 = UbiUnit(
+        RpmUnit(
+            name="excluded_package",
+            version="10",
+            release="20",
+            arch="x86_64",
+        ),
+        None,
+    )
+    # this is another unit that will be in the output set
+    unit_4 = UbiUnit(
+        RpmUnit(
+            name="test",
+            version="11",
+            release="20",
+            arch="x86_64",
+        ),
+        None,
+    )
+    # this one is included, we don't exclude modular packages this time
+    unit_5 = UbiUnit(
+        RpmUnit(
+            name="modular_package",
+            version="12",
+            release="20",
+            arch="x86_64",
+            filename="modular_package.rpm",
+        ),
+        None,
+    )
+
+    rpms = [unit_1, unit_2, unit_3, unit_4, unit_5]
+    output = matcher._get_rpm_output_set(
+        rpms, modular_rpm_filenames=None, keep_all_versions=True
+    )
+
+    # in the output set there should be three units
+    assert len(output) == 3
+    # let's sort the output, order is not guranteed
+    output.sort(key=lambda x: x.version)
+
+    assert output[0].name == "test"
+    assert output[0].version == "10"
+
+    assert output[1].name == "test"
+    assert output[1].version == "11"
+
+    assert output[2].name == "modular_package"
+    assert output[2].version == "12"
+
+
 def test_get_pkgs_from_all_modules(pulp):
     """tests getting pkgs filenames from all available modulemd units"""
     repo = YumRepository(
@@ -879,9 +1007,9 @@ def test_get_rpms_criteria(ubi_config):
 
     matcher = RpmMatcher(None, ubi_config)
     criteria = matcher._get_rpms_criteria()
-    # there should be 1 criterium created based on ubi config
+    # there should be 2 criteria created based on ubi config
     # we skip package with src "arch", those are queried separately
-    assert len(criteria) == 1
+    assert len(criteria) == 2
     # it should be instance of Criteria
     for crit in criteria:
         assert isinstance(crit, Criteria)
@@ -918,15 +1046,16 @@ def test_rpm_matcher_run(pulp, ubi_config):
     )
     # debug - will be in output set
     unit_2 = RpmUnit(
-        name="test",
+        name="test-debug",
         version="1.0",
         release="1",
         arch="x86_64",
         filename="test-debug-1.0-1.x86_64.rpm",
+        sourcerpm="test-1.0-1.src.rpm",
     )
     # source - will be in output set
     unit_3 = RpmUnit(
-        name="test-src",
+        name="test",
         version="1.0",
         release="1",
         arch="src",

@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 - n/a
+
+## [0.9.0] - 2021-09-29
+
+### Changed
+- Publishing UBI repositories is now non-blocking
+
+## [0.8.0]
+
+### Added
+- New cli options --version and --content-set-regex
+
+### Changed
+- Queries for current content use Matcher class now
+- Matching modulemd_defaults units now use the Matcher class as well
+
+## [0.7.0]
+
+### Added
+- Customizable timeout for requests
+
+### Fixed
+- Creation of SRPM output set
+
 ## [0.6.0] - 2021-09-06
 ### Changed
 - Queries for rpm units reimplemented in more efficient way
@@ -49,7 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.8.0...0.9.0
+[0.8.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.7.0...0.8.0
+[0.7.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.6.0...0.7.0
 [0.6.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.5.0...0.6.0
 [0.5.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.4.0...0.5.0
 [0.4.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.1...0.4.0

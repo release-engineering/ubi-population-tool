@@ -1,7 +1,7 @@
 import pytest
 
 from mock import MagicMock
-from pubtools.pulplib import YumRepository, RpmUnit
+from pubtools.pulplib import YumRepository, RpmUnit, ModulemdDefaultsUnit
 from ubipop._utils import (
     AssociateAction,
     AssociateActionModuleDefaults,
@@ -12,6 +12,7 @@ from ubipop._utils import (
     UnassociateActionModules,
     UnassociateActionRpms,
     vercmp_sort,
+    flatten_md_defaults_name_profiles,
 )
 from ubipop._matcher import UbiUnit
 
@@ -121,3 +122,19 @@ def test_vercmp_sort():
     assert (unit_1 >= unit_2) is False
     assert (unit_1 > unit_2) is False
     assert (unit_1 != unit_2) is True
+
+
+def test_flatten_md_defaults_name_profiles():
+    unit = UbiUnit(
+        ModulemdDefaultsUnit(
+            name="test",
+            stream="foo",
+            profiles={"rhel": ["common", "uncommon"], "fedora": ["super", "ultra"]},
+            repo_id="foo-repo",
+        ),
+        "foo-repo",
+    )
+
+    out = flatten_md_defaults_name_profiles(unit)
+
+    assert out == "test:[fedora:super,ultra]:[rhel:common,uncommon]"
