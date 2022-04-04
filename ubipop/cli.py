@@ -86,6 +86,12 @@ def parse_args(args):
         required=False,
         help="Regular expression of ubi content set to be populated.",
     )
+    parser.add_argument(
+        "--ubi-manifest-url",
+        action="store",
+        required=True,
+        help="URL of ubi-manifest service",
+    )
 
     parsed = parser.parse_args(args)
 
@@ -124,6 +130,7 @@ def main(args):
         repo_ids=opts.repo_ids,
         version=opts.version,
         content_set_regex=opts.content_set_regex,
+        ubi_manifest_url=opts.ubi_manifest_url,
     ).populate_ubi_repos()
 
 

@@ -1,7 +1,19 @@
+import sys
 import pytest
 
 from pubtools.pulplib import RpmUnit, ModulemdUnit, ModulemdDefaultsUnit, FakeController
 from ubipop._matcher import UbiUnit
+
+if sys.version_info <= (
+    2,
+    7,
+):
+    import requests_mock as rm
+
+    @pytest.fixture(name="requests_mock")
+    def fixture_requests_mock():
+        with rm.Mocker() as m:
+            yield m
 
 
 def _get_test_unit(klass, **kwargs):

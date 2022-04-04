@@ -1,5 +1,4 @@
 from datetime import datetime
-from operator import attrgetter
 
 import logging
 import os
@@ -44,17 +43,6 @@ from .conftest import (
     get_modulemd_unit,
     get_modulemd_defaults_unit,
 )
-
-if sys.version_info <= (
-    2,
-    7,
-):
-    import requests_mock as rm
-
-    @pytest.fixture(name="requests_mock")
-    def fixture_requests_mock():
-        with rm.Mocker() as m:
-            yield m
 
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "./data")
@@ -149,7 +137,13 @@ def fixture_executor():
 @pytest.fixture(name="mock_ubipop_runner")
 def fixture_mock_ubipop_runner(ubi_repo_set, test_ubiconfig, executor):
     yield UbiPopulateRunner(
-        MagicMock(), MagicMock(), ubi_repo_set, test_ubiconfig, False, executor
+        MagicMock(),
+        MagicMock(),
+        ubi_repo_set,
+        test_ubiconfig,
+        False,
+        executor,
+        MagicMock(),
     )
 
 
@@ -636,11 +630,15 @@ def test_create_output_file_all_repos(
     path = tempfile.mkdtemp("ubipop")
     try:
         out_file_path = os.path.join(path, "output.txt")
-
-        ubipop = UbiPopulate(
-            "foo.pulp.com", ("foo", "foo"), False, output_repos=out_file_path
-        )
-        ubipop.populate_ubi_repos()
+        with patch("ubipop.UbimClient"):
+            ubipop = UbiPopulate(
+                "foo.pulp.com",
+                ("foo", "foo"),
+                False,
+                output_repos=out_file_path,
+                ubi_manifest_url="https://ubi-manifest.com",
+            )
+            ubipop.populate_ubi_repos()
 
         with open(out_file_path) as f:
             content = f.readlines()
@@ -758,39 +756,13 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content):
     mock_ubipop_runner.repos.modules = f_proxy(f_return([modulemd]))
     mock_ubipop_runner.repos.module_defaults = f_proxy(f_return([modulemd_defaults]))
 
-    modular_binary = get_rpm_unit(
-        name="modular_binary",
-        version="1.0",
-        release="1",
-        arch="x86_64",
-        src_repo_id="foo-rpms",
-    )
-    modular_debug = get_rpm_unit(
-        name="modular_debug",
-        version="1.0",
-        release="1",
-        arch="x86_64",
-        src_repo_id="foo-debug",
-    )
-    modular_source = get_srpm_unit(
-        name="modular_source",
-        version="1.0",
-        release="1",
-        src_repo_id="foo-source",
-    )
-
     # pylint: disable=protected-access
     (
         associations,
         unassociations,
         mdd_association,
         mdd_unassociation,
-    ) = mock_ubipop_runner._get_pulp_actions(
-        mock_current_content,
-        modular_binary=f_proxy(f_return(set([modular_binary]))),
-        modular_debug=f_proxy(f_return(set([modular_debug]))),
-        modular_source=f_proxy(f_return(set([modular_source]))),
-    )
+    ) = mock_ubipop_runner._get_pulp_actions(mock_current_content)
 
     # firstly, check correct associations, there should 1 unit of each type associated
     modules, rpms, srpms, debug_rpms = associations
@@ -800,39 +772,21 @@ def test_get_pulp_actions(mock_ubipop_runner, mock_current_content):
     assert len(modules.src_repos) == 1
     assert modules.src_repos[0].id == "foo-rpms"
 
-    # there should be 2 rpms, one modular, one non-modular
-    assert len(rpms.units) == 2
-    rpms.units.sort(key=attrgetter("name"))
-    assert rpms.units[0].name == "modular_binary"
+    # there should be 1 rpm one modular, one non-modular
+    assert len(rpms.units) == 1
+    assert rpms.units[0].name == "test_rpm"
     assert rpms.dst_repo.id == "ubi-foo-rpms"
     assert len(rpms.src_repos) == 1
     assert rpms.src_repos[0].id == "foo-rpms"
 
-    assert rpms.units[1].name == "test_rpm"
-    assert rpms.dst_repo.id == "ubi-foo-rpms"
-    assert len(rpms.src_repos) == 1
-    assert rpms.src_repos[0].id == "foo-rpms"
-
-    srpms.units.sort(key=attrgetter("name"))
-    assert len(srpms.units) == 2
-    assert srpms.units[0].name == "modular_source"
+    assert len(srpms.units) == 1
+    assert srpms.units[0].name == "test_srpm"
     assert srpms.dst_repo.id == "ubi-foo-source"
     assert len(srpms.src_repos) == 1
     assert srpms.src_repos[0].id == "foo-source"
 
-    assert srpms.units[1].name == "test_srpm"
-    assert srpms.dst_repo.id == "ubi-foo-source"
-    assert len(srpms.src_repos) == 1
-    assert srpms.src_repos[0].id == "foo-source"
-
-    debug_rpms.units.sort(key=attrgetter("name"))
-    assert len(debug_rpms.units) == 2
-    assert debug_rpms.units[0].name == "modular_debug"
-    assert debug_rpms.dst_repo.id == "ubi-foo-debug"
-    assert len(debug_rpms.src_repos) == 1
-    assert debug_rpms.src_repos[0].id == "foo-debug"
-
-    assert debug_rpms.units[1].name == "test_debug_pkg"
+    assert len(debug_rpms.units) == 1
+    assert debug_rpms.units[0].name == "test_debug_pkg"
     assert debug_rpms.dst_repo.id == "ubi-foo-debug"
     assert len(debug_rpms.src_repos) == 1
     assert debug_rpms.src_repos[0].id == "foo-debug"
@@ -921,9 +875,7 @@ def test_get_pulp_actions_no_actions(mock_ubipop_runner, mock_current_content):
         unassociations,
         mdd_association,
         mdd_unassociation,
-    ) = mock_ubipop_runner._get_pulp_actions(
-        mock_current_content, modular_binary=[], modular_debug=[], modular_source=[]
-    )
+    ) = mock_ubipop_runner._get_pulp_actions(mock_current_content)
 
     # firstly, check correct associations, there should 0 units associated
     modules, rpms, srpms, debug_rpms = associations
@@ -987,11 +939,11 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
     assert err == ""
     assert (
         assoc_line.strip()
-        == "Would associate ModulemdUnit(name='test_assoc', stream='fake-stream', version=1, context='fake-context', arch='x86_64', content_type_id='modulemd', repository_memberships=None, unit_id=None, artifacts=None, profiles=None, dependencies=None) from test_src to test_dst"
+        == "Would associate ModulemdUnit(name='test_assoc', stream='fake-stream', version=1, context='fake-context', arch='x86_64') from test_src to test_dst"
     )
     assert (
         unassoc_line.strip()
-        == "Would unassociate ModulemdUnit(name='test_unassoc', stream='fake-stream', version=1, context='fake-context', arch='x86_64', content_type_id='modulemd', repository_memberships=None, unit_id=None, artifacts=None, profiles=None, dependencies=None) from test_dst"
+        == "Would unassociate ModulemdUnit(name='test_unassoc', stream='fake-stream', version=1, context='fake-context', arch='x86_64') from test_dst"
     )
 
 
@@ -1099,9 +1051,7 @@ def test_get_pulp_no_duplicates(mock_ubipop_runner, mock_current_content):
     mock_ubipop_runner.repos.module_defaults = f_proxy(f_return([modulemd_defaults]))
 
     # pylint: disable=protected-access
-    associations, _, _, _ = mock_ubipop_runner._get_pulp_actions(
-        mock_current_content, modular_binary=[], modular_debug=[], modular_source=[]
-    )
+    associations, _, _, _ = mock_ubipop_runner._get_pulp_actions(mock_current_content)
 
     _, _, srpms, _ = associations
     # only 5 srpm associations, no duplicates
@@ -1325,7 +1275,11 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
     )
 
     ubi_populate = FakeUbiPopulate(
-        "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
+        "foo.pulp.com",
+        ("foo", "foo"),
+        False,
+        ubiconfig_dir_or_url=TEST_DATA_DIR,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
     fake_pulp = ubi_populate.pulp_client_controller
@@ -1348,6 +1302,7 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
         filename="golang-1.a.x86_64.rpm",
         sourcerpm="golang-1.a.x86_64.src.rpm",
     )
+
     new_rpm = RpmUnit(
         name="golang",
         version="2",
@@ -1379,6 +1334,8 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
     requests_mock.register_uri(
         "GET", url, json={"state": "finished", "task_id": "foo_task_id"}
     )
+    # mock calls to ubi-manifest service
+    _create_ubi_manifest_mocks(requests_mock)
 
     # let's run actual population
     ubi_populate.populate_ubi_repos()
@@ -1400,3 +1357,46 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
     # unfortunately we can't check actual content od repos because
     # un/associate calls are using custom client not the pubtools-pulplib Client
     # TODO add check for actual content after we move to pubtools-pulplib Client
+
+
+def _create_ubi_manifest_mocks(requests_mock):
+    # mock requesting manifest generation
+    url = "api/v1/manifest"
+    url = os.path.join("https://ubi-manifest.com", url)
+    response = [{"task_id": "some-task-id"}]
+    requests_mock.register_uri("POST", url, json=response)
+
+    # mock getting task result
+    url = "api/v1/task/some-task-id"
+    url = os.path.join("https://ubi-manifest.com", url)
+    requests_mock.register_uri(
+        "GET",
+        url,
+        [{"json": {"task_id": "some-task-id", "state": "SUCCESS"}, "status_code": 200}],
+    )
+
+    # mock getting manifest for binary repo
+    url = "api/v1/manifest/ubi_binary"
+    url = os.path.join("https://ubi-manifest.com", url)
+    response = {
+        "repo_id": "ubi_binary",
+        "content": [
+            {
+                "unit_type": "RpmUnit",
+                "src_repo_id": "input_binary",
+                "value": "golang-2.a.x86_64.rpm",
+            },
+        ],
+    }
+    requests_mock.register_uri("GET", url, json=response)
+
+    # mock getting from debug and source repos - just empty manifests
+    url = "api/v1/manifest/ubi_debug"
+    url = os.path.join("https://ubi-manifest.com", url)
+    response = {"repo_id": "some-repo-id", "content": []}
+    requests_mock.register_uri("GET", url, json=response)
+
+    url = "api/v1/manifest/ubi_source"
+    url = os.path.join("https://ubi-manifest.com", url)
+    response = {"repo_id": "some-repo-id", "content": []}
+    requests_mock.register_uri("GET", url, json=response)

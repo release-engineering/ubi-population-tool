@@ -22,7 +22,8 @@ from ubipop._utils import (
     UnassociateActionRpms,
     flatten_md_defaults_name_profiles,
 )
-from ._matcher import ModularMatcher, RpmMatcher, Matcher
+from ._matcher import Matcher
+from .ubi_manifest_client.client import Client as UbimClient
 
 
 _LOG = logging.getLogger("ubipop")
@@ -130,6 +131,8 @@ class UbiPopulate(object):
         self._version = kwargs.get("version", None)
         self._content_set_regex = kwargs.get("content_set_regex", None)
         self._ubiconfig_map = None
+
+        self._ubi_manifest_url = kwargs.get("ubi_manifest_url")
 
     @property
     def pulp_client(self):
@@ -282,7 +285,8 @@ class UbiPopulate(object):
         # whose content sets are all in the cache
 
         awaited_repos_publishes = []
-
+        repo_pairs_list = []
+        ubi_binary_repos = []
         for config in sorted(self.ubiconfig_list, key=str):
             content_sets = [
                 config.content_sets.rpm.output,
@@ -307,22 +311,33 @@ class UbiPopulate(object):
                 _LOG.warning("Skipping current content triplet, some repos are missing")
                 continue
 
-            for repo_set in repo_pairs:
-                right_config = self._get_config(repo_set.out_repos.rpm, config)
+            repo_pairs_list.append((repo_pairs, config))
+            ubi_binary_repos.extend(
+                [repo_set.out_repos.rpm.id for repo_set in repo_pairs]
+            )
 
-                repos_publishes = UbiPopulateRunner(
-                    self.pulp,
-                    self.pulp_client,
-                    repo_set,
-                    right_config,
-                    self.dry_run,
-                    self._executor,
-                ).run_ubi_population()
+        with UbimClient(self._ubi_manifest_url) as ubim_client:
+            tasks = ubim_client.generate_manifest(ubi_binary_repos)
+            tasks.result()
 
-                out_repos.update(repo_set.get_output_repo_ids())
-                # in case of dry-run there are no publications expected
-                if repos_publishes:
-                    awaited_repos_publishes.extend(repos_publishes)
+            for repo_pairs, config in repo_pairs_list:
+                for repo_set in repo_pairs:
+                    right_config = self._get_config(repo_set.out_repos.rpm, config)
+
+                    repos_publishes = UbiPopulateRunner(
+                        self.pulp,
+                        self.pulp_client,
+                        repo_set,
+                        right_config,
+                        self.dry_run,
+                        self._executor,
+                        ubim_client,
+                    ).run_ubi_population()
+
+                    out_repos.update(repo_set.get_output_repo_ids())
+                    # in case of dry-run there are no publications expected
+                    if repos_publishes:
+                        awaited_repos_publishes.extend(repos_publishes)
 
         # wait until publication of all repos is finished
         if awaited_repos_publishes:
@@ -390,20 +405,19 @@ class UbiPopulateRunner(object):
         ubiconfig_item,
         dry_run,
         executor,
+        ubi_manifest_client,
     ):
         self.pulp = legacy_client
         self.pulp_client = pulp_client
+        self.ubim_client = ubi_manifest_client
 
         self.repos = output_repo_set
         self.ubiconfig = ubiconfig_item
         self.dry_run = dry_run
         self._executor = executor
 
-    def _determine_pulp_actions(self, units, current, diff_f, extra_units=None):
+    def _determine_pulp_actions(self, units, current, diff_f):
         expected = list(units)
-        if extra_units:
-            expected += list(extra_units)
-
         to_associate = diff_f(expected, current)
         to_unassociate = diff_f(current, expected)
         return to_associate, to_unassociate
@@ -420,19 +434,19 @@ class UbiPopulateRunner(object):
             self._diff_md_defaults_by_profiles,
         )
 
-    def _get_pulp_actions_pkgs(self, pkgs, current, modular_pkgs):
+    def _get_pulp_actions_pkgs(self, pkgs, current):
         return self._determine_pulp_actions(
-            pkgs, current, self._diff_packages_by_filename, modular_pkgs
+            pkgs, current, self._diff_packages_by_filename
         )
 
-    def _get_pulp_actions_src_pkgs(self, pkgs, current, modular):
+    def _get_pulp_actions_src_pkgs(self, pkgs, current):
         """
         Get required pulp actions to make sure existing and desired source packages are in
         match.
         """
         uniq_srpms = {}
 
-        all_pkgs = list(pkgs) + list(modular)
+        all_pkgs = list(pkgs)
 
         # filter out packages that share same source rpm
         for pkg in all_pkgs:
@@ -444,13 +458,7 @@ class UbiPopulateRunner(object):
             src_pkgs, current, self._diff_packages_by_filename
         )
 
-    def _get_pulp_actions(
-        self,
-        current_content,
-        modular_binary,
-        modular_debug,
-        modular_source,
-    ):
+    def _get_pulp_actions(self, current_content):
         """
         Determines expected pulp actions by comparing current content of output repos and
         expected content.
@@ -468,17 +476,17 @@ class UbiPopulateRunner(object):
         )
 
         rpms_assoc, rpms_unassoc = self._get_pulp_actions_pkgs(
-            self.repos.packages, current_content.binary_rpms, modular_binary
+            self.repos.packages, current_content.binary_rpms
         )
         srpms_assoc, srpms_unassoc = self._get_pulp_actions_src_pkgs(
-            self.repos.source_rpms, current_content.source_rpms, modular_source
+            self.repos.source_rpms, current_content.source_rpms
         )
 
         debug_assoc = None
         debug_unassoc = None
         if current_content.debug_rpms:
             debug_assoc, debug_unassoc = self._get_pulp_actions_pkgs(
-                self.repos.debug_rpms, current_content.debug_rpms, modular_debug
+                self.repos.debug_rpms, current_content.debug_rpms
             )
 
         associations = (
@@ -536,29 +544,24 @@ class UbiPopulateRunner(object):
         return diff
 
     def run_ubi_population(self):
-
         current_content = self._get_current_content()
-        # start async querying for modulemds and modular and non-modular packages
-        mm = ModularMatcher(self.repos.in_repos, self.ubiconfig.modules).run()
-        rm = RpmMatcher(self.repos.in_repos, self.ubiconfig).run()
 
-        self.repos.modules = mm.modules
-        self.repos.module_defaults = mm.modulemd_defaults
-        self.repos.packages = rm.binary_rpms
-        self.repos.debug_rpms = rm.debug_rpms
-        self.repos.source_rpms = rm.source_rpms
+        binary_manifest = self.ubim_client.get_manifest(self.repos.out_repos.rpm.id)
+        debug_manifest = self.ubim_client.get_manifest(self.repos.out_repos.source.id)
+        source_manifest = self.ubim_client.get_manifest(self.repos.out_repos.debug.id)
+
+        self.repos.modules = binary_manifest.modules
+        self.repos.module_defaults = binary_manifest.modulemd_defaults
+        self.repos.packages = binary_manifest.packages
+        self.repos.debug_rpms = debug_manifest.packages
+        self.repos.source_rpms = source_manifest.packages
 
         (
             associations,
             unassociations,
             mdd_association,
             mdd_unassociation,
-        ) = self._get_pulp_actions(
-            current_content,
-            mm.binary_rpms,
-            mm.debug_rpms,
-            mm.source_rpms,
-        )
+        ) = self._get_pulp_actions(current_content)
 
         if self.dry_run:
             self.log_curent_content(current_content)
