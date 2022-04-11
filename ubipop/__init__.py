@@ -547,8 +547,8 @@ class UbiPopulateRunner(object):
         current_content = self._get_current_content()
 
         binary_manifest = self.ubim_client.get_manifest(self.repos.out_repos.rpm.id)
-        debug_manifest = self.ubim_client.get_manifest(self.repos.out_repos.source.id)
-        source_manifest = self.ubim_client.get_manifest(self.repos.out_repos.debug.id)
+        debug_manifest = self.ubim_client.get_manifest(self.repos.out_repos.debug.id)
+        source_manifest = self.ubim_client.get_manifest(self.repos.out_repos.source.id)
 
         self.repos.modules = binary_manifest.modules
         self.repos.module_defaults = binary_manifest.modulemd_defaults
