@@ -562,6 +562,16 @@ class UbiPopulateRunner(object):
 
         return diff
 
+    def _search_expected_modulemd_defaults(self, modulemd_defaults):
+        criteria_values = [(unit.name,) for unit in modulemd_defaults]
+        fields = ("name",)
+        or_criteria = Matcher.create_or_criteria(fields, criteria_values)
+        return f_proxy(
+            self._executor.submit(
+                Matcher.search_modulemd_defaults, or_criteria, self.repos.in_repos.rpm
+            )
+        )
+
     def run_ubi_population(self):
         current_content = self._get_current_content()
 
@@ -579,7 +589,9 @@ class UbiPopulateRunner(object):
                 self.repos.out_repos.source.id
             )
             self.repos.modules = binary_manifest.modules
-            self.repos.module_defaults = binary_manifest.modulemd_defaults
+            self.repos.module_defaults = self._search_expected_modulemd_defaults(
+                binary_manifest.modulemd_defaults
+            )
             self.repos.packages = binary_manifest.packages
             self.repos.debug_rpms = debug_manifest.packages
             self.repos.source_rpms = source_manifest.packages
