@@ -1319,8 +1319,32 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
         sourcerpm="golang-2.a.x86_64.src.rpm",
     )
 
-    fake_pulp.insert_units(output_binary_repo, [old_rpm])
-    fake_pulp.insert_units(input_binary_repo, [new_rpm])
+    old_modulemd = ModulemdUnit(
+        name="test_md", stream="s", version="100", context="c", arch="x86_64"
+    )
+    new_modulemd = ModulemdUnit(
+        name="test_md", stream="s", version="200", context="c", arch="x86_64"
+    )
+
+    old_modulemd_defaults = ModulemdDefaultsUnit(
+        name="test_md_defaults",
+        stream="stream",
+        profiles={"minimal": ["name_1"]},
+        repo_id="ubi_binary",
+    )
+    new_modulemd_defaults = ModulemdDefaultsUnit(
+        name="test_md_defaults",
+        stream="stream",
+        profiles={"minimal": ["name_1", "name_2"]},
+        repo_id="input_binary",
+    )
+
+    fake_pulp.insert_units(
+        output_binary_repo, [old_rpm, old_modulemd, old_modulemd_defaults]
+    )
+    fake_pulp.insert_units(
+        input_binary_repo, [new_rpm, new_modulemd, new_modulemd_defaults]
+    )
 
     url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/".format(
         dst_repo="ubi_binary"
@@ -1392,6 +1416,16 @@ def _create_ubi_manifest_mocks(requests_mock):
                 "unit_type": "RpmUnit",
                 "src_repo_id": "input_binary",
                 "value": "golang-2.a.x86_64.rpm",
+            },
+            {
+                "unit_type": "ModulemdUnit",
+                "src_repo_id": "input_binary",
+                "value": "test_md:s:200:c:x86_64",
+            },
+            {
+                "unit_type": "ModulemdDefaultsUnit",
+                "src_repo_id": "input_binary",
+                "value": "test_md_defaults:stream",
             },
         ],
     }

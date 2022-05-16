@@ -89,6 +89,12 @@ class ModulemdUnit(UbiCompatibleUnit):
             dst_repo_id=dst_repo_id,
         )
 
+    @property
+    def nsvca(self):
+        return ":".join(
+            (self.name, self.stream, str(self.version), self.context, self.arch)
+        )
+
 
 @attr.s
 class ModulemdDefaultsUnit(UbiCompatibleUnit):
