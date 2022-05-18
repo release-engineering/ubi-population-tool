@@ -97,7 +97,7 @@ def test_get_manifest(requests_mock):
             {
                 "unit_type": "ModulemdUnit",
                 "src_repo_id": "another-repo-id",
-                "value": "name:stream:version:context:arch",
+                "value": "name:stream:1234567890:context:arch",
             },
             {
                 "unit_type": "ModulemdDefaultsUnit",
@@ -136,7 +136,7 @@ def test_get_manifest(requests_mock):
         assert unit.dst_repo_id == "some-repo-id"
         assert unit.name == "name"
         assert unit.stream == "stream"
-        assert unit.version == "version"
+        assert unit.version == 1234567890
         assert unit.context == "context"
         assert unit.arch == "arch"
 

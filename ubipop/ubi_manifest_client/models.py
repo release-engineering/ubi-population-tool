@@ -82,7 +82,7 @@ class ModulemdUnit(UbiCompatibleUnit):
         return cls(
             name=n,
             stream=s,
-            version=v,
+            version=int(v),
             context=c,
             arch=a,
             src_repo_id=src_repo_id,
