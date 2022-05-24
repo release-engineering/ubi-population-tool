@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
+## [0.10.0] - 2022-05-24
+
+### Added
+
+- New optional cli option --ubi-manifest-url that enables usage of ubi-manifest service
+- Added support for using data from ubi-manifest service
+
 ## [0.9.0] - 2021-09-29
 
 ### Changed
