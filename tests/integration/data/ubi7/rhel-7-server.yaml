@@ -1,0 +1,40 @@
+content_sets:
+  rpm:
+    output: ubi-7-server-rpms
+    input: rhel-7-server-rpms
+  srpm:
+    output: ubi-7-server-source-rpms
+    input: rhel-7-server-source-rpms
+  debuginfo:
+    output: ubi-7-server-debug-rpms
+    input: rhel-7-server-debug-rpms
+arches:
+ - src
+ - x86_64
+packages:
+  include:
+  - ethtool.*
+  - ethtool-debuginfo.*
+  - glibc.*
+  - glibc-debuginfo-common.*
+  - perl-FCGI.*
+  - perl-FCGI-debugsource.*
+  - httpd-tools.*
+  - kernel-headers.*
+  - MySQL-python.*
+  - MySQL-python-debuginfo.*
+  exclude:
+  - MySQL-python-debuginfo
+  - ethtool-debuginfo
+  - nuxwdog
+modules:
+  include:
+  - name: pki-core
+    stream: private-dmoluguw-10.6
+  - name: httpd
+    stream: 2.4
+    profiles:
+    - default
+  - name: perl-YAML
+    stream: 1.24
+

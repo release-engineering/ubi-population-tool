@@ -1,0 +1,27 @@
+content_sets:
+  rpm:
+    output: ubi-8-for-x86_64-appstream-rpms
+    input: rhel-8-for-x86_64-appstream-rpms
+  srpm:
+    output: ubi-8-for-x86_64-appstream-source-rpms
+    input: rhel-8-for-x86_64-appstream-source-rpms
+  debuginfo:
+    output: ubi-8-for-x86_64-appstream-debug-rpms
+    input: rhel-8-for-x86_64-appstream-debug-rpms
+
+arches:
+ - src
+ - x86_64
+packages:
+  include:
+  - abrt.*
+  exclude:
+  - zziplib.*
+modules:
+  include:
+  - name: perl
+    stream: 5.24
+  - name: httpd
+    stream: 2.4
+  - name: squid
+    stream: 4
