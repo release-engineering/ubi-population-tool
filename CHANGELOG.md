@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
+## [0.11.0] - 2022-05-25
+
+### Fixed
+
+- Fixed python packages lookup in setup.py
+
+## [0.10.0] - 2022-05-24
+
+### Added
+
+- New optional cli option --ubi-manifest-url that enables usage of ubi-manifest service
+- Added support for using data from ubi-manifest service
+
 ## [0.9.0] - 2021-09-29
 
 ### Changed
@@ -72,7 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.10.0...0.11.0
+[0.10.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.9.0...0.10.0
 [0.9.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.8.0...0.9.0
 [0.8.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.7.0...0.8.0
 [0.7.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.6.0...0.7.0

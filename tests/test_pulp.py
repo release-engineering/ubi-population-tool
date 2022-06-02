@@ -1,4 +1,3 @@
-import sys
 import threading
 
 try:
@@ -25,17 +24,6 @@ from .conftest import (
 
 ORIG_HTTP_TOTAL_RETRIES = pulp_client.HTTP_TOTAL_RETRIES
 ORIG_HTTP_RETRY_BACKOFF = pulp_client.HTTP_RETRY_BACKOFF
-
-if sys.version_info <= (
-    2,
-    7,
-):
-    import requests_mock as rm
-
-    @pytest.fixture(name="requests_mock")
-    def fixture_requests_mock():
-        with rm.Mocker() as m:
-            yield m
 
 
 @pytest.fixture(name="mock_pulp")

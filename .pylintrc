@@ -101,4 +101,6 @@ disable=print-statement,
         raise-missing-from,
         # skip check for non-snake_case names
         invalid-name,
+        # skip check for lambdas
+        unnecessary-lambda
 

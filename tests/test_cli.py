@@ -46,7 +46,12 @@ def test_no_pulp_hostname(capsys):
     ],
 )
 def test_wrong_user_pass_cert_combination(capsys, auth_args):
-    args = ["--pulp-hostname", "foo.pulp.com"] + auth_args
+    args = [
+        "--pulp-hostname",
+        "foo.pulp.com",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
+    ] + auth_args
 
     with pytest.raises(SystemExit) as e_info:
         main(args)
@@ -58,7 +63,16 @@ def test_wrong_user_pass_cert_combination(capsys, auth_args):
 
 @mock.patch("ubipop.UbiPopulate")
 def test_default_config_source(mock_ubipopulate):
-    args = ["--pulp-hostname", "foo.pulp.com", "--user", "foo", "--pass", "foo"]
+    args = [
+        "--pulp-hostname",
+        "foo.pulp.com",
+        "--user",
+        "foo",
+        "--pass",
+        "foo",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
+    ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
         "foo.pulp.com",
@@ -73,6 +87,7 @@ def test_default_config_source(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -87,6 +102,8 @@ def test_custom_config_source(mock_ubipopulate):
         "foo",
         "--conf-src",
         "custom/conf/dir",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -102,6 +119,7 @@ def test_custom_config_source(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -114,6 +132,8 @@ def test_crt(mock_ubipopulate):
         "/cert.cert",
         "--conf-src",
         "custom/conf/dir",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -129,6 +149,7 @@ def test_crt(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -145,6 +166,8 @@ def test_specified_filenames(mock_ubipopulate):
         "custom/conf/dir",
         "f1",
         "f2",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -160,6 +183,7 @@ def test_specified_filenames(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -174,6 +198,8 @@ def test_specified_content_sets(mock_ubipopulate):
         "foo",
         "--content-sets",
         "test_repo1-rpms",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -191,6 +217,7 @@ def test_specified_content_sets(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -205,6 +232,8 @@ def test_specified_repo_ids(mock_ubipopulate):
         "foo",
         "--repo-ids",
         "test_repo1",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -222,6 +251,7 @@ def test_specified_repo_ids(mock_ubipopulate):
         ],
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -239,6 +269,8 @@ def test_dry_run(mock_ubipopulate):
         "f1",
         "f2",
         "--dry-run",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -254,6 +286,7 @@ def test_dry_run(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -272,6 +305,8 @@ def test_custom_workers_number(mock_ubipopulate):
         "f2",
         "--workers",
         "42",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -287,6 +322,7 @@ def test_custom_workers_number(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -306,6 +342,8 @@ def test_insecure(mock_ubipopulate):
         "--workers",
         "42",
         "--insecure",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -321,6 +359,7 @@ def test_insecure(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -335,6 +374,8 @@ def test_output_file(mock_ubipopulate):
         "foo",
         "--output-repos",
         "/foo/out/repos.txt",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -350,6 +391,7 @@ def test_output_file(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -364,6 +406,8 @@ def test_version(mock_ubipopulate):
         "foo",
         "--version",
         "100",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -379,6 +423,7 @@ def test_version(mock_ubipopulate):
         repo_ids=None,
         version="100",
         content_set_regex=None,
+        ubi_manifest_url="https://ubi-manifest.com",
     )
 
 
@@ -393,6 +438,8 @@ def test_content_set_regex(mock_ubipopulate):
         "foo",
         "--content-set-regex",
         "test-regex.*",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
     ]
     main(args)
     mock_ubipopulate.assert_called_once_with(
@@ -408,4 +455,5 @@ def test_content_set_regex(mock_ubipopulate):
         repo_ids=None,
         version=None,
         content_set_regex="test-regex.*",
+        ubi_manifest_url="https://ubi-manifest.com",
     )
