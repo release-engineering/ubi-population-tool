@@ -103,7 +103,8 @@ class Matcher(object):
 
         return f_flat_map(f_sequence(fts), flatten_list_of_sets)
 
-    def _create_or_criteria(self, fields, values):
+    @classmethod
+    def create_or_criteria(cls, fields, values):
         # fields - list/tuple of fields [field1, field2]
         # values - list of tuples [(field1 value, field2 value), ...]
         # creates criteria for pulp query in a following way
@@ -184,7 +185,7 @@ class Matcher(object):
                     continue
                 filenames.append((pkg.sourcerpm,))
 
-        pkgs_or_criteria = self._create_or_criteria(("filename",), filenames)
+        pkgs_or_criteria = self.create_or_criteria(("filename",), filenames)
         return pkgs_or_criteria
 
 
@@ -254,7 +255,7 @@ class ModularMatcher(Matcher):
     def _get_modular_rpms_criteria(self):
         filenames_to_search = self._modular_rpms_filenames(self.modules)
         filenames_to_search = [(filename,) for filename in filenames_to_search]
-        pkgs_or_criteria = self._create_or_criteria(("filename",), filenames_to_search)
+        pkgs_or_criteria = self.create_or_criteria(("filename",), filenames_to_search)
         return pkgs_or_criteria
 
     def _get_modulemds_criteria(self):
@@ -274,7 +275,7 @@ class ModularMatcher(Matcher):
             )
 
         fields = ("name", "stream")
-        or_criteria = self._create_or_criteria(fields, criteria_values)
+        or_criteria = self.create_or_criteria(fields, criteria_values)
         return or_criteria
 
     def _get_modulemd_output_set(self, modules):
@@ -426,7 +427,7 @@ class RpmMatcher(Matcher):
             criteria_values.append((package_pattern.name, arch))
 
         fields = ("name", "arch")
-        or_criteria = self._create_or_criteria(fields, criteria_values)
+        or_criteria = self.create_or_criteria(fields, criteria_values)
         return or_criteria
 
     def _get_pkgs_from_all_modules(self):

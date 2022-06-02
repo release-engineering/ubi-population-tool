@@ -87,7 +87,7 @@ def test_search_units(pulp):
     pulp.insert_units(repo, [unit_1, unit_2])
 
     matcher = Matcher(None, None)
-    criteria = matcher._create_or_criteria(["name", "arch"], [("test", "x86_64")])
+    criteria = matcher.create_or_criteria(["name", "arch"], [("test", "x86_64")])
     # let Future return result
     search_result = matcher._search_units(repo, criteria, "rpm").result()
 
@@ -113,7 +113,7 @@ def test_create_criteria():
     fields = ["color", "size"]
     values = [("blue", "10"), ("white", "15")]
 
-    criteria = matcher._create_or_criteria(fields, values)
+    criteria = matcher.create_or_criteria(fields, values)
 
     # there should be 2 criteria created
     assert len(criteria) == 2
@@ -129,10 +129,10 @@ def test_create_criteria_uneven_args():
 
     fields = ["color", "size"]
     values = [("blue", "10"), ("white")]
-    # call to _create_or_criteria raises ValueError because of uneven number of values of the second tuple
+    # call to create_or_criteria raises ValueError because of uneven number of values of the second tuple
     # in value list
     with pytest.raises(ValueError):
-        _ = matcher._create_or_criteria(fields, values)
+        _ = matcher.create_or_criteria(fields, values)
 
 
 def test_search_units_per_repos(pulp):
@@ -158,7 +158,7 @@ def test_search_units_per_repos(pulp):
     expected_repo_ids = ["test_repo_1", "test_repo_2"]
     matcher = Matcher(None, None)
 
-    criteria = matcher._create_or_criteria(
+    criteria = matcher.create_or_criteria(
         ["name", "arch"], [("test", "x86_64"), ("test", "i386")]
     )
 
@@ -199,7 +199,7 @@ def test_search_rpms(pulp):
     pulp.insert_units(repo, [unit_1, unit_2])
 
     matcher = Matcher(None, None)
-    criteria = matcher._create_or_criteria(["filename"], [("test.x86_64.rpm",)])
+    criteria = matcher.create_or_criteria(["filename"], [("test.x86_64.rpm",)])
     # let Future return result
     result = matcher.search_rpms(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
@@ -234,7 +234,7 @@ def test_search_srpms(pulp):
     pulp.insert_units(repo, [unit_1, unit_2])
 
     matcher = Matcher(None, None)
-    criteria = matcher._create_or_criteria(["filename"], [("test.src.rpm",)])
+    criteria = matcher.create_or_criteria(["filename"], [("test.src.rpm",)])
     # let Future return result
     result = matcher.search_srpms(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
@@ -267,7 +267,7 @@ def test_search_moludemds(pulp):
     pulp.insert_units(repo, [unit_1, unit_2])
 
     matcher = Matcher(None, None)
-    criteria = matcher._create_or_criteria(["name", "stream"], [("test", "10")])
+    criteria = matcher.create_or_criteria(["name", "stream"], [("test", "10")])
     # let Future return result
     result = matcher.search_modulemds(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria
@@ -292,7 +292,7 @@ def test_search_moludemd_defaults(pulp):
     pulp.insert_units(repo, [unit_1])
 
     matcher = Matcher(None, None)
-    criteria = matcher._create_or_criteria(["name", "stream"], [("test", "10")])
+    criteria = matcher.create_or_criteria(["name", "stream"], [("test", "10")])
     # let Future return result
     result = matcher.search_modulemd_defaults(criteria, [repo]).result()
     # there should be be only one unit in the result set according to criteria

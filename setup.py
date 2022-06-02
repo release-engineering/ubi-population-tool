@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def get_description():
@@ -21,7 +21,7 @@ def get_requirements():
 
 setup(
     name="ubi-population-tool",
-    version="0.9.0",
+    version="0.11.0",
     license="GNU General Public License",
     author="",
     author_email="",
@@ -40,7 +40,7 @@ setup(
     ],
     url="https://github.com/release-engineering/ubi-population-tool",
     install_requires=get_requirements(),
-    packages=["ubipop"],
+    packages=find_packages(exclude=["tests", "tests.*"]),
     entry_points={
         "console_scripts": [
             "ubipop = ubipop.cli:entry_point",
