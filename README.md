@@ -7,9 +7,9 @@
 
 A command-line tool for populating ubi repositories.
 
-# Cli usage
+# CLI usage
 
-Cli can be run by *ubipop* with arguments:
+CLI can be run by *ubipop* with arguments:
 
 - positional arguments:
   - content_sets: list of content sets to be processed
