@@ -1,0 +1,887 @@
+{
+  "repo_id": "ubi-7-server-rpms__7Server__x86_64",
+  "content": [
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "perl-YAML:1.24:820181214175558:8652dbeb:x86_64"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "perl-YAML:1.24:820181214175558:7c757546:x86_64"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "pki-core:private-dmoluguw-10.6:820190111021949:5a87be8a:x86_64"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "httpd:2.4:820181123113900:9edba152:x86_64"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "ModulemdDefaultsUnit",
+      "unit_attr": "name:stream",
+      "value": "httpd:2.4"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "fontconfig-2.13.0-4.3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libsemanage-2.5-14.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "rpm-4.11.3-35.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "python-2.7.5-76.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "info-5.1-5.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "kmod-libs-20-23.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "sqlite-3.7.17-8.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "rpm-libs-4.11.3-35.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "dbus-glib-0.100-7.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "shared-mime-info-1.8-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "elfutils-libelf-0.172-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-Storable-2.45-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "polkit-0.112-18.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "redhat-release-server-7.6-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "glibc-2.17-260.el7.i686.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-Scalar-List-Utils-1.27-248.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "lksctp-tools-1.0.17-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libsmartcols-2.23.2-59.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libffi-3.0.13-18.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libuser-0.60-9.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "kernel-headers-3.10.0-957.12.2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nss-sysinit-3.34.0-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "util-linux-2.23.2-59.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "kmod-20-23.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "coreutils-8.22-23.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libpwquality-1.2.3-5.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "httpd-tools-2.4.6-80.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "cracklib-dicts-2.9.0-11.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libpng-1.5.13-5.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libgpg-error-1.12-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "popt-1.13-16.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "zlib-1.2.7-18.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "cracklib-2.9.0-11.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "hardlink-1.0-19.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-FCGI-0.74-8.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "cyrus-sasl-lib-2.1.26-23.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libxml2-2.9.1-5.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "MySQL-python-1.2.5-1.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nuxwdog-1.0.3-8.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libverto-0.2.5-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "findutils-4.5.11-6.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "tar-1.26-35.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "glibc-2.17-260.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "gawk-4.0.2-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libutempter-1.1.6-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "ethtool-4.8-9.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "ustr-1.0.4-16.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libattr-2.4.46-13.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "httpd-tools-2.4.6-88.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "kpartx-0.4.9-123.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "lua-5.1.4-15.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nss-tools-3.34.0-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "java-1.7.0-openjdk-headless-1.7.0.191-2.6.15.5.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "curl-7.29.0-51.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "systemd-libs-219-62.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "qrencode-libs-3.4.1-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "grep-2.20-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nss-softokn-3.34.0-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-Socket-2.010-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "dbus-1.10.24-12.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "dracut-033-554.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "glibc-common-2.17-260.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "cpio-2.11-27.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-PathTools-3.40-5.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "json-c-0.11-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "xz-libs-5.2.2-1.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "keyutils-libs-1.5.8-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libacl-2.2.51-14.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "java-11-openjdk-headless-11.0.ea.28-7.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "procps-ng-3.3.10-23.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-macros-5.16.3-293.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "polkit-pkla-compat-0.1-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libuuid-2.23.2-59.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-threads-shared-1.43-6.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "httpd-2.4.6-88.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "cups-libs-1.6.3-35.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-libs-5.16.3-293.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libselinux-2.5-14.1.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "mariadb-libs-5.5.56-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "mozjs17-17.0.0-20.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "jss-4.4.4-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libjpeg-turbo-1.2.90-6.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libcurl-7.29.0-51.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nss-pem-1.0.3-5.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libdb-5.3.21-24.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "java-1.8.0-openjdk-headless-1.8.0.181-7.b13.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-threads-1.87-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "pcsc-lite-libs-1.8.8-8.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libblkid-2.23.2-59.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "elfutils-libs-0.172-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "alsa-lib-1.1.6-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nss-softokn-freebl-3.34.0-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "bash-4.2.46-31.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "apr-util-1.5.2-6.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "acl-2.2.51-14.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libmount-2.23.2-59.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "freetype-2.8-12.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "avahi-libs-0.6.31-19.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "gdbm-1.10-8.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "gzip-1.5-10.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nss-util-3.34.0-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "device-mapper-1.02.149-8.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-5.16.3-293.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "pcre-8.32-17.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "krb5-libs-1.15.1-34.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "gmp-6.0.0-15.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "shadow-utils-4.1.5.1-25.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "python-libs-2.7.5-76.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "sed-4.2.2-5.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libcap-2.22-9.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "filesystem-3.2-25.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "chkconfig-1.7.4-1.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-Filter-1.49-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "openldap-2.4.44-20.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "audit-libs-2.8.4-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "device-mapper-libs-1.02.149-8.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libcom_err-1.42.9-13.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libsepol-2.5-10.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "dbus-libs-1.10.24-12.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "glib2-2.56.1-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libssh2-1.4.3-12.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "lz4-1.7.5-2.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nspr-4.17.0-1.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "readline-6.2-10.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libidn-1.28-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "nss-3.34.0-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "diffutils-3.3-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libcap-ng-0.7.5-4.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "systemd-219-62.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "ncurses-5.9-13.20130511.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "GConf2-3.2.6-8.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "apr-1.4.8-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libgcc-4.8.5-36.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "pam-1.1.8-22.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "bzip2-libs-1.0.6-13.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "xz-5.2.2-1.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "cryptsetup-libs-2.0.3-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "libstdc++-4.8.5-36.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "openssl-libs-1.0.2k-16.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "ncurses-libs-5.9-13.20130511.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "perl-Time-HiRes-1.9725-3.el7.x86_64.rpm"
+    },
+    {
+      "src_repo_id": "rhel-7-server-rpms__7Server__x86_64",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "expat-2.1.0-8.el7.x86_64.rpm"
+    }
+  ]
+}
