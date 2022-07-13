@@ -318,6 +318,24 @@ def get_input_or_output_repo_from_config(config_file, version, in_repo=True):
     return repo_dir, repo_url
 
 
+def filter_debug_packages(type, cfg_packages_whitelist):
+    if type == "debug":
+        filter_debug = lambda pkg: pkg.name.endswith("debuginfo") or pkg.name.endswith(
+            "debugsource"
+        )
+
+    else:
+        filter_debug = lambda pkg: not pkg.name.endswith(
+            "debuginfo"
+        ) or not pkg.name.endswith("debugsource")
+
+    pkgs_expected_exclude = [
+        pkg.name for pkg in cfg_packages_whitelist if filter_debug(pkg)
+    ]
+
+    return pkgs_expected_exclude
+
+
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
 def test_run_ubi_pop_for_rhel7(pulp_client):
     run_ubipop_tool(["rhel-7-server-rpms"])
@@ -367,3 +385,298 @@ def test_run_ubi_pop_for_rhel7(pulp_client):
     assert (
         "common [d]" in mod_profile
     ), "Modulemd httpd should have common profile as default."
+
+
+@pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
+def test_ubipop_does_not_associate_packages_in_exclude_list(pulp_client):
+    """
+    Test if ubipop does not associate packages in the repo.
+
+    One package in whitelisted and blacklist at the same time
+    will not be associated to repo.
+    No modules are whitelisted or blacklisted.
+    """
+    cfg = load_ubiconfig("rhel-8-for-x86_64-baseos.yaml", "ubi8.5")
+    (
+        content_set_output_repo,
+        content_set_output_repo_url,
+    ) = get_input_or_output_repo_from_config(
+        "rhel-8-for-x86_64-baseos.yaml", "ubi8.5", in_repo=False
+    )
+    # the exclude packages are ["gettext","ncurses","gettext-debuginfo","ncurses-debuginfo"]
+    for item in content_set_output_repo:
+        pkg = filter_debug_packages(item, cfg.packages.blacklist)
+        # verify before do the ubipop, one package.blacklist in the ubi repo, "ncurses" in rpm and source ubi repo
+        # "ncurses-debuginfo" in debug ubi repo
+        assert (
+            len(
+                get_rpm_from_repo(
+                    pulp_client, content_set_output_repo[item], pkg, "name"
+                )
+            )
+        ) == 1
+
+    run_ubipop_tool(["rhel-8-for-x86_64-baseos-rpms"])
+
+    # #verify after ubipop, no exclude package rpm exist in the ubi repo, as it is unassoicated
+    for item in content_set_output_repo:
+        pkg = filter_debug_packages(item, cfg.packages.blacklist)
+        assert not get_rpm_from_repo(
+            pulp_client, content_set_output_repo[item], [pkg], "name"
+        ), "find the package which should be exclude:{} in {}".format(
+            pkg, content_set_output_repo[item]
+        )
+
+    expected_module_rpm = [
+        "perl-HTTP-Tiny-0.074-2.module+el8.1.0+2926+ce7246ad.noarch.rpm"
+    ]
+
+    (
+        content_set_output_repo_appstream,
+        content_set_output_repo_url_appstream,
+    ) = get_input_or_output_repo_from_config(
+        "rhel-8-for-x86_64-appstream.yaml", "ubi8.5", in_repo=False
+    )
+
+    # verify before do the ubipop, one module rpm in the ubi repo
+    assert (
+        len(
+            get_rpm_from_repo(
+                pulp_client,
+                content_set_output_repo_appstream["rpm"],
+                expected_module_rpm,
+                "filename",
+            )
+        )
+    ) == 1
+    run_ubipop_tool(["rhel-8-for-x86_64-appstream-rpms"])
+
+    # verify after ubipop, the modulemd rpm still not be unassociated, though it's in blacklist
+    assert (
+        len(
+            get_rpm_from_repo(
+                pulp_client,
+                content_set_output_repo_appstream["rpm"],
+                expected_module_rpm,
+                "filename",
+            )
+        )
+    ) == 1
+
+
+@pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
+def test_ubipop_not_filter_non_module_rpm_and_module_rpm_with_same_package(pulp_client):
+    """
+    Test if ubipop will not exclude non-module rpm in the repo.
+    non-module rpm and module_rpm has the same package perl, which should be included after pop
+    Module_rpm and non-module rpm will not be filter, so when module_rpm has less version than
+    module_rpm, it will not be excluded also.
+    """
+    expected = [
+        "perl-5.26.3-420.el8.s390x.rpm",
+        "perl-5.32.1-471.module+el8.6.0+13324+628a2397.s390x.rpm",
+    ]
+
+    (
+        content_set_output_repo,
+        content_set_output_repo_url,
+    ) = get_input_or_output_repo_from_config(
+        "rhel-8-for-s390x-appstream.yaml", "ubi8.5", in_repo=False
+    )
+
+    (
+        content_set_input_repo,
+        content_set_input_repo_url,
+    ) = get_input_or_output_repo_from_config(
+        "rhel-8-for-s390x-appstream.yaml", "ubi8.5", in_repo=True
+    )
+
+    # verify the two packages do not be included in the ubi repo
+    assert not get_rpm_from_repo(
+        pulp_client, content_set_output_repo["rpm"], expected, "filename"
+    )
+
+    # verify the two packages is in the rhel input repo, so when afer ubipop, it will be associated
+    for rpm in expected:
+        # verify the rpm exist in the rhel input repo
+        assert get_rpm_from_repo(
+            pulp_client, content_set_input_repo["rpm"], [rpm], "filename"
+        ), "Can't find the rpm in the rhel repo:{}".format(rpm)
+
+    run_ubipop_tool(["rhel-8-for-s390x-appstream-rpms"])
+
+    rpm_repo_url = get_repo_url(content_set_output_repo_url["rpm"])
+
+    # verify the two packages are associated
+    for rpm in expected:
+        # verify the rpm exist in the ubi repo
+        assert get_rpm_from_repo(
+            pulp_client, content_set_output_repo["rpm"], [rpm], "filename"
+        ), "Can't find the rpm :{}".format(rpm)
+        # verify the rpm exist in the cdn server
+        assert can_download_package(
+            rpm, rpm_repo_url
+        ), "Can't download package: {}".format(rpm)
+
+
+@pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
+def test_ubipop_not_filter_module_rpm_with_different_version(pulp_client):
+
+    """
+    Test if ubipop will not filter module rpm in the repo
+
+    """
+    (
+        content_set_output_repo,
+        content_set_output_repo_url,
+    ) = get_input_or_output_repo_from_config(
+        "rhel-8-for-ppc64le-appstream.yaml", "ubi8.5", in_repo=False
+    )
+    (
+        expected_rpm_list,
+        expected_modulemd_list,
+        expected_modulemd_default_list,
+    ) = get_rpm_from_expected_json("ubi8/expected_rhel8_ppc64le_repo.json")
+    rpm_repo = content_set_output_repo["rpm"]
+    rpm_repo_url = get_repo_url(content_set_output_repo_url["rpm"])
+
+    # verify the ubi repo is empty, no rpm and no module before ubipop
+    assert not get_rpm_from_repo(
+        pulp_client, rpm_repo, expected_rpm_list, "filename"
+    ), "rpm exist in the ubi repo"
+    for modulemd in expected_modulemd_list:
+        assert not get_modulemd_from_repo(
+            pulp_client, rpm_repo, modulemd
+        ), "modulemd exist in the ubi repo"
+    for modulemd_default in expected_modulemd_default_list:
+        assert not get_modulemd_default_from_repo(
+            pulp_client, rpm_repo, modulemd_default
+        ), "modulemd_default exist in the ubi repo"
+    run_ubipop_tool(["rhel-8-for-ppc64le-appstream-rpms"], dry_run=True)
+
+    # after dry run, no change, so the repo still is empty
+
+    assert not get_rpm_from_repo(
+        pulp_client, rpm_repo, expected_rpm_list, "filename"
+    ), "rpm exist in the ubi repo"
+    for modulemd in expected_modulemd_list:
+        assert not get_modulemd_from_repo(
+            pulp_client, rpm_repo, modulemd
+        ), "modulemd exist in the ubi repo"
+    for modulemd_default in expected_modulemd_default_list:
+        assert not get_modulemd_default_from_repo(
+            pulp_client, rpm_repo, modulemd_default
+        ), "modulemd_default exist in the ubi repo"
+
+    run_ubipop_tool(["rhel-8-for-ppc64le-appstream-rpms"])
+
+    for rpm in expected_rpm_list:
+        if "containers-common" in rpm:
+            # verify the containers-common rpm exist in the repo
+            assert get_rpm_from_repo(
+                pulp_client, rpm_repo, [rpm], "filename"
+            ), "Can't find the rpm :{}".format(rpm)
+            # verify the rpm exist in the cdn server
+            assert can_download_package(
+                rpm, rpm_repo_url
+            ), "Can't download package: {}".format(rpm)
+
+    # verify the modulemd exist in the repo
+    for modulemd in expected_modulemd_list:
+        assert get_modulemd_from_repo(
+            pulp_client, rpm_repo, modulemd
+        ), "Can't find the modulemd :{}".format(modulemd)
+
+    # verify the modulemd_default exist in the repo
+    for modulemd_defaults in expected_modulemd_default_list:
+        assert get_modulemd_default_from_repo(
+            pulp_client, rpm_repo, modulemd_defaults
+        ), "Can't find the modulemd_default :{}".format(modulemd_defaults)
+
+    # verify the modulemd exist and modulemd default in the cdn server
+    modulemds = query_repo_modules(None, "ubi", rpm_repo_url, full_data=True)
+    assert len(modulemds) == 6, "Unexpected repo modulemds found."
+    mod_name, mod_profile = separate_modules(modulemds)[1]
+    assert (
+        mod_name == "container-tools"
+    ), "Expected modulemd: httpd, found modulemd: {}".format(mod_name)
+    assert (
+        "common [d]" in mod_profile
+    ), "Modulemd httpd should have common profile as default."
+
+
+@pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
+def test_ubipop_get_dependencies_module_rpm(pulp_client):
+
+    """
+    Test if ubipop get the dependencies of module
+    ubipop can get the dependencies of rpm
+
+    """
+
+    expected_module = ["perl:5.24:8010020190529084201:3af8e029:aarch64"]
+    expected_packages = ["ncurses", "ncurses-base", "ncurses-libs"]
+
+    cfg = load_ubiconfig("rhel-8-for-aarch64-appstream.yaml", "ubi8.5")
+    (
+        content_set_output_repo,
+        content_set_output_repo_url,
+    ) = get_input_or_output_repo_from_config(
+        "rhel-8-for-aarch64-appstream.yaml", "ubi8.5", in_repo=False
+    )
+
+    # verify the ubiconfig_include doesn't have the perl:5.24
+    mds_stream = []
+    for md in cfg.modules.whitelist:
+        if md.name == "perl":
+            mds_stream.append(md.stream)
+    assert md.stream[0] != expected_module[0].split(":")[1]
+    # verify before ubipop, not perl:5.24 in ubi repo
+    for modulemd in expected_module:
+        assert not get_modulemd_from_repo(
+            pulp_client, content_set_output_repo["rpm"], modulemd
+        ), "Can find the modulemd :{}".format(modulemd)
+
+    run_ubipop_tool("rhel-8-for-aarch64-appstream-rpms")
+
+    # verify the perl:5.24 is in the ubi repo, though the config only include perl:5.32.
+
+    for modulemd in expected_module:
+        assert get_modulemd_from_repo(
+            pulp_client, content_set_output_repo["rpm"], modulemd
+        ), "Can't find the modulemd :{}".format(modulemd)
+
+    # verity before ubipop, there is no expected_rpm exist in ubi-8-for-aarch64-base-rpms
+    # and there is no such package in config
+    cfg_base = load_ubiconfig("rhel-8-for-aarch64-baseos.yaml", "ubi8.5")
+    (
+        content_set_output_repo_base,
+        content_set_output_repo_url_base,
+    ) = get_input_or_output_repo_from_config(
+        "rhel-8-for-aarch64-baseos.yaml", "ubi8.5", in_repo=False
+    )
+    pkgs_included = [pkg.name for pkg in cfg_base.packages.whitelist]
+    for package in expected_packages:
+        assert package not in pkgs_included
+        assert (
+            len(
+                get_rpm_from_repo(
+                    pulp_client, content_set_output_repo_base["rpm"], [package], "name"
+                )
+            )
+            == 0
+        ), "packages should not exist in ubi repo :{}".format(package)
+
+    run_ubipop_tool("rhel-8-for-aarch64-baseos-rpms")
+
+    # verify after ubipop, the package exist as depencidies rpm, though no config
+    # here also verify the set of repo ubi-8-for-aarch64-base-rpms be published
+    for package in expected_packages:
+        assert (
+            len(
+                get_rpm_from_repo(
+                    pulp_client, content_set_output_repo_base["rpm"], [package], "name"
+                )
+            )
+            != 0
+        ), "packages should not exist in ubi repo :{}".format(package)

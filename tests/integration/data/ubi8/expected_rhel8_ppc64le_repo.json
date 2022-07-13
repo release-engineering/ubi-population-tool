@@ -1,0 +1,125 @@
+{
+  "repo_id": "ubi-8-for-ppc64le-appstream-rpms__8",
+  "content": [
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "389-ds:1.4:8000020190424152135:ab753183:ppc64le"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "httpd:2.4:8000020190405071959:55190bc5:ppc64le"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "container-tools:1.0:8000020190404145617:2ffa3d27:ppc64le"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "container-tools:rhel8:8060020220401155929:2e213529:ppc64le"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "container-tools:4.0:8060020220401155902:2e213529:ppc64le"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "ModulemdUnit",
+      "unit_attr": "nsvca",
+      "value": "container-tools:3.0:8060020220404111443:2e213529:ppc64le"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "ModulemdDefaultsUnit",
+      "unit_attr": "name:stream",
+      "value": "container-tools:rhel8"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "ModulemdDefaultsUnit",
+      "unit_attr": "name:stream",
+      "value": "httpd:2.4"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "389-ds-base-snmp-1.4.0.20-10.module+el8.0.0+3096+101825d5.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "containers-common-0.1.32-3.git1715c90.module+el8.0.0+2956+30df4692.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "389-ds-base-legacy-tools-1.4.0.20-10.module+el8.0.0+3096+101825d5.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "389-ds-base-libs-1.4.0.20-10.module+el8.0.0+3096+101825d5.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "containers-common-1-27.module+el8.6.0+14673+621cb8be.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "389-ds-base-devel-1.4.0.20-10.module+el8.0.0+3096+101825d5.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "container-selinux-2.94-1.git1e99f1d.module+el8.0.0+2956+30df4692.noarch.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "python3-lib389-1.4.0.20-10.module+el8.0.0+3096+101825d5.noarch.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "containers-common-1-28.module+el8.6.0+14672+b2f82327.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "389-ds-base-1.4.0.20-10.module+el8.0.0+3096+101825d5.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "containernetworking-plugins-0.7.4-3.git9ebe139.module+el8.0.0+2956+30df4692.ppc64le.rpm"
+    },
+    {
+      "src_repo_id": "rhel-8-for-ppc64le-appstream-rpms__8",
+      "unit_type": "RpmUnit",
+      "unit_attr": "filename",
+      "value": "containers-common-1.2.4-1.module+el8.6.0+14694+4f5132e0.ppc64le.rpm"
+    }
+  ]
+}
