@@ -115,6 +115,7 @@ def parse_args(args):
 def main(args):
     logging.basicConfig(format=DEFAULT_LOG_FMT, datefmt=DEFAULT_DATE_FMT)
     logging.getLogger("pubtools.pulplib").setLevel(logging.INFO)
+    logging.getLogger("fastpurge").setLevel(logging.INFO)
     opts, auth = parse_args(args)
 
     ubipop.UbiPopulate(
