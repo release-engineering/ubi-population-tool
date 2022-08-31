@@ -422,7 +422,7 @@ def test_ubipop_does_not_associate_packages_in_exclude_list(pulp_client):
     for item in content_set_output_repo:
         pkg = filter_debug_packages(item, cfg.packages.blacklist)
         assert not get_rpm_from_repo(
-            pulp_client, content_set_output_repo[item], [pkg], "name"
+            pulp_client, content_set_output_repo[item], pkg, "name"
         ), "find the package which should be exclude:{} in {}".format(
             pkg, content_set_output_repo[item]
         )
