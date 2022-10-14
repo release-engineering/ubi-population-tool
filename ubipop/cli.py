@@ -112,10 +112,14 @@ def parse_args(args):
     return parser.parse_args(args), auth
 
 
+FOREIGN_LOGGERS = ("pubtools.pulplib", "fastpurge", "ubiconfig")
+
+
 def main(args):
     logging.basicConfig(format=DEFAULT_LOG_FMT, datefmt=DEFAULT_DATE_FMT)
-    logging.getLogger("pubtools.pulplib").setLevel(logging.INFO)
-    logging.getLogger("fastpurge").setLevel(logging.INFO)
+    for logger in FOREIGN_LOGGERS:
+        logging.getLogger(logger).setLevel(logging.INFO)
+
     opts, auth = parse_args(args)
 
     ubipop.UbiPopulate(
