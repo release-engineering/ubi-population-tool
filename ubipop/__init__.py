@@ -1,11 +1,13 @@
 from datetime import date
 import logging
 import re
+import os
 
 from collections import defaultdict, deque, namedtuple
 from concurrent.futures import as_completed
 from itertools import chain
 from pubtools.pulplib import Client, Criteria, PublishOptions
+from fastpurge import FastPurgeClient
 
 import attr
 import ubiconfig
@@ -66,10 +68,10 @@ class UbiRepoSet(object):
 
         self._ensure_repos_existence()
 
-    def get_output_repo_ids(self):
-        repos = set([self.out_repos.rpm.id, self.out_repos.source.id])
+    def get_output_repos(self):
+        repos = set([self.out_repos.rpm, self.out_repos.source])
         if self.out_repos.debug.result():
-            repos.add(self.out_repos.debug.id)
+            repos.add(self.out_repos.debug)
 
         return repos
 
@@ -133,6 +135,9 @@ class UbiPopulate(object):
         self._ubiconfig_map = None
 
         self._ubi_manifest_url = kwargs.get("ubi_manifest_url") or None
+
+        self._EDGERC_CFG = os.getenv("UBIPOP_EDGERC_CFG", "/etc/.edgerc")
+        self._FASTPURGE_ROOT_URL = os.getenv("UBIPOP_FASTPURGE_ROOT_URL", "")
 
     @property
     def pulp_client(self):
@@ -331,10 +336,28 @@ class UbiPopulate(object):
         if awaited_repos_publishes:
             f_sequence(awaited_repos_publishes).result()
 
+        self._purge_cache(out_repos)
+
         if self.output_repos:
             with open(self.output_repos, "w") as f:
                 for repo in out_repos:
-                    f.write(repo.strip() + "\n")
+                    f.write(repo.id.strip() + "\n")
+
+    def _purge_cache(self, repos):
+        if not self.dry_run and self._FASTPURGE_ROOT_URL:
+            with FastPurgeClient(auth=self._EDGERC_CFG) as fp_client:
+                urls_to_purge = []
+                for repo in repos:
+                    for url in repo.mutable_urls:
+                        flush_url = os.path.join(
+                            self._FASTPURGE_ROOT_URL, repo.relative_url, url
+                        )
+                        urls_to_purge.append(flush_url)
+                _LOG.info("Purging cache started.")
+                fp_client.purge_by_url(urls_to_purge).result()
+                _LOG.info("Purging cache finished.")
+        else:
+            _LOG.warning("Cache purge disabled.")
 
     def _run_ubi_population(self, repo_pairs_list, out_repos, ubim_client=None):
         awaited_repos_publishes = []
@@ -352,7 +375,7 @@ class UbiPopulate(object):
                     ubim_client,
                 ).run_ubi_population()
 
-                out_repos.update(repo_set.get_output_repo_ids())
+                out_repos.update(repo_set.get_output_repos())
                 # in case of dry-run there are no publications expected
                 if repos_publishes:
                     awaited_repos_publishes.extend(repos_publishes)

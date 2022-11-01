@@ -6,6 +6,7 @@ import os
 import shutil
 import sys
 import tempfile
+import textwrap
 
 import pytest
 import ubiconfig
@@ -162,14 +163,16 @@ def get_test_repo(**kwargs):
     )
 
 
-def test_get_output_repo_ids(ubi_repo_set):
-    repo_ids = ubi_repo_set.get_output_repo_ids()
-    assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source", "ubi-foo-debug"])
+def test_get_output_repos(ubi_repo_set):
+    repos = ubi_repo_set.get_output_repos()
+    assert set([repo.id for repo in repos]) == set(
+        ["ubi-foo-rpms", "ubi-foo-source", "ubi-foo-debug"]
+    )
 
 
-def test_get_output_repo_ids_no_debug(ubi_repo_set_no_debug):
-    repo_ids = ubi_repo_set_no_debug.get_output_repo_ids()
-    assert repo_ids == set(["ubi-foo-rpms", "ubi-foo-source"])
+def test_get_output_repos_no_debug(ubi_repo_set_no_debug):
+    repos = ubi_repo_set_no_debug.get_output_repos()
+    assert set([repo.id for repo in repos]) == set(["ubi-foo-rpms", "ubi-foo-source"])
 
 
 def test_raise_config_missing(caplog):
@@ -1221,9 +1224,34 @@ def test_get_current_content(mock_ubipop_runner, pulp, skip_debug_repo):
     assert source_rpms[0].name == "test-srpm"
 
 
+@pytest.fixture(name="fastpurge_env")
+def fixture_fastpurge_env(monkeypatch):
+    with tempfile.NamedTemporaryFile("w") as fp:
+        monkeypatch.setenv("UBIPOP_EDGERC_CFG", fp.name)
+        monkeypatch.setenv("UBIPOP_FASTPURGE_ROOT_URL", "https://test.root-url.com/")
+
+        fp.write(
+            textwrap.dedent(
+                """
+        [default]
+        client_secret = some-secret
+        host = some-host
+        access_token = some-access-token
+        client_token = some-client-token
+        """
+            )
+        )
+        fp.flush()
+
+        yield
+
+
 @patch("pubtools.pulplib.YumRepository.get_debug_repository")
 @patch("pubtools.pulplib.YumRepository.get_source_repository")
-def test_populate_ubi_repos(get_debug_repository, get_source_repository, requests_mock):
+def test_populate_ubi_repos(
+    get_debug_repository, get_source_repository, fastpurge_env, requests_mock
+):
+    # pylint: disable=unused-argument
     """Test run of populate_ubi_repos that check correct number of repo publication. It's simplified to
     contain only actions on RPM packages."""
     dt = datetime(2019, 9, 12, 0, 0, 0)
@@ -1260,7 +1288,7 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
         ubi_config_version="8",
         eng_product_id=102,
         distributors=[d1],
-        relative_url="content/unit/2/client",
+        relative_url="content/unit/1/client",
     )
     input_binary_repo = YumRepository(id="input_binary")
     input_source_repo = YumRepository(id="input_source")
@@ -1278,7 +1306,7 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
         population_sources=["input_debug"],
         eng_product_id=102,
         distributors=[d3],
-        relative_url="content/unit/2/client",
+        relative_url="content/unit/3/client",
     )
 
     ubi_populate = FakeUbiPopulate(
@@ -1367,7 +1395,7 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
     )
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
-
+    _create_fastpurge_mocks(requests_mock)
     # let's run actual population
     ubi_populate.populate_ubi_repos()
     history = fake_pulp.publish_history
@@ -1388,6 +1416,24 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
     # unfortunately we can't check actual content od repos because
     # un/associate calls are using custom client not the pubtools-pulplib Client
     # TODO add check for actual content after we move to pubtools-pulplib Client
+
+    request = requests_mock.request_history[
+        -1
+    ]  # last request should be for purge cache request
+
+    expected_req = [
+        "https://test.root-url.com/content/unit/2/client/repodata/repomd.xml",
+        "https://test.root-url.com/content/unit/3/client/repodata/repomd.xml",
+        "https://test.root-url.com/content/unit/1/client/repodata/repomd.xml",
+    ]
+    assert sorted(request.json()["objects"]) == sorted(expected_req)
+
+
+def _create_fastpurge_mocks(requests_mock):
+    url = "https://some-host/ccu/v3/delete/url/production"
+    seconds = 0.1
+    response = {"some": ["return", "value"], "estimatedSeconds": seconds}
+    requests_mock.register_uri("POST", url, status_code=201, json=response)
 
 
 def _create_ubi_manifest_mocks(requests_mock):
