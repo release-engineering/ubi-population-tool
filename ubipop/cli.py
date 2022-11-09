@@ -89,7 +89,7 @@ def parse_args(args):
     parser.add_argument(
         "--ubi-manifest-url",
         action="store",
-        required=False,  # TODO change to True, when we move to ubi-manifest approach only, without fallback to legacy code path
+        required=True,
         help="URL of ubi-manifest service",
     )
 
