@@ -6,13 +6,13 @@ jobs:
   py27:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install RPM
         run: |
           sudo apt-get install -y rpm
           sudo apt-get install -y libkrb5-dev
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 2.7
       - name: Install Tox
@@ -22,13 +22,13 @@ jobs:
   py38:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install RPM
         run: |
           sudo apt-get install -y rpm
           sudo apt-get install -y libkrb5-dev
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.8
       - name: Install Tox
@@ -38,13 +38,13 @@ jobs:
   py39:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install RPM
         run: |
           sudo apt-get install -y rpm
           sudo apt-get install -y libkrb5-dev
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
       - name: Install Tox
@@ -54,13 +54,13 @@ jobs:
   static:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install RPM
         run: |
           sudo apt-get install -y rpm
           sudo apt-get install -y libkrb5-dev
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
       - name: Install Tox
@@ -70,12 +70,12 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install RPM
         run: |
           sudo apt-get install -y rpm
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
       - name: Install Tox
@@ -85,7 +85,7 @@ jobs:
       - name: Install pytest cov
         run: pip install pytest-cov
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
