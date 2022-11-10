@@ -7,6 +7,8 @@ except ImportError:
 
 from io import BytesIO
 
+import logging
+import sys
 import pytest
 import requests
 
@@ -86,11 +88,31 @@ def fixture_mock_unassociate(requests_mock, mock_repo, mock_response_for_async_r
     requests_mock.register_uri("POST", url, json=mock_response_for_async_req)
 
 
+@pytest.fixture(name="set_logging")
+def fixture_set_logging():
+    logger = logging.getLogger("ubipop")
+    logger.setLevel(logging.INFO)
+    yield logger
+    logger.handlers = []
+
+
 def test_associate_packages(mock_pulp, mock_associate, mock_repo, mock_package):
     # pylint: disable=unused-argument
     task_ids = mock_pulp.associate_packages(mock_repo, mock_repo, [mock_package])
     assert len(task_ids[0])
     assert task_ids[0] == "foo_task_id"
+
+
+def test_associate_packages_log(
+    capsys, mock_pulp, mock_associate, set_logging, mock_repo, mock_package
+):
+    # pylint: disable=unused-argument
+    set_logging.addHandler(logging.StreamHandler(sys.stdout))
+    mock_pulp.associate_packages(mock_repo, mock_repo, [mock_package])
+    out, _ = capsys.readouterr()
+    assert (
+        out.strip() == "Associating rpm,srpm(foo-pkg.rpm) from test_repo to test_repo"
+    )
 
 
 def test_unassociate_packages(mock_pulp, mock_unassociate, mock_repo, mock_package):
@@ -112,6 +134,16 @@ def test_unassociate_module_defaults(mock_pulp, mock_unassociate, mock_repo, moc
     task_ids = mock_pulp.unassociate_module_defaults(mock_repo, [mock_mdd])
     assert task_ids
     assert task_ids[0] == "foo_task_id"
+
+
+def test_unassociate_module_defaults_log(
+    capsys, mock_pulp, mock_unassociate, set_logging, mock_repo, mock_mdd
+):
+    # pylint: disable=unused-argument
+    set_logging.addHandler(logging.StreamHandler(sys.stdout))
+    mock_pulp.unassociate_module_defaults(mock_repo, [mock_mdd])
+    out, _ = capsys.readouterr()
+    assert out.strip() == "Unassociating modulemd_defaults(virt:rhel) from test_repo"
 
 
 @pytest.fixture(name="search_task_response")
