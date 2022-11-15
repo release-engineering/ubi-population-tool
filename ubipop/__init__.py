@@ -86,7 +86,8 @@ class UbiRepoSet(object):
             _LOG.error("Input Source repo does not exist")
 
         if not self.in_repos.debug:
-            _LOG.warning("Input Debug repo does not exist")
+            fatal = True
+            _LOG.error("Input Debug repo does not exist")
 
         if not self.out_repos.rpm:
             fatal = True
@@ -97,7 +98,8 @@ class UbiRepoSet(object):
             _LOG.error("Output Source repo does not exist")
 
         if not self.out_repos.debug:
-            _LOG.warning("Output Debug repo does not exist")
+            fatal = True
+            _LOG.error("Output Debug repo does not exist")
 
         if fatal:
             raise RepoMissing()
@@ -419,7 +421,10 @@ class UbiPopulate(object):
         return ubi_repo_sets
 
     def _get_population_sources(self, out_repo):
-        if not out_repo.population_sources:
+        if (
+            not hasattr(out_repo, "population_sources")
+            or not out_repo.population_sources
+        ):
             raise PopulationSourceMissing
 
         repos = [

@@ -289,6 +289,17 @@ def test_get_population_sources_empty():
         )  # pylint: disable=protected-access
 
 
+def test_get_population_sources_none():
+    fake_ubipopulate = FakeUbiPopulate(
+        "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
+    )
+
+    with pytest.raises(PopulationSourceMissing):
+        fake_ubipopulate._get_population_sources(
+            None
+        )  # pylint: disable=protected-access
+
+
 @patch("pubtools.pulplib.YumRepository.get_debug_repository")
 @patch("pubtools.pulplib.YumRepository.get_source_repository")
 def test_get_ubi_repo_sets(get_debug_repository, get_source_repository):
@@ -337,6 +348,40 @@ def test_get_ubi_repo_sets(get_debug_repository, get_source_repository):
     assert output_repos.rpm.id == "ubi_binary"
     assert output_repos.source.id == "ubi_source"
     assert output_repos.debug.id == "ubi_debug"
+
+
+@patch("pubtools.pulplib.YumRepository.get_debug_repository")
+@patch("pubtools.pulplib.YumRepository.get_source_repository")
+def test_get_ubi_repo_sets_repo_missing(
+    get_debug_repository, get_source_repository, caplog
+):
+    content_set = "rhel-8-for-x86_64-appstream-rpms"
+    repo = YumRepository(
+        id="ubi_binary",
+        content_set="rhel-8-for-x86_64-appstream-rpms",
+        population_sources=["input_binary"],
+        ubi_population=True,
+    )
+
+    input_binary_repo = YumRepository(id="input_binary")
+
+    mock_in_repo = MagicMock()
+    mock_in_repo.result.return_value = None
+    get_source_repository.return_value = mock_in_repo
+    get_debug_repository.return_value = mock_in_repo
+
+    fake_ubipopulate = FakeUbiPopulate(
+        "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
+    )
+
+    fake_pulp = fake_ubipopulate.pulp_client_controller
+    fake_pulp.insert_repository(repo)
+    fake_pulp.insert_repository(input_binary_repo)
+
+    with pytest.raises(RepoMissing):
+        fake_ubipopulate._get_ubi_repo_sets(content_set)
+    assert "Input Source repo does not exist" in caplog.text
+    assert "Input Debug repo does not exist" in caplog.text
 
 
 def test_diff_modules(mock_ubipop_runner):
@@ -405,13 +450,13 @@ def test_diff_modules(mock_ubipop_runner):
     "rhel_repo_set, ubi_repo_set, fail",
     [
         (
-            RepoSet(None, None, "foo-debug"),
-            RepoSet(None, None, "ubi-foo-debug"),
+            RepoSet(None, None, None),
+            RepoSet(None, None, None),
             True,
         ),
         (
-            RepoSet("foo-rpms", "foo-source", None),
-            RepoSet("ubi-foo-rpms", "ubi-foo-source", None),
+            RepoSet("foo-rpms", "foo-source", "foo-debug"),
+            RepoSet("ubi-foo-rpms", "ubi-foo-source", "ubi-foo-debug"),
             False,
         ),
     ],
@@ -422,13 +467,11 @@ def test_ubi_repo_set(rhel_repo_set, ubi_repo_set, fail, caplog):
             UbiRepoSet(rhel_repo_set, ubi_repo_set)
 
         assert "ERROR" in caplog.text
-        assert "repo does not exist" in caplog.text
-        assert "WARN" not in caplog.text
-
+        assert "Rpm repo does not exist" in caplog.text
+        assert "Source repo does not exist" in caplog.text
+        assert "Debug repo does not exist" in caplog.text
     else:
         UbiRepoSet(rhel_repo_set, ubi_repo_set)
-        assert "WARN" in caplog.text
-        assert "repo does not exist" in caplog.text
         assert "ERROR" not in caplog.text
 
 
