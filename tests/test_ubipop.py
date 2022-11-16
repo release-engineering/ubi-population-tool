@@ -31,7 +31,6 @@ from ubipop import (
     UbiPopulate,
     ConfigMissing,
     RepoMissing,
-    PopulationSourceMissing,
 )
 from ubipop._utils import (
     AssociateActionModules,
@@ -283,10 +282,9 @@ def test_get_population_sources_empty():
         "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
     )
 
-    with pytest.raises(PopulationSourceMissing):
-        fake_ubipopulate._get_population_sources(
-            repo
-        )  # pylint: disable=protected-access
+    assert (
+        fake_ubipopulate._get_population_sources(repo) == []
+    )  # pylint: disable=protected-access
 
 
 def test_get_population_sources_none():
@@ -294,10 +292,9 @@ def test_get_population_sources_none():
         "foo.pulp.com", ("foo", "foo"), False, ubiconfig_dir_or_url=TEST_DATA_DIR
     )
 
-    with pytest.raises(PopulationSourceMissing):
-        fake_ubipopulate._get_population_sources(
-            None
-        )  # pylint: disable=protected-access
+    assert (
+        fake_ubipopulate._get_population_sources(None) == []
+    )  # pylint: disable=protected-access
 
 
 @patch("pubtools.pulplib.YumRepository.get_debug_repository")

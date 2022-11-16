@@ -425,7 +425,7 @@ class UbiPopulate(object):
             not hasattr(out_repo, "population_sources")
             or not out_repo.population_sources
         ):
-            raise PopulationSourceMissing
+            return []
 
         repos = [
             self.pulp_client.get_repository(repo_id)
