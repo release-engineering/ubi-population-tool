@@ -102,5 +102,12 @@ disable=print-statement,
         # skip check for non-snake_case names
         invalid-name,
         # skip check for lambdas
-        unnecessary-lambda
+        unnecessary-lambda,
+        too-many-arguments,
+        too-many-statements,
+        too-many-locals,
+        consider-using-set-comprehension,
+        import-outside-toplevel,
+        inconsistent-return-statements,
+        too-many-instance-attributes
 

@@ -24,7 +24,7 @@ from ubipop._utils import (
     UnassociateActionRpms,
     flatten_md_defaults_name_profiles,
 )
-from ._matcher import Matcher, ModularMatcher, RpmMatcher
+from ._matcher import Matcher
 from .ubi_manifest_client.client import Client as UbimClient
 
 
@@ -320,18 +320,11 @@ class UbiPopulate(object):
             ubi_binary_repos.extend(
                 [repo_set.out_repos.rpm.id for repo_set in repo_pairs]
             )
-        if self._ubi_manifest_url:
-            with UbimClient(self._ubi_manifest_url) as ubim_client:
-                tasks = ubim_client.generate_manifest(ubi_binary_repos)
-                tasks.result()
-                awaited_repos_publishes = self._run_ubi_population(
-                    repo_pairs_list, out_repos, ubim_client
-                )
-
-        # TODO legacy code path, to be removed after ubi-manifest functionality is verified
-        else:
+        with UbimClient(self._ubi_manifest_url) as ubim_client:
+            tasks = ubim_client.generate_manifest(ubi_binary_repos)
+            tasks.result()
             awaited_repos_publishes = self._run_ubi_population(
-                repo_pairs_list, out_repos
+                repo_pairs_list, out_repos, ubim_client
             )
 
         # wait until publication of all repos is finished
@@ -608,36 +601,16 @@ class UbiPopulateRunner(object):
         modular_source_rpms = []
 
         # start async querying for modulemds and modular and non-modular packages
-        if self.ubim_client:
-            binary_manifest = self.ubim_client.get_manifest(self.repos.out_repos.rpm.id)
-            debug_manifest = self.ubim_client.get_manifest(
-                self.repos.out_repos.debug.id
-            )
-            source_manifest = self.ubim_client.get_manifest(
-                self.repos.out_repos.source.id
-            )
-            self.repos.modules = binary_manifest.modules
-            self.repos.module_defaults = self._search_expected_modulemd_defaults(
-                binary_manifest.modulemd_defaults
-            )
-            self.repos.packages = binary_manifest.packages
-            self.repos.debug_rpms = debug_manifest.packages
-            self.repos.source_rpms = source_manifest.packages
-
-        # TODO remove this codepath after functionality of ubi-manifest is verified
-        else:
-            mm = ModularMatcher(self.repos.in_repos, self.ubiconfig.modules).run()
-            rm = RpmMatcher(self.repos.in_repos, self.ubiconfig).run()
-
-            self.repos.modules = mm.modules
-            self.repos.module_defaults = mm.modulemd_defaults
-            self.repos.packages = rm.binary_rpms
-            self.repos.debug_rpms = rm.debug_rpms
-            self.repos.source_rpms = rm.source_rpms
-
-            modular_rpms = mm.binary_rpms
-            modular_debug_rpms = mm.debug_rpms
-            modular_source_rpms = mm.source_rpms
+        binary_manifest = self.ubim_client.get_manifest(self.repos.out_repos.rpm.id)
+        debug_manifest = self.ubim_client.get_manifest(self.repos.out_repos.debug.id)
+        source_manifest = self.ubim_client.get_manifest(self.repos.out_repos.source.id)
+        self.repos.modules = binary_manifest.modules
+        self.repos.module_defaults = self._search_expected_modulemd_defaults(
+            binary_manifest.modulemd_defaults
+        )
+        self.repos.packages = binary_manifest.packages
+        self.repos.debug_rpms = debug_manifest.packages
+        self.repos.source_rpms = source_manifest.packages
 
         (
             associations,
