@@ -137,6 +137,16 @@ class Pulp(object):
     def _rpms_query(self, rpms):
         return [{"filename": rpm.filename} for rpm in rpms]
 
+    def _filter_item_log(self, type_ids, unit):
+        log_message = ""
+        if "rpm" in type_ids or "srpm" in type_ids:
+            log_message = unit.filename
+        elif "modulemd" in type_ids:
+            log_message = unit.nsvca
+        elif "modulemd_defaults" in type_ids:
+            log_message = ":".join((unit.name, unit.stream))
+        return log_message
+
     def unassociate_units(self, repo, units, type_ids):
         url = "repositories/{dst_repo}/actions/unassociate/".format(dst_repo=repo.id)
         data = {
@@ -145,10 +155,10 @@ class Pulp(object):
                 "filters": {"unit": {"$or": self._get_query_list(type_ids, units)}},
             },
         }
-        log_msg = "Unassociating %s from %s"
+        log_msg = "Unassociating %s(%s) from %s"
         for unit in units:
-            _LOG.info(log_msg, str(unit), repo.id)
-
+            info = self._filter_item_log(type_ids, unit)
+            _LOG.info(log_msg, ",".join(type_ids), info, repo.id)
         ret = self.do_request("post", url, data).json()
         return [task["task_id"] for task in ret["spawned_tasks"]]
 
@@ -165,9 +175,10 @@ class Pulp(object):
                 },
             },
         }
-        log_msg = "Associating %s from %s to %s"
+        log_msg = "Associating %s(%s) from %s to %s"
         for unit in units:
-            _LOG.info(log_msg, str(unit), src_repo.id, dest_repo.id)
+            info = self._filter_item_log(type_ids, unit)
+            _LOG.info(log_msg, ",".join(type_ids), info, src_repo.id, dest_repo.id)
         ret = self.do_request("post", url, data)
         ret.raise_for_status()
         ret_json = ret.json()
