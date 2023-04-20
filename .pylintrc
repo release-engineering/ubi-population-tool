@@ -109,5 +109,6 @@ disable=print-statement,
         consider-using-set-comprehension,
         import-outside-toplevel,
         inconsistent-return-statements,
-        too-many-instance-attributes
+        too-many-instance-attributes,
+        too-many-lines,
 

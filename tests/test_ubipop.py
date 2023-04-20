@@ -1,49 +1,50 @@
-from datetime import datetime
-
 import logging
 import os
 import shutil
 import sys
 import tempfile
 import textwrap
+from concurrent.futures import wait
+from datetime import datetime
 
 import pytest
 import ubiconfig
-
-from pubtools.pulplib import (
-    YumRepository,
-    FakeController,
-    Client,
-    Distributor,
-    ModulemdUnit,
-    RpmUnit,
-    ModulemdDefaultsUnit,
-)
-from mock import MagicMock, patch, call
+from mock import MagicMock, call, patch
 from more_executors import Executors
 from more_executors.futures import f_proxy, f_return
-from ubipop import (
-    RepoContent,
-    UbiPopulateRunner,
-    UbiRepoSet,
-    RepoSet,
-    UbiPopulate,
-    ConfigMissing,
-    RepoMissing,
-)
-from ubipop._utils import (
-    AssociateActionModules,
-    UnassociateActionModules,
-    AssociateActionModuleDefaults,
-    UnassociateActionModuleDefaults,
-)
-from .conftest import (
-    get_rpm_unit,
-    get_srpm_unit,
-    get_modulemd_unit,
-    get_modulemd_defaults_unit,
+from pubtools.pulplib import (
+    Client,
+    Distributor,
+    FakeController,
+    ModulemdDefaultsUnit,
+    ModulemdUnit,
+    RpmUnit,
+    YumRepository,
 )
 
+from ubipop import (
+    ConfigMissing,
+    RepoContent,
+    RepoMissing,
+    RepoSet,
+    UbiPopulate,
+    UbiPopulateRunner,
+    UbiRepoSet,
+)
+from ubipop._cdn import Publisher
+from ubipop._utils import (
+    AssociateActionModuleDefaults,
+    AssociateActionModules,
+    UnassociateActionModuleDefaults,
+    UnassociateActionModules,
+)
+
+from .conftest import (
+    get_modulemd_defaults_unit,
+    get_modulemd_unit,
+    get_rpm_unit,
+    get_srpm_unit,
+)
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "./data")
 
@@ -136,14 +137,19 @@ def fixture_executor():
 
 @pytest.fixture(name="mock_ubipop_runner")
 def fixture_mock_ubipop_runner(ubi_repo_set, test_ubiconfig, executor):
+    publisher_args = {"publish_options": {"clean": True}}
+
     yield UbiPopulateRunner(
-        MagicMock(),
-        MagicMock(),
-        ubi_repo_set,
-        test_ubiconfig,
-        False,
-        executor,
-        MagicMock(),
+        legacy_client=MagicMock(),  # legacy client
+        pulp_client=MagicMock(),  # pubtools-pulplib client
+        output_repo_set=ubi_repo_set,
+        ubiconfig_item=test_ubiconfig,
+        dry_run=False,
+        executor=executor,
+        ubi_manifest_client=MagicMock(),
+        publisher=Publisher(
+            **publisher_args,
+        ),
     )
 
 
@@ -231,10 +237,11 @@ def test_publish_out_repos(mock_ubipop_runner):
         f_proxy(f_return(repo)), f_proxy(f_return()), f_proxy(f_return())
     )
 
-    fts = mock_ubipop_runner._publish_out_repos()
+    mock_ubipop_runner._publish_out_repos()
 
     # we should publish only one repository with one distributor
-    assert len(fts) == 1
+    assert len(mock_ubipop_runner._publisher._publish_queue) == 1
+    wait(mock_ubipop_runner._publisher._publish_queue)
     assert [hist.repository.id for hist in fake_pulp.publish_history] == ["repo"]
 
 
@@ -674,14 +681,15 @@ def test_create_output_file_all_repos(
     try:
         out_file_path = os.path.join(path, "output.txt")
         with patch("ubipop.UbimClient"):
-            ubipop = UbiPopulate(
-                "foo.pulp.com",
-                ("foo", "foo"),
-                False,
-                output_repos=out_file_path,
-                ubi_manifest_url="https://ubi-manifest.com",
-            )
-            ubipop.populate_ubi_repos()
+            with patch("ubipop.Publisher"):
+                ubipop = UbiPopulate(
+                    "foo.pulp.com",
+                    ("foo", "foo"),
+                    False,
+                    output_repos=out_file_path,
+                    ubi_manifest_url="https://ubi-manifest.com",
+                )
+                ubipop.populate_ubi_repos()
 
         with open(out_file_path) as f:
             content = f.readlines()
@@ -1263,11 +1271,15 @@ def test_get_current_content(mock_ubipop_runner, pulp, skip_debug_repo):
     assert source_rpms[0].name == "test-srpm"
 
 
-@pytest.fixture(name="fastpurge_env")
-def fixture_fastpurge_env(monkeypatch):
+@pytest.fixture(name="cache_purge_env")
+def fixture_cache_purge_env(monkeypatch):
     with tempfile.NamedTemporaryFile("w") as fp:
         monkeypatch.setenv("UBIPOP_EDGERC_CFG", fp.name)
-        monkeypatch.setenv("UBIPOP_FASTPURGE_ROOT_URL", "https://test.root-url.com/")
+        monkeypatch.setenv("UBIPOP_CDN_ROOT", "https://test.root-url.com/")
+        monkeypatch.setenv(
+            "UBIPOP_ARL_TEMPLATES",
+            "/test/template-1/{ttl}/{path},/test/template-2/{ttl}/{path}",
+        )
 
         fp.write(
             textwrap.dedent(
@@ -1288,7 +1300,7 @@ def fixture_fastpurge_env(monkeypatch):
 @patch("pubtools.pulplib.YumRepository.get_debug_repository")
 @patch("pubtools.pulplib.YumRepository.get_source_repository")
 def test_populate_ubi_repos(
-    get_debug_repository, get_source_repository, fastpurge_env, requests_mock
+    get_debug_repository, get_source_repository, cache_purge_env, requests_mock
 ):
     # pylint: disable=unused-argument
     """Test run of populate_ubi_repos that check correct number of repo publication. It's simplified to
@@ -1435,6 +1447,7 @@ def test_populate_ubi_repos(
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
     _create_fastpurge_mocks(requests_mock)
+    _create_cdn_mocks(requests_mock)
     # let's run actual population
     ubi_populate.populate_ubi_repos()
     history = fake_pulp.publish_history
@@ -1461,10 +1474,17 @@ def test_populate_ubi_repos(
     ]  # last request should be for purge cache request
 
     expected_req = [
-        "https://test.root-url.com/content/unit/2/client/repodata/repomd.xml",
         "https://test.root-url.com/content/unit/3/client/repodata/repomd.xml",
+        "/test/template-1/24h/content/unit/3/client/repodata/repomd.xml",
+        "/test/template-2/24h/content/unit/3/client/repodata/repomd.xml",
+        "https://test.root-url.com/content/unit/2/client/repodata/repomd.xml",
+        "/test/template-1/30m/content/unit/2/client/repodata/repomd.xml",
+        "/test/template-2/30m/content/unit/2/client/repodata/repomd.xml",
         "https://test.root-url.com/content/unit/1/client/repodata/repomd.xml",
+        "/test/template-1/10s/content/unit/1/client/repodata/repomd.xml",
+        "/test/template-2/10s/content/unit/1/client/repodata/repomd.xml",
     ]
+
     assert sorted(request.json()["objects"]) == sorted(expected_req)
 
 
@@ -1526,3 +1546,15 @@ def _create_ubi_manifest_mocks(requests_mock):
     url = os.path.join("https://ubi-manifest.com", url)
     response = {"repo_id": "some-repo-id", "content": []}
     requests_mock.register_uri("GET", url, json=response)
+
+
+def _create_cdn_mocks(requests_mock):
+    url_ttl = [
+        ("https://test.root-url.com/content/unit/1/client/repodata/repomd.xml", "10s"),
+        ("https://test.root-url.com/content/unit/2/client/repodata/repomd.xml", "30m"),
+        ("https://test.root-url.com/content/unit/3/client/repodata/repomd.xml", "24h"),
+    ]
+
+    for url, ttl in url_ttl:
+        headers = {"X-Cache-Key": f"/fake/cache-key/{ttl}/something"}
+        requests_mock.register_uri("HEAD", url, headers=headers)

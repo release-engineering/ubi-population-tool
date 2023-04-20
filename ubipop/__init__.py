@@ -26,7 +26,7 @@ from ubipop._utils import (
 )
 from ._matcher import Matcher
 from .ubi_manifest_client.client import Client as UbimClient
-
+from ._cdn import Publisher
 
 _LOG = logging.getLogger("ubipop")
 
@@ -138,8 +138,19 @@ class UbiPopulate(object):
 
         self._ubi_manifest_url = kwargs.get("ubi_manifest_url") or None
 
-        self._EDGERC_CFG = os.getenv("UBIPOP_EDGERC_CFG", "/etc/.edgerc")
-        self._FASTPURGE_ROOT_URL = os.getenv("UBIPOP_FASTPURGE_ROOT_URL", "")
+        self._publisher_args = {
+            "edgerc": os.getenv("UBIPOP_EDGERC_CFG", "/etc/.edgerc"),
+            "publish_options": {
+                "clean": True,
+            },
+            "cdn_root": os.getenv("UBIPOP_CDN_ROOT", ""),
+            "arl_templates": os.getenv("UBIPOP_ARL_TEMPLATES", "").split(","),
+            "cert": (
+                os.getenv("UBIPOP_CDN_CERT", ""),
+                os.getenv("UBIPOP_CDN_KEY", ""),
+            ),
+            "verify": os.getenv("UBIPOP_CDN_CA_CERT", ""),
+        }
 
     @property
     def pulp_client(self):
@@ -320,47 +331,30 @@ class UbiPopulate(object):
             ubi_binary_repos.extend(
                 [repo_set.out_repos.rpm.id for repo_set in repo_pairs]
             )
+
         with UbimClient(self._ubi_manifest_url) as ubim_client:
             tasks = ubim_client.generate_manifest(ubi_binary_repos)
             tasks.result()
-            awaited_repos_publishes = self._run_ubi_population(
-                repo_pairs_list, out_repos, ubim_client
-            )
 
-        # wait until publication of all repos is finished
-        if awaited_repos_publishes:
-            f_sequence(awaited_repos_publishes).result()
-
-        self._purge_cache(out_repos)
+            with Publisher(**self._publisher_args) as publisher:
+                self._run_ubi_population(
+                    repo_pairs_list, out_repos, ubim_client, publisher
+                )
+                publisher.wait_publish_and_purge_cache()
 
         if self.output_repos:
             with open(self.output_repos, "w") as f:
                 for repo in out_repos:
                     f.write(repo.id.strip() + "\n")
 
-    def _purge_cache(self, repos):
-        if not self.dry_run and self._FASTPURGE_ROOT_URL:
-            with FastPurgeClient(auth=self._EDGERC_CFG) as fp_client:
-                urls_to_purge = []
-                for repo in repos:
-                    for url in repo.mutable_urls:
-                        flush_url = os.path.join(
-                            self._FASTPURGE_ROOT_URL, repo.relative_url, url
-                        )
-                        urls_to_purge.append(flush_url)
-                _LOG.info("Purging cache started.")
-                fp_client.purge_by_url(urls_to_purge).result()
-                _LOG.info("Purging cache finished.")
-        else:
-            _LOG.warning("Cache purge disabled.")
-
-    def _run_ubi_population(self, repo_pairs_list, out_repos, ubim_client=None):
-        awaited_repos_publishes = []
+    def _run_ubi_population(
+        self, repo_pairs_list, out_repos, ubim_client=None, publisher=None
+    ):
         for repo_pairs, config in repo_pairs_list:
             for repo_set in repo_pairs:
                 right_config = self._get_config(repo_set.out_repos.rpm, config)
 
-                repos_publishes = UbiPopulateRunner(
+                UbiPopulateRunner(
                     self.pulp,
                     self.pulp_client,
                     repo_set,
@@ -368,14 +362,10 @@ class UbiPopulate(object):
                     self.dry_run,
                     self._executor,
                     ubim_client,
+                    publisher,
                 ).run_ubi_population()
 
                 out_repos.update(repo_set.get_output_repos())
-                # in case of dry-run there are no publications expected
-                if repos_publishes:
-                    awaited_repos_publishes.extend(repos_publishes)
-
-        return awaited_repos_publishes
 
     def _get_ubi_repo_sets(self, ubi_binary_cs):
         """
@@ -438,6 +428,7 @@ class UbiPopulateRunner(object):
         dry_run,
         executor,
         ubi_manifest_client=None,
+        publisher=None,
     ):
         self.pulp = legacy_client
         self.pulp_client = pulp_client
@@ -447,6 +438,7 @@ class UbiPopulateRunner(object):
         self.ubiconfig = ubiconfig_item
         self.dry_run = dry_run
         self._executor = executor
+        self._publisher = publisher
 
     def _determine_pulp_actions(self, units, current, diff_f, extra_units=None):
         expected = list(units)
@@ -640,8 +632,7 @@ class UbiPopulateRunner(object):
                 (mdd_association,), (mdd_unassociation,)
             )
 
-            # return list of futures with repo publishes
-            return self._publish_out_repos()
+            self._publish_out_repos()
 
     def _associate_unassociate_units(self, action_list):
         fts = []
@@ -768,14 +759,13 @@ class UbiPopulateRunner(object):
         return current_content
 
     def _publish_out_repos(self):
-        fts = []
-        repos_to_publish = (
+        to_publish = []
+
+        for repo in (
             self.repos.out_repos.rpm,
             self.repos.out_repos.debug,
             self.repos.out_repos.source,
-        )
-        options = PublishOptions(clean=True)
-        for repo in repos_to_publish:
+        ):
             if repo.result():
-                fts.append(repo.publish(options))
-        return fts
+                to_publish.append(repo)
+        self._publisher.enqueue(*to_publish)
