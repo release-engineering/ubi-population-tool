@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: 3.9
       - name: Install Tox
-        run: pip install tox
+        run: pip install tox 'virtualenv<20.21.1'
       - name: Run Tox
         run: |
           tox -e docs
