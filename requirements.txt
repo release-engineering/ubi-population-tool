@@ -6,3 +6,4 @@ pyrsistent
 pubtools-pulplib>=2.34.2
 attrs
 fastpurge
+urllib3<2
