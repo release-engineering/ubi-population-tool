@@ -32,14 +32,12 @@ setup(
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.6",
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     url="https://github.com/release-engineering/ubi-population-tool",
     install_requires=get_requirements(),
+    python_requires=">=3.7",
     packages=find_packages(exclude=["tests", "tests.*"]),
     entry_points={
         "console_scripts": [
