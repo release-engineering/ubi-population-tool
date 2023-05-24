@@ -37,7 +37,20 @@ def test_no_pulp_hostname(capsys):
 @pytest.mark.parametrize(
     "auth_args",
     [
-        (["--user", "foo", "--pass", "foo", "--cert", "foo/cert.cert"]),
+        (
+            [
+                "--user",
+                "foo",
+                "--pass",
+                "foo",
+                "--cert",
+                "foo/cert.cert",
+                "--key",
+                "foo/cert.key",
+            ]
+        ),
+        (["--user", "foo", "--key", "foo/cert.key"]),
+        (["--pass", "foo", "--cert", "foo/cert.cert"]),
         (["--pass", "foo", "--cert", "foo/cert.cert"]),
         (["--user", "foo", "--cert", "foo/cert.cert"]),
         (["--user", "foo"]),
@@ -57,7 +70,7 @@ def test_wrong_user_pass_cert_combination(capsys, auth_args):
         main(args)
 
     _, err = capsys.readouterr()
-    assert "Provide --user and --password options or --cert" in err
+    assert "Provide --user and --password options or --cert and --key" in err
     assert e_info.value.code == 2
 
 
@@ -130,6 +143,8 @@ def test_crt(mock_ubipopulate):
         "foo.pulp.com",
         "--cert",
         "/cert.cert",
+        "--key",
+        "/cert.key",
         "--conf-src",
         "custom/conf/dir",
         "--ubi-manifest-url",
@@ -138,7 +153,7 @@ def test_crt(mock_ubipopulate):
     main(args)
     mock_ubipopulate.assert_called_once_with(
         "foo.pulp.com",
-        ("/cert.cert",),
+        ("/cert.cert", "/cert.key"),
         False,
         [],
         "custom/conf/dir",

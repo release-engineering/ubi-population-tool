@@ -119,7 +119,7 @@ class UbiPopulate(object):
         **kwargs
     ):
         # legacy client implemeted in this repo, it's expected to be replaced by pubtools.pulplib.Client
-        self.pulp = Pulp(pulp_hostname, pulp_auth, insecure)
+        self.pulp = self._make_pulp_client(pulp_hostname, pulp_auth, insecure, Pulp)
         self._pulp_hostname = pulp_hostname
         self._pulp_auth = pulp_auth
         self._insecure = insecure
@@ -156,12 +156,20 @@ class UbiPopulate(object):
     def pulp_client(self):
         if self._pulp_client is None:
             self._pulp_client = self._make_pulp_client(
-                self._pulp_hostname, self._pulp_auth, self._insecure
+                self._pulp_hostname, self._pulp_auth, self._insecure, Client
             )
         return self._pulp_client
 
-    def _make_pulp_client(self, url, auth, insecure):
-        return Client("https://" + url, auth=auth, verify=not insecure)
+    def _make_pulp_client(self, url, auth, insecure, client_klass):
+        kwargs = {
+            "verify": not insecure,
+        }
+        if os.path.isfile(auth[0]) and os.path.isfile(auth[1]):
+            kwargs["cert"] = auth
+        else:
+            kwargs["auth"] = auth
+
+        return client_klass("https://" + url, **kwargs)
 
     @property
     def ubiconfig_list(self):
