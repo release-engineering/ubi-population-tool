@@ -136,7 +136,7 @@ def main(args):
         opts.dry_run,
         opts.input,
         opts.conf_src,
-        opts.insecure,
+        not opts.insecure,
         opts.workers,
         opts.output_repos,
         content_sets=opts.content_sets,

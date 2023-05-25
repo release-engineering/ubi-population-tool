@@ -113,16 +113,16 @@ class UbiPopulate(object):
         dry_run,
         ubiconfig_filename_list=None,
         ubiconfig_dir_or_url=None,
-        insecure=False,
+        verify=True,
         workers_count=4,
         output_repos=None,
         **kwargs
     ):
         # legacy client implemeted in this repo, it's expected to be replaced by pubtools.pulplib.Client
-        self.pulp = self._make_pulp_client(pulp_hostname, pulp_auth, insecure, Pulp)
+        self.pulp = self._make_pulp_client(pulp_hostname, pulp_auth, verify, Pulp)
         self._pulp_hostname = pulp_hostname
         self._pulp_auth = pulp_auth
-        self._insecure = insecure
+        self._verify = verify
         self._pulp_client = None
         self.dry_run = dry_run
         self.output_repos = output_repos
@@ -156,13 +156,13 @@ class UbiPopulate(object):
     def pulp_client(self):
         if self._pulp_client is None:
             self._pulp_client = self._make_pulp_client(
-                self._pulp_hostname, self._pulp_auth, self._insecure, Client
+                self._pulp_hostname, self._pulp_auth, self._verify, Client
             )
         return self._pulp_client
 
-    def _make_pulp_client(self, url, auth, insecure, client_klass):
+    def _make_pulp_client(self, url, auth, verify, client_klass):
         kwargs = {
-            "verify": not insecure,
+            "verify": verify,
         }
         if os.path.isfile(auth[0]) and os.path.isfile(auth[1]):
             kwargs["cert"] = auth
@@ -327,7 +327,6 @@ class UbiPopulate(object):
                     "Skipping %s, since it's been used already", config.file_name
                 )
                 continue
-
             try:
                 repo_pairs = self._get_ubi_repo_sets(config.content_sets.rpm.output)
 
