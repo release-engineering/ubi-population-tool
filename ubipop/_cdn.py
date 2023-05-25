@@ -67,7 +67,9 @@ class Publisher:
 
     @property
     def cdn_client(self):
-        if self._cdn_client_args is None:
+        if not all(
+            [self._cdn_client_args["url"], self._cdn_client_args["arl_templates"]]
+        ):
             return None
 
         if not self._cdn_client:
@@ -76,7 +78,7 @@ class Publisher:
 
     @property
     def cdn_cache_purger(self):
-        if self._cdn_root is None:
+        if not self._cdn_root:
             return None
 
         if not self._cdn_cache_purger:
@@ -96,7 +98,6 @@ class Publisher:
         f_sequence(self._publish_queue).result()
         LOG.info("Publish finished")
         if self.cdn_cache_purger:
-
             LOG.info("CDN cache purge started")
             self._purge_cache().result()
             LOG.info("CDN cache purge finished")
@@ -114,8 +115,9 @@ class Publisher:
 
                     url = os.path.join(self._cdn_root, relative_mutable_url)
                     purges.append(f_return(url))
-                    arls_ft = self.cdn_client.get_arl_for_path(relative_mutable_url)
-                    purges.extend(arls_ft)
+                    if self.cdn_client:
+                        arls_ft = self.cdn_client.get_arl_for_path(relative_mutable_url)
+                        purges.extend(arls_ft)
 
         return f_map(f_sequence(purges), self.cdn_cache_purger.purge_by_url)
 
@@ -218,7 +220,6 @@ class CdnClient:
         return self._session.head(*args, **kwargs)
 
     def _on_failure(self, header, exception):
-
         LOG.error("Requesting header %s failed: %s", header, exception)
         raise exception
 
@@ -226,7 +227,6 @@ class CdnClient:
         url = os.path.join(self._url, path)
 
         LOG.info("Getting headers %s for %s", list(headers.values()), url)
-        # import pdb; pdb.set_trace()
 
         out = self._executor.submit(self._head, url, headers=headers)
         out = f_map(
