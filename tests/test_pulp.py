@@ -30,7 +30,7 @@ ORIG_HTTP_RETRY_BACKOFF = pulp_client.HTTP_RETRY_BACKOFF
 
 @pytest.fixture(name="mock_pulp")
 def fixture_mock_pulp():
-    yield Pulp("foo.pulp.com", (None,))
+    yield Pulp("foo.pulp.com")
 
 
 @pytest.fixture(name="mock_repo")
@@ -379,5 +379,9 @@ def test_session_is_not_shared(mock_pulp, count):
 
 def test_insecure():
     with patch("urllib3.disable_warnings") as patched_warnings:
-        Pulp("foo.host", ("fake", "user"), insecure=True)
+        kwargs = {
+            "auth": ("fake", "user"),
+            "insecure": True,
+        }
+        Pulp("foo.host", **kwargs)
         patched_warnings.assert_called_once()
