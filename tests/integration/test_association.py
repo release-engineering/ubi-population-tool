@@ -1,23 +1,23 @@
+import json
+import logging
 import os
 import subprocess
-import logging
+
 import pytest
 import requests
 import ubiconfig
-import ubipop
-import json
-
-from ubipop._pulp_client import Pulp
-from ubipop.ubi_manifest_client.client import Client
-
 from pubtools.pulplib import (
     Client,
     Criteria,
     Matcher,
+    ModulemdDefaultsUnit,
     ModulemdUnit,
     RpmUnit,
-    ModulemdDefaultsUnit,
 )
+
+import ubipop
+from ubipop._pulp_client import Pulp
+from ubipop.ubi_manifest_client.client import Client
 
 PULP_HOSTNAME = os.getenv("TEST_PULP_HOSTNAME")
 PULP_USER = os.getenv("TEST_PULP_USER")
@@ -232,7 +232,6 @@ def separate_modules(module_list):
 
 
 def get_rpm_from_repo(client, repo, rpm_list, field):
-
     rpm = []
     if field == "name":
         repo_unit = get_rpm_by_name(client, repo, rpm_list)
@@ -553,7 +552,6 @@ def test_ubipop_not_filter_non_module_rpm_and_module_rpm_with_same_package(pulp_
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
 def test_ubipop_not_filter_module_rpm_with_different_version(pulp_client):
-
     """
     Test if ubipop will not filter module rpm in the repo
 
@@ -639,7 +637,6 @@ def test_ubipop_not_filter_module_rpm_with_different_version(pulp_client):
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
 def test_ubipop_get_dependencies_module_rpm(pulp_client):
-
     """
     Test if ubipop get the dependencies of module
     ubipop can get the dependencies of rpm

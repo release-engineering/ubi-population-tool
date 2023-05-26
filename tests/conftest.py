@@ -1,7 +1,8 @@
 import sys
-import pytest
 
-from pubtools.pulplib import RpmUnit, ModulemdUnit, ModulemdDefaultsUnit, FakeController
+import pytest
+from pubtools.pulplib import FakeController, ModulemdDefaultsUnit, ModulemdUnit, RpmUnit
+
 from ubipop._matcher import UbiUnit
 
 if sys.version_info <= (

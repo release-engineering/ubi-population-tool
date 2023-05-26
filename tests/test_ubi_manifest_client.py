@@ -1,7 +1,7 @@
 import os
-from mock import MagicMock
 
 import pytest
+from mock import MagicMock
 
 from ubipop.ubi_manifest_client.client import Client, UbiManifestTaskFailure
 from ubipop.ubi_manifest_client.models import (
@@ -38,7 +38,6 @@ def test_generate_manifest(requests_mock):
     )
 
     with Client("https://foo-bar.com") as client:
-
         tasks = client.generate_manifest(["repo_id_1", "repo_id_2"])
         tasks.result()
 

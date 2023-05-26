@@ -1,7 +1,8 @@
 import pytest
-
 from mock import MagicMock
-from pubtools.pulplib import YumRepository, ModulemdDefaultsUnit
+from pubtools.pulplib import ModulemdDefaultsUnit, YumRepository
+
+from ubipop._matcher import UbiUnit
 from ubipop._utils import (
     AssociateAction,
     AssociateActionModuleDefaults,
@@ -13,7 +14,6 @@ from ubipop._utils import (
     UnassociateActionRpms,
     flatten_md_defaults_name_profiles,
 )
-from ubipop._matcher import UbiUnit
 
 
 def test_raise_not_implemented_pulp_action():
