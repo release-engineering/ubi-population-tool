@@ -42,7 +42,9 @@ def load_ubiconfig(filename, version):
 @pytest.fixture(name="pulp_client")
 def make_pulp_client():
     with Client(
-        url="https://" + PULP_HOSTNAME + "/", auth=(PULP_USER, PULP_PWD), verify=True
+        url="https://" + PULP_HOSTNAME + "/",
+        auth=(PULP_USER, PULP_PWD),
+        verify=PULP_SECURE,
     ) as client:
         yield client
 
@@ -58,7 +60,7 @@ def run_ubipop_tool(content_set, workers=10, dry_run=False):
         pulp_auth=auth,
         dry_run=dry_run,
         ubiconfig_dir_or_url=GITLAB_CONFIG_URL,
-        insecure=not PULP_SECURE,
+        verify=PULP_SECURE,
         workers_count=workers,
         ubi_manifest_url=MANIFEST_URL,
         content_sets=content_set,
@@ -71,7 +73,7 @@ def run_ubipop_tool(content_set, workers=10, dry_run=False):
 
 
 def get_repos_from_cs(cs, skip_dot_version=False):
-    p = Pulp(PULP_HOSTNAME, (PULP_USER, PULP_PWD), not PULP_SECURE)
+    p = Pulp(PULP_HOSTNAME, auth=(PULP_USER, PULP_PWD), verify=PULP_SECURE)
 
     ret = p.do_request(
         "post",

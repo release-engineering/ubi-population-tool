@@ -47,16 +47,13 @@ class Pulp(object):
 
     def __init__(self, hostname, **kwargs):
         self.hostname = hostname
-        self.scheme = "https://"
+        self.scheme = "https://" if not hostname.startswith("https://") else ""
         self.base_url = urljoin(self.scheme + hostname, self.PULP_API)
         self.local = threading.local()
 
         self._session_kwargs = {}
 
-        if "insecure" in kwargs:
-            kwargs["verify"] = not kwargs.pop("insecure")
-
-        if not kwargs.get("verify"):
+        if kwargs.get("verify") is False:
             import urllib3
 
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

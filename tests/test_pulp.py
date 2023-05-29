@@ -381,7 +381,7 @@ def test_insecure():
     with patch("urllib3.disable_warnings") as patched_warnings:
         kwargs = {
             "auth": ("fake", "user"),
-            "insecure": True,
+            "verify": False,
         }
         Pulp("foo.host", **kwargs)
         patched_warnings.assert_called_once()
