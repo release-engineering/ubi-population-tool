@@ -138,13 +138,14 @@ class UbiPopulate(object):
 
         self._ubi_manifest_url = kwargs.get("ubi_manifest_url") or None
 
+        arl_templates = os.getenv("UBIPOP_ARL_TEMPLATES", "")
         self._publisher_args = {
             "edgerc": os.getenv("UBIPOP_EDGERC_CFG", "/etc/.edgerc"),
             "publish_options": {
                 "clean": True,
             },
             "cdn_root": os.getenv("UBIPOP_CDN_ROOT", ""),
-            "arl_templates": os.getenv("UBIPOP_ARL_TEMPLATES", "").split(","),
+            "arl_templates": arl_templates.split(",") if arl_templates else [],
             "cert": (
                 os.getenv("UBIPOP_CDN_CERT", ""),
                 os.getenv("UBIPOP_CDN_KEY", ""),
