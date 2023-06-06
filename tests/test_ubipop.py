@@ -6,6 +6,7 @@ import tempfile
 import textwrap
 from concurrent.futures import wait
 from datetime import datetime
+from tempfile import NamedTemporaryFile
 
 import pytest
 import ubiconfig
@@ -1558,3 +1559,40 @@ def _create_cdn_mocks(requests_mock):
     for url, ttl in url_ttl:
         headers = {"X-Cache-Key": f"/fake/cache-key/{ttl}/something"}
         requests_mock.register_uri("HEAD", url, headers=headers)
+
+
+@patch("ubipop.Client")
+@patch("ubipop.Pulp")
+def test_make_pulp_client_cert(mocked_client, mocked_legacy_client):
+    """Tests that pulp client (pubtools and legacy) can be created with cert/key used for auth"""
+    with NamedTemporaryFile() as cert, NamedTemporaryFile() as key:
+        cert_path = os.path.abspath(cert.name)
+        key_path = os.path.abspath(key.name)
+        auth = (cert_path, key_path)
+
+        ubi_populate = UbiPopulate("example.pulp.com", auth, dry_run=False)
+        _ = ubi_populate.pulp_client
+
+        mocked_client.assert_called_once_with(
+            "https://example.pulp.com", verify=True, cert=auth
+        )
+        mocked_legacy_client.assert_called_once_with(
+            "https://example.pulp.com", verify=True, cert=auth
+        )
+
+
+@patch("ubipop.Client")
+@patch("ubipop.Pulp")
+def test_make_pulp_client_username(mocked_client, mocked_legacy_client):
+    """Tests that pulp client (pubtools and legacy) can be created with username/password used for auth"""
+
+    auth = ("username", "password")
+    ubi_populate = UbiPopulate("example.pulp.com", auth, dry_run=False)
+    _ = ubi_populate.pulp_client
+
+    mocked_client.assert_called_once_with(
+        "https://example.pulp.com", verify=True, auth=auth
+    )
+    mocked_legacy_client.assert_called_once_with(
+        "https://example.pulp.com", verify=True, auth=auth
+    )

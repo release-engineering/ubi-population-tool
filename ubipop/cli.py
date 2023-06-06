@@ -58,7 +58,16 @@ def parse_args(args):
         "--password", action="store", required=False, help="pulp password"
     )
     parser.add_argument(
-        "--cert", action="store", required=False, help="path to to user cert"
+        "--cert",
+        action="store",
+        required=False,
+        help="path to to user cert for pulp authentication",
+    )
+    parser.add_argument(
+        "--key",
+        action="store",
+        required=False,
+        help="path to to user key for pulp authentication",
     )
     parser.add_argument(
         "--workers",
@@ -95,18 +104,17 @@ def parse_args(args):
 
     parsed = parser.parse_args(args)
 
-    auth_err_msg = "Provide --user and --password options or --cert"
-    if all((parsed.user, parsed.password, parsed.cert)):
+    auth_err_msg = "Provide --user and --password options or --cert and --key"
+    if all((parsed.user, parsed.password, parsed.cert, parsed.key)):
         parser.error(auth_err_msg)
 
-    auth = None
+    auth = (None, None)
     if parsed.user and parsed.password:
         auth = (parsed.user, parsed.password)
-    elif parsed.user and not parsed.password or not parsed.user and parsed.password:
-        parser.error(auth_err_msg)
-    elif parsed.cert:
-        auth = (parsed.cert,)
-    else:
+    elif parsed.cert and parsed.key:
+        auth = (parsed.cert, parsed.key)
+
+    if not all(auth):
         parser.error(auth_err_msg)
 
     return parser.parse_args(args), auth
@@ -128,7 +136,7 @@ def main(args):
         opts.dry_run,
         opts.input,
         opts.conf_src,
-        opts.insecure,
+        not opts.insecure,
         opts.workers,
         opts.output_repos,
         content_sets=opts.content_sets,

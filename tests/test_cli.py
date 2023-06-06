@@ -37,7 +37,20 @@ def test_no_pulp_hostname(capsys):
 @pytest.mark.parametrize(
     "auth_args",
     [
-        (["--user", "foo", "--pass", "foo", "--cert", "foo/cert.cert"]),
+        (
+            [
+                "--user",
+                "foo",
+                "--pass",
+                "foo",
+                "--cert",
+                "foo/cert.cert",
+                "--key",
+                "foo/cert.key",
+            ]
+        ),
+        (["--user", "foo", "--key", "foo/cert.key"]),
+        (["--pass", "foo", "--cert", "foo/cert.cert"]),
         (["--pass", "foo", "--cert", "foo/cert.cert"]),
         (["--user", "foo", "--cert", "foo/cert.cert"]),
         (["--user", "foo"]),
@@ -57,7 +70,7 @@ def test_wrong_user_pass_cert_combination(capsys, auth_args):
         main(args)
 
     _, err = capsys.readouterr()
-    assert "Provide --user and --password options or --cert" in err
+    assert "Provide --user and --password options or --cert and --key" in err
     assert e_info.value.code == 2
 
 
@@ -80,7 +93,7 @@ def test_default_config_source(mock_ubipopulate):
         False,
         [],
         None,
-        False,
+        True,
         4,
         None,
         content_sets=None,
@@ -112,7 +125,7 @@ def test_custom_config_source(mock_ubipopulate):
         False,
         [],
         "custom/conf/dir",
-        False,
+        True,
         4,
         None,
         content_sets=None,
@@ -130,6 +143,8 @@ def test_crt(mock_ubipopulate):
         "foo.pulp.com",
         "--cert",
         "/cert.cert",
+        "--key",
+        "/cert.key",
         "--conf-src",
         "custom/conf/dir",
         "--ubi-manifest-url",
@@ -138,11 +153,11 @@ def test_crt(mock_ubipopulate):
     main(args)
     mock_ubipopulate.assert_called_once_with(
         "foo.pulp.com",
-        ("/cert.cert",),
+        ("/cert.cert", "/cert.key"),
         False,
         [],
         "custom/conf/dir",
-        False,
+        True,
         4,
         None,
         content_sets=None,
@@ -176,7 +191,7 @@ def test_specified_filenames(mock_ubipopulate):
         False,
         ["f1", "f2"],
         "custom/conf/dir",
-        False,
+        True,
         4,
         None,
         content_sets=None,
@@ -208,7 +223,7 @@ def test_specified_content_sets(mock_ubipopulate):
         False,
         [],
         None,
-        False,
+        True,
         4,
         None,
         content_sets=[
@@ -242,7 +257,7 @@ def test_specified_repo_ids(mock_ubipopulate):
         False,
         [],
         None,
-        False,
+        True,
         4,
         None,
         content_sets=None,
@@ -279,7 +294,7 @@ def test_dry_run(mock_ubipopulate):
         True,
         ["f1", "f2"],
         "custom/conf/dir",
-        False,
+        True,
         4,
         None,
         content_sets=None,
@@ -315,7 +330,7 @@ def test_custom_workers_number(mock_ubipopulate):
         False,
         ["f1", "f2"],
         "custom/conf/dir",
-        False,
+        True,
         42,
         None,
         content_sets=None,
@@ -352,7 +367,7 @@ def test_insecure(mock_ubipopulate):
         False,
         ["f1", "f2"],
         "custom/conf/dir",
-        True,
+        False,
         42,
         None,
         content_sets=None,
@@ -384,7 +399,7 @@ def test_output_file(mock_ubipopulate):
         False,
         [],
         None,
-        False,
+        True,
         4,
         "/foo/out/repos.txt",
         content_sets=None,
@@ -416,7 +431,7 @@ def test_version(mock_ubipopulate):
         False,
         [],
         None,
-        False,
+        True,
         4,
         None,
         content_sets=None,
@@ -448,7 +463,7 @@ def test_content_set_regex(mock_ubipopulate):
         False,
         [],
         None,
-        False,
+        True,
         4,
         None,
         content_sets=None,

@@ -45,17 +45,26 @@ class PulpRetryAdapter(requests.adapters.HTTPAdapter):
 class Pulp(object):
     PULP_API = "/pulp/api/v2/"
 
-    def __init__(self, hostname, auth, insecure=False):
+    def __init__(self, hostname, **kwargs):
         self.hostname = hostname
-        self.auth = auth
-        self.scheme = "https://"
+        self.scheme = "https://" if not hostname.startswith("https://") else ""
         self.base_url = urljoin(self.scheme + hostname, self.PULP_API)
-        self.insecure = insecure
         self.local = threading.local()
-        if insecure:
+
+        self._session_kwargs = {}
+
+        if kwargs.get("verify") is False:
             import urllib3
 
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        for arg in (
+            "auth",
+            "cert",
+            "verify",
+        ):
+            if arg in kwargs:
+                self._session_kwargs[arg] = kwargs.pop(arg)
 
     def _make_session(self):
         adapter = PulpRetryAdapter()
@@ -63,10 +72,8 @@ class Pulp(object):
         session.mount("http://", adapter)
         session.mount("https://", adapter)
 
-        if len(self.auth) == 1:
-            session.cert = self.auth[0]
-        else:
-            session.auth = self.auth
+        for key, value in self._session_kwargs.items():
+            setattr(session, key, value)
 
         self.local.session = session
 
@@ -77,13 +84,9 @@ class Pulp(object):
         req_url = urljoin(self.base_url, url)
 
         if req_type == "post":
-            ret = self.local.session.post(
-                req_url, json=data, verify=not self.insecure, timeout=HTTP_TIMEOUT
-            )
+            ret = self.local.session.post(req_url, json=data, timeout=HTTP_TIMEOUT)
         elif req_type == "get":
-            ret = self.local.session.get(
-                req_url, verify=not self.insecure, timeout=HTTP_TIMEOUT
-            )
+            ret = self.local.session.get(req_url, timeout=HTTP_TIMEOUT)
         else:
             ret = None
 
