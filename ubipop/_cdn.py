@@ -10,7 +10,7 @@ from concurrent.futures import as_completed
 import requests
 from fastpurge import FastPurgeClient
 from more_executors import Executors
-from more_executors.futures import f_map, f_return, f_sequence
+from more_executors.futures import f_map, f_flat_map, f_return, f_sequence
 from pubtools.pulplib import PublishOptions
 
 LOG = logging.getLogger("ubipop")
@@ -106,7 +106,6 @@ class Publisher:
 
     def _purge_cache(self):
         purges = []
-
         for repo in as_completed(self._publish_queue):
             _repo = repo.result()
             if _repo.relative_url:
@@ -119,7 +118,7 @@ class Publisher:
                         arls_ft = self.cdn_client.get_arl_for_path(relative_mutable_url)
                         purges.extend(arls_ft)
 
-        return f_map(f_sequence(purges), self.cdn_cache_purger.purge_by_url)
+        return f_flat_map(f_sequence(purges), self.cdn_cache_purger.purge_by_url)
 
 
 class CdnCachePurger:
