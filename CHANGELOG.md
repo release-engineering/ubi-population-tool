@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
+## [0.14.2] - 2023-06-08
+
+### Fixed
+
+- Waiting for all CDN cache purge requests to finish
 
 ## [0.14.1] - 2023-06-05
 
@@ -119,7 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.2...HEAD
+[0.14.2]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.1...0.14.2
 [0.14.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.0...0.14.1
 [0.14.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.13.0...0.14.0
 [0.13.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.12.0...0.13.0
