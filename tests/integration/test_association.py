@@ -23,6 +23,7 @@ PULP_HOSTNAME = os.getenv("TEST_PULP_HOSTNAME")
 PULP_USER = os.getenv("TEST_PULP_USER")
 PULP_PWD = os.getenv("TEST_PULP_PWD")
 PULP_CERT_PATH = os.getenv("TEST_PULP_CERT_PATH")
+PULP_KEY_PATH = os.getenv("TEST_PULP_KEY_PATH")
 PULP_SECURE = os.getenv("TEST_PULP_SECURE", "0").lower() in ["true", "yes", "1"]
 MANIFEST_URL = os.getenv("TEST_MANIFEST_URL")
 REQUESTS_CA_BUNDLE = os.getenv("REQUESTS_CA_BUNDLE")
@@ -41,19 +42,24 @@ def load_ubiconfig(filename, version):
 
 @pytest.fixture(name="pulp_client")
 def make_pulp_client():
-    with Client(
-        url="https://" + PULP_HOSTNAME + "/",
-        auth=(PULP_USER, PULP_PWD),
-        verify=PULP_SECURE,
-    ) as client:
-        yield client
+    kwargs = {
+        "verify": PULP_SECURE,
+    }
+
+    if PULP_CERT_PATH is not None and PULP_KEY_PATH is not None:
+        kwargs["cert"] = (PULP_CERT_PATH, PULP_KEY_PATH)
+    # if cert/key not present, use user/pass auth to pulp
+    else:
+        kwargs["auth"] = (PULP_USER, PULP_PWD)
+
+    return Client("https://" + PULP_HOSTNAME + "/", **kwargs)
 
 
 def run_ubipop_tool(content_set, workers=10, dry_run=False):
     if PULP_CERT_PATH is None:
         auth = (PULP_USER, PULP_PWD)
     else:
-        auth = (PULP_CERT_PATH,)
+        auth = (PULP_CERT_PATH, PULP_KEY_PATH)
 
     up = ubipop.UbiPopulate(
         pulp_hostname=PULP_HOSTNAME,
@@ -73,7 +79,12 @@ def run_ubipop_tool(content_set, workers=10, dry_run=False):
 
 
 def get_repos_from_cs(cs, skip_dot_version=False):
-    p = Pulp(PULP_HOSTNAME, auth=(PULP_USER, PULP_PWD), verify=PULP_SECURE)
+    if PULP_CERT_PATH is not None:
+        p = Pulp(
+            PULP_HOSTNAME, cert=(PULP_CERT_PATH, PULP_KEY_PATH), verify=PULP_SECURE
+        )
+    else:
+        p = Pulp(PULP_HOSTNAME, auth=(PULP_USER, PULP_PWD), verify=PULP_SECURE)
 
     ret = p.do_request(
         "post",
