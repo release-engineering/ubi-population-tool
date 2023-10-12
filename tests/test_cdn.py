@@ -111,8 +111,12 @@ def test_publisher_with_cache_purge(pulp, requests_mock):
     setup_fastpurge_mock(requests_mock)
 
     url_ttl = ("https://cdn.example.com/content/unit/1/client/repomd.xml", "33s")
-
-    headers = {"X-Cache-Key": f"/fake/cache-key/{url_ttl[1]}/something"}
+    # ARLs are generated from the template using the {ttl} placeholder, which is replaced with
+    # the real TTL value. The real TTL value is extracted from the cache key header of the real
+    # request for the given path using '/(\d+[smhd])/' regex.
+    # The /1h/foo in the mocked header here is to test that if the path contains a component
+    # that also matches the TTL regex ('/1h/'), it will still find the correct value ('/33s/').
+    headers = {"X-Cache-Key": f"/fake/cache-key/{url_ttl[1]}/something/1h/foo"}
     requests_mock.register_uri("HEAD", url_ttl[0], headers=headers)
 
     # enqueue repos to publish and wait for publish and purge to finish
