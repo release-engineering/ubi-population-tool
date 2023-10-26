@@ -105,7 +105,12 @@ def test_publisher_with_cache_purge(pulp, requests_mock):
             "clean": True,
         },
         "cdn_root": "https://cdn.example.com",
-        "arl_templates": ["/arl/1/test/{ttl}/{path}", "/arl/2/test/{ttl}/{path}"],
+        "arl_templates": [
+            "/arl/1/test/{ttl}/{path}",
+            "/arl/2/test/{ttl}/{path}",
+            # extra case with whitespace chars
+            "  /arl/3/test/{ttl}/{path} /extra// \n\n  \t  ",
+        ],
         "max_retry_sleep": 0.001,
     }
     setup_fastpurge_mock(requests_mock)
@@ -137,6 +142,7 @@ def test_publisher_with_cache_purge(pulp, requests_mock):
         "https://cdn.example.com/content/unit/1/client/repomd.xml",
         "/arl/1/test/33s/content/unit/1/client/repomd.xml",
         "/arl/2/test/33s/content/unit/1/client/repomd.xml",
+        "/arl/3/test/33s/content/unit/1/client/repomd.xml /extra//",
     ]
 
 

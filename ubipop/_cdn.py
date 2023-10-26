@@ -180,7 +180,7 @@ class CdnClient:
                 used within this class (e.g. "verify", "cert").
         """
         self._url = url
-        self._arl_templates = arl_templates
+        self._arl_templates = [item.strip() for item in arl_templates or []]
         self._tls = threading.local()
 
         retry_args = {
