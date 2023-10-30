@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
+## [0.14.4] - 2023-10-30
+
+### Fixed
+
+- Explicitly setting `verify` for each request in `CdnClient`
+
 ## [0.14.3] - 2023-10-27
 
 ### Fixed
@@ -134,7 +140,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.3...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.4...HEAD
+[0.14.4]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.3...0.14.4
 [0.14.3]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.2...0.14.3
 [0.14.2]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.1...0.14.2
 [0.14.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.0...0.14.1
