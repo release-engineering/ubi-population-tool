@@ -216,6 +216,10 @@ class CdnClient:
         return self._tls.session
 
     def _head(self, *args, **kwargs):
+        # set verify for each request
+        # verify set on session doesn't work due to https://github.com/psf/requests/issues/3829
+        # if REQUESTS_CA_BUNDLE is set on env, it takes precedence
+        kwargs["verify"] = self._session.verify
         return self._session.head(*args, **kwargs)
 
     def _on_failure(self, header, exception):
