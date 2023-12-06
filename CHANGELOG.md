@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
+## [0.14.5] - 2023-12-06
+
+### Changed
+
+- Bumped required version of `ubi-config` dependency
+
 ## [0.14.4] - 2023-10-30
 
 ### Fixed
@@ -140,7 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.4...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.5...HEAD
+[0.14.5]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.4...0.14.5
 [0.14.4]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.3...0.14.4
 [0.14.3]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.2...0.14.3
 [0.14.2]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.1...0.14.2
