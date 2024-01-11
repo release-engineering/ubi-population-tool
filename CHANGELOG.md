@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
+## [0.15.1] - 2024-01-11
+
+### Added
+
+- Option for skipping repository publish
+
 ## [0.14.5] - 2023-12-06
 
 ### Changed
@@ -146,7 +152,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.5...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.5...0.15.1
 [0.14.5]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.4...0.14.5
 [0.14.4]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.3...0.14.4
 [0.14.3]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.2...0.14.3
