@@ -1,32 +1,29 @@
-from datetime import date
 import logging
-import re
 import os
-
-from collections import defaultdict, deque, namedtuple
+import re
+from collections import defaultdict, namedtuple
 from concurrent.futures import as_completed
-from itertools import chain
-from pubtools.pulplib import Client, Criteria, PublishOptions
-from fastpurge import FastPurgeClient
 
 import attr
 import ubiconfig
-
 from more_executors import Executors
-from more_executors.futures import f_sequence, f_proxy, f_return
+from more_executors.futures import f_proxy, f_return
+from pubtools.pulplib import Client, Criteria
+
 from ubipop._pulp_client import Pulp
 from ubipop._utils import (
-    AssociateActionModules,
     AssociateActionModuleDefaults,
+    AssociateActionModules,
     AssociateActionRpms,
-    UnassociateActionModules,
     UnassociateActionModuleDefaults,
+    UnassociateActionModules,
     UnassociateActionRpms,
     flatten_md_defaults_name_profiles,
 )
+
+from ._cdn import Publisher
 from ._matcher import Matcher
 from .ubi_manifest_client.client import Client as UbimClient
-from ._cdn import Publisher
 
 _LOG = logging.getLogger("ubipop")
 

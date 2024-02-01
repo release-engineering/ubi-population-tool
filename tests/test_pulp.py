@@ -5,24 +5,20 @@ try:
 except ImportError:
     from httplib import HTTPResponse
 
-from io import BytesIO
-
 import logging
 import sys
+from io import BytesIO
+
 import pytest
 import requests
-
 from mock import MagicMock, patch
+from pubtools.pulplib import YumRepository
 from requests.exceptions import HTTPError
 
-from pubtools.pulplib import YumRepository
 from ubipop import _pulp_client as pulp_client
 from ubipop._pulp_client import Pulp, PulpRetryAdapter
 
-from .conftest import (
-    get_rpm_unit,
-    get_modulemd_defaults_unit,
-)
+from .conftest import get_modulemd_defaults_unit, get_rpm_unit
 
 ORIG_HTTP_TOTAL_RETRIES = pulp_client.HTTP_TOTAL_RETRIES
 ORIG_HTTP_RETRY_BACKOFF = pulp_client.HTTP_RETRY_BACKOFF
