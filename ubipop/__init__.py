@@ -1,32 +1,29 @@
-from datetime import date
 import logging
-import re
 import os
-
-from collections import defaultdict, deque, namedtuple
+import re
+from collections import defaultdict, namedtuple
 from concurrent.futures import as_completed
-from itertools import chain
-from pubtools.pulplib import Client, Criteria, PublishOptions
-from fastpurge import FastPurgeClient
 
 import attr
 import ubiconfig
-
 from more_executors import Executors
-from more_executors.futures import f_sequence, f_proxy, f_return
+from more_executors.futures import f_proxy, f_return
+from pubtools.pulplib import Client, Criteria
+
 from ubipop._pulp_client import Pulp
 from ubipop._utils import (
-    AssociateActionModules,
     AssociateActionModuleDefaults,
+    AssociateActionModules,
     AssociateActionRpms,
-    UnassociateActionModules,
     UnassociateActionModuleDefaults,
+    UnassociateActionModules,
     UnassociateActionRpms,
     flatten_md_defaults_name_profiles,
 )
+
+from ._cdn import Publisher
 from ._matcher import Matcher
 from .ubi_manifest_client.client import Client as UbimClient
-from ._cdn import Publisher
 
 _LOG = logging.getLogger("ubipop")
 
@@ -36,10 +33,6 @@ class RepoMissing(Exception):
 
 
 class ConfigMissing(Exception):
-    pass
-
-
-class PopulationSourceMissing(Exception):
     pass
 
 
@@ -119,7 +112,9 @@ class UbiPopulate(object):
         **kwargs
     ):
         # legacy client implemeted in this repo, it's expected to be replaced by pubtools.pulplib.Client
-        self.pulp = self._make_pulp_client(pulp_hostname, pulp_auth, verify, Pulp)
+        self.legacy_pulp_client = self._make_pulp_client(
+            pulp_hostname, pulp_auth, verify, Pulp
+        )
         self._pulp_hostname = pulp_hostname
         self._pulp_auth = pulp_auth
         self._verify = verify
@@ -135,9 +130,7 @@ class UbiPopulate(object):
         self._version = kwargs.get("version", None)
         self._content_set_regex = kwargs.get("content_set_regex", None)
         self._ubiconfig_map = None
-
         self._ubi_manifest_url = kwargs.get("ubi_manifest_url") or None
-
         arl_templates = os.getenv("UBIPOP_ARL_TEMPLATES", "")
         self._publisher_args = {
             "edgerc": os.getenv("UBIPOP_EDGERC_CFG", "/etc/.edgerc"),
@@ -191,12 +184,6 @@ class UbiPopulate(object):
             ubi_conf_list.extend(loader.load_all())
 
         return self._filter_ubi_conf_list(ubi_conf_list)
-
-    @property
-    def ubiconfig_map(self):
-        if self._ubiconfig_map is None:
-            self._ubiconfig_map = self._create_config_map()
-        return self._ubiconfig_map
 
     def _filter_ubi_conf_list(self, config_list):
         """
@@ -254,57 +241,8 @@ class UbiPopulate(object):
 
         return filtered_conf_list
 
-    def _create_config_map(self):
-        """Create a config map from self.ubiconfig_list, it has the form in:
-        {
-            "7.7":
-                {
-                    "config_filename1": config1,
-                    "config_filename2": config2,
-                    ...,
-                },
-            "8.1":
-                {
-                    "config_filename1": config1,
-                    ...,
-                },
-            ....
-        }
-        """
-
-        config_map = {}
-        for config in self.ubiconfig_list:
-            config_map.setdefault(config.version, {}).setdefault(
-                config.file_name, config
-            )
-
-        return config_map
-
-    def _get_config(self, repo, config):
-        # get the right config file by ubi_config_version attr of a repository
-        # if not found, try to fallback to the default version (major version)
-        if not repo.ubi_config_version:
-            raise ValueError("Repo: %s does not have ubi_config_version" % repo.id)
-
-        _ubi_config_version = repo.ubi_config_version
-        if _ubi_config_version not in self.ubiconfig_map:
-            # if the config is missing, we need to use the default config branch
-            _ubi_config_version = _ubi_config_version.split(".")[0]
-        try:
-            right_config = self.ubiconfig_map[_ubi_config_version][config.file_name]
-        except KeyError:
-            _LOG.error(
-                "Config file %s missing from %s and default %s branches",
-                config.file_name,
-                repo.ubi_config_version,
-                repo.ubi_config_version.split(".")[0],
-            )
-            raise ConfigMissing()
-
-        return right_config
-
     def populate_ubi_repos(self):
-        repo_pairs_list = []
+        repo_sets_list = []
         out_repos = set()  # list of all affected repositories
         ubi_binary_repos = []  # binary repos used for generating manifest
 
@@ -335,7 +273,7 @@ class UbiPopulate(object):
                 _LOG.warning("Skipping current content triplet, some repos are missing")
                 continue
 
-            repo_pairs_list.append((repo_sets, config))
+            repo_sets_list.append(repo_sets)
             ubi_binary_repos.extend(
                 [repo_set.out_repos.rpm.id for repo_set in repo_sets]
             )
@@ -347,12 +285,12 @@ class UbiPopulate(object):
             if self._skip_publish != "false":
                 _LOG.warning("Repository publishing via ubipop will be skipped")
                 self._run_ubi_population(
-                    repo_pairs_list, out_repos, ubim_client, publisher=None
+                    repo_sets_list, out_repos, ubim_client, publisher=None
                 )
             else:
                 with Publisher(**self._publisher_args) as publisher:
                     self._run_ubi_population(
-                        repo_pairs_list, out_repos, ubim_client, publisher
+                        repo_sets_list, out_repos, ubim_client, publisher
                     )
                     publisher.wait_publish_and_purge_cache()
 
@@ -360,26 +298,6 @@ class UbiPopulate(object):
             with open(self.output_repos_file, "w") as f:
                 for repo in out_repos:
                     f.write(repo.id.strip() + "\n")
-
-    def _run_ubi_population(
-        self, repo_pairs_list, out_repos, ubim_client=None, publisher=None
-    ):
-        for repo_sets, config in repo_pairs_list:
-            for repo_set in repo_sets:
-                right_config = self._get_config(repo_set.out_repos.rpm, config)
-
-                UbiPopulateRunner(
-                    self.pulp,
-                    self.pulp_client,
-                    repo_set,
-                    right_config,
-                    self.dry_run,
-                    self._executor,
-                    ubim_client,
-                    publisher,
-                ).run_ubi_population()
-
-                out_repos.update(repo_set.get_output_repos())
 
     def _get_ubi_repo_sets(self, ubi_binary_cs):
         """
@@ -431,25 +349,36 @@ class UbiPopulate(object):
 
         return repos
 
+    def _run_ubi_population(
+        self, repo_sets_list, out_repos, ubim_client=None, publisher=None
+    ):
+        for repo_sets in repo_sets_list:
+            for repo_set in repo_sets:
+                UbiPopulateRunner(
+                    self.legacy_pulp_client,
+                    repo_set,
+                    self.dry_run,
+                    self._executor,
+                    ubim_client,
+                    publisher,
+                ).run_ubi_population()
+
+                out_repos.update(repo_set.get_output_repos())
+
 
 class UbiPopulateRunner(object):
     def __init__(
         self,
-        legacy_client,
         pulp_client,
-        output_repo_set,
-        ubiconfig_item,
+        repo_set,
         dry_run,
         executor,
         ubi_manifest_client=None,
         publisher=None,
     ):
-        self.pulp = legacy_client
         self.pulp_client = pulp_client
         self.ubim_client = ubi_manifest_client
-
-        self.repos = output_repo_set
-        self.ubiconfig = ubiconfig_item
+        self.repo_set = repo_set
         self.dry_run = dry_run
         self._executor = executor
         self._publisher = publisher
@@ -488,54 +417,56 @@ class UbiPopulateRunner(object):
         """
 
         modules_assoc, modules_unassoc = self._get_pulp_actions_mds(
-            self.repos.modules, current_content.modules
+            self.repo_set.modules, current_content.modules
         )
         md_defaults_assoc, md_defaults_unassoc = self._get_pulp_actions_md_defaults(
-            self.repos.module_defaults, current_content.modulemd_defaults
+            self.repo_set.module_defaults, current_content.modulemd_defaults
         )
 
         rpms_assoc, rpms_unassoc = self._get_pulp_actions_pkgs(
-            self.repos.packages, current_content.binary_rpms
+            self.repo_set.packages, current_content.binary_rpms
         )
         srpms_assoc, srpms_unassoc = self._get_pulp_actions_pkgs(
-            self.repos.source_rpms, current_content.source_rpms
+            self.repo_set.source_rpms, current_content.source_rpms
         )
 
         debug_assoc = None
         debug_unassoc = None
         if current_content.debug_rpms:
             debug_assoc, debug_unassoc = self._get_pulp_actions_pkgs(
-                self.repos.debug_rpms, current_content.debug_rpms
+                self.repo_set.debug_rpms, current_content.debug_rpms
             )
 
         associations = (
             AssociateActionModules(
-                modules_assoc, self.repos.out_repos.rpm, self.repos.in_repos.rpm
+                modules_assoc, self.repo_set.out_repos.rpm, self.repo_set.in_repos.rpm
             ),
             AssociateActionRpms(
-                rpms_assoc, self.repos.out_repos.rpm, self.repos.in_repos.rpm
+                rpms_assoc, self.repo_set.out_repos.rpm, self.repo_set.in_repos.rpm
             ),
             AssociateActionRpms(
-                srpms_assoc, self.repos.out_repos.source, self.repos.in_repos.source
+                srpms_assoc,
+                self.repo_set.out_repos.source,
+                self.repo_set.in_repos.source,
             ),
             AssociateActionRpms(
-                debug_assoc, self.repos.out_repos.debug, self.repos.in_repos.debug
+                debug_assoc, self.repo_set.out_repos.debug, self.repo_set.in_repos.debug
             ),
         )
 
         unassociations = (
-            UnassociateActionModules(modules_unassoc, self.repos.out_repos.rpm),
-            UnassociateActionRpms(rpms_unassoc, self.repos.out_repos.rpm),
-            UnassociateActionRpms(srpms_unassoc, self.repos.out_repos.source),
-            UnassociateActionRpms(debug_unassoc, self.repos.out_repos.debug),
+            UnassociateActionModules(modules_unassoc, self.repo_set.out_repos.rpm),
+            UnassociateActionRpms(rpms_unassoc, self.repo_set.out_repos.rpm),
+            UnassociateActionRpms(srpms_unassoc, self.repo_set.out_repos.source),
+            UnassociateActionRpms(debug_unassoc, self.repo_set.out_repos.debug),
         )
 
         mdd_association = AssociateActionModuleDefaults(
-            md_defaults_assoc, self.repos.out_repos.rpm, self.repos.in_repos.rpm
+            md_defaults_assoc, self.repo_set.out_repos.rpm, self.repo_set.in_repos.rpm
         )
 
         mdd_unassociation = UnassociateActionModuleDefaults(
-            md_defaults_unassoc, self.repos.out_repos.rpm
+            md_defaults_unassoc, self.repo_set.out_repos.rpm
         )
 
         return associations, unassociations, mdd_association, mdd_unassociation
@@ -568,7 +499,9 @@ class UbiPopulateRunner(object):
         or_criteria = Matcher.create_or_criteria(fields, criteria_values)
         return f_proxy(
             self._executor.submit(
-                Matcher.search_modulemd_defaults, or_criteria, self.repos.in_repos.rpm
+                Matcher.search_modulemd_defaults,
+                or_criteria,
+                self.repo_set.in_repos.rpm,
             )
         )
 
@@ -576,16 +509,18 @@ class UbiPopulateRunner(object):
         current_content = self._get_current_content()
 
         # start async querying for modulemds and modular and non-modular packages
-        binary_manifest = self.ubim_client.get_manifest(self.repos.out_repos.rpm.id)
-        debug_manifest = self.ubim_client.get_manifest(self.repos.out_repos.debug.id)
-        source_manifest = self.ubim_client.get_manifest(self.repos.out_repos.source.id)
-        self.repos.modules = binary_manifest.modules
-        self.repos.module_defaults = self._search_expected_modulemd_defaults(
+        binary_manifest = self.ubim_client.get_manifest(self.repo_set.out_repos.rpm.id)
+        debug_manifest = self.ubim_client.get_manifest(self.repo_set.out_repos.debug.id)
+        source_manifest = self.ubim_client.get_manifest(
+            self.repo_set.out_repos.source.id
+        )
+        self.repo_set.modules = binary_manifest.modules
+        self.repo_set.module_defaults = self._search_expected_modulemd_defaults(
             binary_manifest.modulemd_defaults
         )
-        self.repos.packages = binary_manifest.packages
-        self.repos.debug_rpms = debug_manifest.packages
-        self.repos.source_rpms = source_manifest.packages
+        self.repo_set.packages = binary_manifest.packages
+        self.repo_set.debug_rpms = debug_manifest.packages
+        self.repo_set.source_rpms = source_manifest.packages
 
         (
             associations,
@@ -617,7 +552,10 @@ class UbiPopulateRunner(object):
         for action in action_list:
             if action.units:
                 fts.extend(
-                    [self._executor.submit(*a) for a in action.get_actions(self.pulp)]
+                    [
+                        self._executor.submit(*a)
+                        for a in action.get_actions(self.pulp_client)
+                    ]
                 )
 
         return fts
@@ -638,27 +576,27 @@ class UbiPopulateRunner(object):
         for ft in as_completed(futures):
             tasks = ft.result()
             if tasks:
-                self.pulp.wait_for_tasks(tasks)
+                self.pulp_client.wait_for_tasks(tasks)
 
     def log_curent_content(self, current_content):
-        _LOG.info("Current modules in repo: %s", self.repos.out_repos.rpm.id)
+        _LOG.info("Current modules in repo: %s", self.repo_set.out_repos.rpm.id)
         for module in current_content.modules:
             _LOG.info(module.nsvca)
 
-        _LOG.info("Current module_defaults in repo: %s", self.repos.out_repos.rpm.id)
+        _LOG.info("Current module_defaults in repo: %s", self.repo_set.out_repos.rpm.id)
         for md_d in current_content.modulemd_defaults:
             _LOG.info("module_defaults: %s, profiles: %s", md_d.name, md_d.profiles)
 
-        _LOG.info("Current rpms in repo: %s", self.repos.out_repos.rpm.id)
+        _LOG.info("Current rpms in repo: %s", self.repo_set.out_repos.rpm.id)
         for rpm in current_content.binary_rpms:
             _LOG.info(rpm.filename)
 
-        _LOG.info("Current srpms in repo: %s", self.repos.out_repos.source.id)
+        _LOG.info("Current srpms in repo: %s", self.repo_set.out_repos.source.id)
         for rpm in current_content.source_rpms:
             _LOG.info(rpm.filename)
 
-        if self.repos.out_repos.debug:
-            _LOG.info("Current rpms in repo: %s", self.repos.out_repos.debug.id)
+        if self.repo_set.out_repos.debug:
+            _LOG.info("Current rpms in repo: %s", self.repo_set.out_repos.debug.id)
             for rpm in current_content.debug_rpms:
                 _LOG.info(rpm.filename)
 
@@ -699,29 +637,31 @@ class UbiPopulateRunner(object):
         criteria = [Criteria.true()]
         current_modulemds = f_proxy(
             self._executor.submit(
-                Matcher.search_modulemds, criteria, [self.repos.out_repos.rpm]
+                Matcher.search_modulemds, criteria, [self.repo_set.out_repos.rpm]
             )
         )
         current_modulemd_defaults = f_proxy(
             self._executor.submit(
-                Matcher.search_modulemd_defaults, criteria, [self.repos.out_repos.rpm]
+                Matcher.search_modulemd_defaults,
+                criteria,
+                [self.repo_set.out_repos.rpm],
             )
         )
         current_rpms = f_proxy(
             self._executor.submit(
-                Matcher.search_rpms, criteria, [self.repos.out_repos.rpm]
+                Matcher.search_rpms, criteria, [self.repo_set.out_repos.rpm]
             )
         )
         current_srpms = f_proxy(
             self._executor.submit(
-                Matcher.search_srpms, criteria, [self.repos.out_repos.source]
+                Matcher.search_srpms, criteria, [self.repo_set.out_repos.source]
             )
         )
 
-        if self.repos.out_repos.debug.result():
+        if self.repo_set.out_repos.debug.result():
             current_debug_rpms = f_proxy(
                 self._executor.submit(
-                    Matcher.search_rpms, criteria, [self.repos.out_repos.debug]
+                    Matcher.search_rpms, criteria, [self.repo_set.out_repos.debug]
                 )
             )
         else:
@@ -740,9 +680,9 @@ class UbiPopulateRunner(object):
         to_publish = []
 
         for repo in (
-            self.repos.out_repos.rpm,
-            self.repos.out_repos.debug,
-            self.repos.out_repos.source,
+            self.repo_set.out_repos.rpm,
+            self.repo_set.out_repos.debug,
+            self.repo_set.out_repos.source,
         ):
             if repo.result():
                 to_publish.append(repo)
