@@ -2,22 +2,23 @@ import logging
 import os
 import re
 from collections import defaultdict, namedtuple
-from concurrent.futures import as_completed
 
 import attr
 import ubiconfig
 from more_executors import Executors
 from more_executors.futures import f_proxy, f_return
-from pubtools.pulplib import Client, Criteria
+from pubtools.pulplib import (
+    Client,
+    Criteria,
+    ModulemdDefaultsUnit,
+    ModulemdUnit,
+    RpmUnit,
+)
 
-from ubipop._pulp_client import Pulp
 from ubipop._utils import (
-    AssociateActionModuleDefaults,
-    AssociateActionModules,
-    AssociateActionRpms,
-    UnassociateActionModuleDefaults,
-    UnassociateActionModules,
-    UnassociateActionRpms,
+    Association,
+    Unassociation,
+    batcher,
     flatten_md_defaults_name_profiles,
 )
 
@@ -29,10 +30,6 @@ _LOG = logging.getLogger("ubipop")
 
 
 class RepoMissing(Exception):
-    pass
-
-
-class ConfigMissing(Exception):
     pass
 
 
@@ -111,10 +108,6 @@ class UbiPopulate(object):
         output_repos_file=None,
         **kwargs
     ):
-        # legacy client implemeted in this repo, it's expected to be replaced by pubtools.pulplib.Client
-        self.legacy_pulp_client = self._make_pulp_client(
-            pulp_hostname, pulp_auth, verify, Pulp
-        )
         self._pulp_hostname = pulp_hostname
         self._pulp_auth = pulp_auth
         self._verify = verify
@@ -129,8 +122,8 @@ class UbiPopulate(object):
         self._repo_ids = kwargs.get("repo_ids", None)
         self._version = kwargs.get("version", None)
         self._content_set_regex = kwargs.get("content_set_regex", None)
-        self._ubiconfig_map = None
         self._ubi_manifest_url = kwargs.get("ubi_manifest_url") or None
+        self._action_batch_size = kwargs.get("action_batch_size", 100)
         arl_templates = os.getenv("UBIPOP_ARL_TEMPLATES", "")
         self._publisher_args = {
             "edgerc": os.getenv("UBIPOP_EDGERC_CFG", "/etc/.edgerc"),
@@ -150,21 +143,15 @@ class UbiPopulate(object):
     @property
     def pulp_client(self):
         if self._pulp_client is None:
-            self._pulp_client = self._make_pulp_client(
-                self._pulp_hostname, self._pulp_auth, self._verify, Client
-            )
+            kwargs = {"verify": self._verify}
+            if os.path.isfile(self._pulp_auth[0]) and os.path.isfile(
+                self._pulp_auth[1]
+            ):
+                kwargs["cert"] = self._pulp_auth
+            else:
+                kwargs["auth"] = self._pulp_auth
+            self._pulp_client = Client("https://" + self._pulp_hostname, **kwargs)
         return self._pulp_client
-
-    def _make_pulp_client(self, url, auth, verify, client_klass):
-        kwargs = {
-            "verify": verify,
-        }
-        if os.path.isfile(auth[0]) and os.path.isfile(auth[1]):
-            kwargs["cert"] = auth
-        else:
-            kwargs["auth"] = auth
-
-        return client_klass("https://" + url, **kwargs)
 
     @property
     def ubiconfig_list(self):
@@ -355,12 +342,13 @@ class UbiPopulate(object):
         for repo_sets in repo_sets_list:
             for repo_set in repo_sets:
                 UbiPopulateRunner(
-                    self.legacy_pulp_client,
+                    self.pulp_client,
                     repo_set,
                     self.dry_run,
                     self._executor,
                     ubim_client,
                     publisher,
+                    self._action_batch_size,
                 ).run_ubi_population()
 
                 out_repos.update(repo_set.get_output_repos())
@@ -375,6 +363,7 @@ class UbiPopulateRunner(object):
         executor,
         ubi_manifest_client=None,
         publisher=None,
+        action_batch_size=100,
     ):
         self.pulp_client = pulp_client
         self.ubim_client = ubi_manifest_client
@@ -382,128 +371,7 @@ class UbiPopulateRunner(object):
         self.dry_run = dry_run
         self._executor = executor
         self._publisher = publisher
-
-    def _determine_pulp_actions(self, units, current, diff_f):
-        expected = list(units)
-        to_associate = diff_f(expected, current)
-        to_unassociate = diff_f(current, expected)
-        return to_associate, to_unassociate
-
-    def _get_pulp_actions_mds(self, modules, current):
-        return self._determine_pulp_actions(
-            modules, current, self._diff_modules_by_nsvca
-        )
-
-    def _get_pulp_actions_md_defaults(self, module_defaults, current):
-        return self._determine_pulp_actions(
-            module_defaults,
-            current,
-            self._diff_md_defaults_by_profiles,
-        )
-
-    def _get_pulp_actions_pkgs(self, pkgs, current):
-        return self._determine_pulp_actions(
-            pkgs, current, self._diff_packages_by_filename
-        )
-
-    def _get_pulp_actions(self, current_content):
-        """
-        Determines expected pulp actions by comparing current content of output repos and
-        expected content.
-
-        Content that needs association: unit is in expected but not in current
-        Content that needs unassociation: unit is in current but not in expected
-        No action: unit is in current and in expected
-        """
-
-        modules_assoc, modules_unassoc = self._get_pulp_actions_mds(
-            self.repo_set.modules, current_content.modules
-        )
-        md_defaults_assoc, md_defaults_unassoc = self._get_pulp_actions_md_defaults(
-            self.repo_set.module_defaults, current_content.modulemd_defaults
-        )
-
-        rpms_assoc, rpms_unassoc = self._get_pulp_actions_pkgs(
-            self.repo_set.packages, current_content.binary_rpms
-        )
-        srpms_assoc, srpms_unassoc = self._get_pulp_actions_pkgs(
-            self.repo_set.source_rpms, current_content.source_rpms
-        )
-
-        debug_assoc = None
-        debug_unassoc = None
-        if current_content.debug_rpms:
-            debug_assoc, debug_unassoc = self._get_pulp_actions_pkgs(
-                self.repo_set.debug_rpms, current_content.debug_rpms
-            )
-
-        associations = (
-            AssociateActionModules(
-                modules_assoc, self.repo_set.out_repos.rpm, self.repo_set.in_repos.rpm
-            ),
-            AssociateActionRpms(
-                rpms_assoc, self.repo_set.out_repos.rpm, self.repo_set.in_repos.rpm
-            ),
-            AssociateActionRpms(
-                srpms_assoc,
-                self.repo_set.out_repos.source,
-                self.repo_set.in_repos.source,
-            ),
-            AssociateActionRpms(
-                debug_assoc, self.repo_set.out_repos.debug, self.repo_set.in_repos.debug
-            ),
-        )
-
-        unassociations = (
-            UnassociateActionModules(modules_unassoc, self.repo_set.out_repos.rpm),
-            UnassociateActionRpms(rpms_unassoc, self.repo_set.out_repos.rpm),
-            UnassociateActionRpms(srpms_unassoc, self.repo_set.out_repos.source),
-            UnassociateActionRpms(debug_unassoc, self.repo_set.out_repos.debug),
-        )
-
-        mdd_association = AssociateActionModuleDefaults(
-            md_defaults_assoc, self.repo_set.out_repos.rpm, self.repo_set.in_repos.rpm
-        )
-
-        mdd_unassociation = UnassociateActionModuleDefaults(
-            md_defaults_unassoc, self.repo_set.out_repos.rpm
-        )
-
-        return associations, unassociations, mdd_association, mdd_unassociation
-
-    def _diff_modules_by_nsvca(self, modules_1, modules_2):
-        return self._diff_lists_by_attr(modules_1, modules_2, "nsvca")
-
-    def _diff_md_defaults_by_profiles(self, module_defaults_1, module_defaults_2):
-        return self._diff_lists_by_attr(
-            module_defaults_1, module_defaults_2, flatten_md_defaults_name_profiles
-        )
-
-    def _diff_packages_by_filename(self, packages_1, packages_2):
-        return self._diff_lists_by_attr(packages_1, packages_2, "filename")
-
-    def _diff_lists_by_attr(self, list_1, list_2, attr_or_func):
-        def diff_attr(obj):
-            if callable(attr_or_func):
-                return attr_or_func(obj)
-            return getattr(obj, attr_or_func)
-
-        attrs_list_2 = [diff_attr(obj) for obj in list_2]
-        diff = [obj for obj in list_1 if diff_attr(obj) not in attrs_list_2]
-
-        return diff
-
-    def _search_expected_modulemd_defaults(self, modulemd_defaults):
-        criteria_values = [(unit.name,) for unit in modulemd_defaults]
-        fields = ("name",)
-        or_criteria = Matcher.create_or_criteria(fields, criteria_values)
-        return f_proxy(
-            self._executor.submit(
-                Matcher.search_modulemd_defaults,
-                or_criteria,
-                self.repo_set.in_repos.rpm,
-            )
-        )
+        self._action_batch_size = action_batch_size
 
     def run_ubi_population(self):
         current_content = self._get_current_content()
@@ -514,6 +382,7 @@ class UbiPopulateRunner(object):
         source_manifest = self.ubim_client.get_manifest(
             self.repo_set.out_repos.source.id
         )
+
         self.repo_set.modules = binary_manifest.modules
         self.repo_set.module_defaults = self._search_expected_modulemd_defaults(
             binary_manifest.modulemd_defaults
@@ -537,98 +406,21 @@ class UbiPopulateRunner(object):
             )
         else:
             fts = []
-            fts.extend(self._associate_unassociate_units(associations + unassociations))
-            # wait for associate/unassociate tasks
-            self._wait_pulp(fts)
+            fts.extend(self._do_copy(associations))
+            fts.extend(self._do_remove(unassociations))
+            for ft in fts:
+                ft.result()
 
-            self._associate_unassociate_md_defaults(
-                (mdd_association,), (mdd_unassociation,)
-            )
+            # Completely remove modulemd_defaults before copying.
+            self._do_remove([mdd_unassociation])
+            for ft in fts:
+                ft.result()
+            self._do_copy([mdd_association])
+            for ft in fts:
+                ft.result()
+
             if self._publisher:
                 self._publish_out_repos()
-
-    def _associate_unassociate_units(self, action_list):
-        fts = []
-        for action in action_list:
-            if action.units:
-                fts.extend(
-                    [
-                        self._executor.submit(*a)
-                        for a in action.get_actions(self.pulp_client)
-                    ]
-                )
-
-        return fts
-
-    def _associate_unassociate_md_defaults(self, action_md_ass, action_md_unass):
-        """
-        Unassociate old module defaults units first, wait until done and
-        then start new units association
-        """
-        fts_unass = self._associate_unassociate_units(action_md_unass)
-        self._wait_pulp(fts_unass)
-
-        fts_ass = self._associate_unassociate_units(action_md_ass)
-        self._wait_pulp(fts_ass)
-
-    def _wait_pulp(self, futures):
-        # wait for pulp tasks from futures
-        for ft in as_completed(futures):
-            tasks = ft.result()
-            if tasks:
-                self.pulp_client.wait_for_tasks(tasks)
-
-    def log_curent_content(self, current_content):
-        _LOG.info("Current modules in repo: %s", self.repo_set.out_repos.rpm.id)
-        for module in current_content.modules:
-            _LOG.info(module.nsvca)
-
-        _LOG.info("Current module_defaults in repo: %s", self.repo_set.out_repos.rpm.id)
-        for md_d in current_content.modulemd_defaults:
-            _LOG.info("module_defaults: %s, profiles: %s", md_d.name, md_d.profiles)
-
-        _LOG.info("Current rpms in repo: %s", self.repo_set.out_repos.rpm.id)
-        for rpm in current_content.binary_rpms:
-            _LOG.info(rpm.filename)
-
-        _LOG.info("Current srpms in repo: %s", self.repo_set.out_repos.source.id)
-        for rpm in current_content.source_rpms:
-            _LOG.info(rpm.filename)
-
-        if self.repo_set.out_repos.debug:
-            _LOG.info("Current rpms in repo: %s", self.repo_set.out_repos.debug.id)
-            for rpm in current_content.debug_rpms:
-                _LOG.info(rpm.filename)
-
-    def log_pulp_actions(self, associations, unassociations):
-        for item in associations:
-            if item.units:
-                for unit in item.units:
-                    _LOG.info(
-                        "Would associate %s from %s to %s",
-                        unit,
-                        unit.associate_source_repo_id,
-                        item.dst_repo.id,
-                    )
-
-            else:
-                _LOG.info(
-                    "No association expected for %s from %s to %s",
-                    item.TYPE,
-                    [r.id for r in item.src_repos],
-                    item.dst_repo.id,
-                )
-
-        for item in unassociations:
-            if item.units:
-                for unit in item.units:
-                    _LOG.info("Would unassociate %s from %s", unit, item.dst_repo.id)
-            else:
-                _LOG.info(
-                    "No unassociation expected for %s from %s",
-                    item.TYPE,
-                    item.dst_repo.id,
-                )
 
     def _get_current_content(self):
         """
@@ -675,6 +467,246 @@ class UbiPopulateRunner(object):
             current_modulemd_defaults,
         )
         return current_content
+
+    def _search_expected_modulemd_defaults(self, modulemd_defaults):
+        criteria_values = [(unit.name,) for unit in modulemd_defaults]
+        fields = ("name",)
+        or_criteria = Matcher.create_or_criteria(fields, criteria_values)
+        return f_proxy(
+            self._executor.submit(
+                Matcher.search_modulemd_defaults,
+                or_criteria,
+                self.repo_set.in_repos.rpm,
+            )
+        )
+
+    def _get_pulp_actions(self, current_content):
+        """
+        Determines expected pulp actions by comparing current content of output repos and
+        expected content.
+
+        Content that needs association: unit is in expected but not in current
+        Content that needs unassociation: unit is in current but not in expected
+        No action: unit is in current and in expected
+        """
+
+        modules_assoc, modules_unassoc = self._get_pulp_actions_mds(
+            self.repo_set.modules, current_content.modules
+        )
+        md_defaults_assoc, md_defaults_unassoc = self._get_pulp_actions_md_defaults(
+            self.repo_set.module_defaults, current_content.modulemd_defaults
+        )
+
+        rpms_assoc, rpms_unassoc = self._get_pulp_actions_pkgs(
+            self.repo_set.packages, current_content.binary_rpms
+        )
+        srpms_assoc, srpms_unassoc = self._get_pulp_actions_pkgs(
+            self.repo_set.source_rpms, current_content.source_rpms
+        )
+
+        debug_assoc = None
+        debug_unassoc = None
+        if current_content.debug_rpms:
+            debug_assoc, debug_unassoc = self._get_pulp_actions_pkgs(
+                self.repo_set.debug_rpms, current_content.debug_rpms
+            )
+
+        associations = (
+            Association(
+                modules_assoc,
+                ModulemdUnit,
+                self.repo_set.out_repos.rpm,
+                self.repo_set.in_repos.rpm,
+            ),
+            Association(
+                rpms_assoc,
+                RpmUnit,
+                self.repo_set.out_repos.rpm,
+                self.repo_set.in_repos.rpm,
+            ),
+            Association(
+                srpms_assoc,
+                RpmUnit,
+                self.repo_set.out_repos.source,
+                self.repo_set.in_repos.source,
+            ),
+            Association(
+                debug_assoc,
+                RpmUnit,
+                self.repo_set.out_repos.debug,
+                self.repo_set.in_repos.debug,
+            ),
+        )
+
+        unassociations = (
+            Unassociation(modules_unassoc, ModulemdUnit, self.repo_set.out_repos.rpm),
+            Unassociation(rpms_unassoc, RpmUnit, self.repo_set.out_repos.rpm),
+            Unassociation(srpms_unassoc, RpmUnit, self.repo_set.out_repos.source),
+            Unassociation(debug_unassoc, RpmUnit, self.repo_set.out_repos.debug),
+        )
+
+        mdd_association = Association(
+            md_defaults_assoc,
+            ModulemdDefaultsUnit,
+            self.repo_set.out_repos.rpm,
+            self.repo_set.in_repos.rpm,
+        )
+        mdd_unassociation = Unassociation(
+            md_defaults_unassoc, ModulemdDefaultsUnit, self.repo_set.out_repos.rpm
+        )
+
+        return associations, unassociations, mdd_association, mdd_unassociation
+
+    def _get_pulp_actions_mds(self, modules, current):
+        return self._determine_pulp_actions(
+            modules, current, self._diff_modules_by_nsvca
+        )
+
+    def _get_pulp_actions_md_defaults(self, module_defaults, current):
+        return self._determine_pulp_actions(
+            module_defaults,
+            current,
+            self._diff_md_defaults_by_profiles,
+        )
+
+    def _get_pulp_actions_pkgs(self, pkgs, current):
+        return self._determine_pulp_actions(
+            pkgs, current, self._diff_packages_by_filename
+        )
+
+    def _determine_pulp_actions(self, units, current, diff_f):
+        expected = list(units)
+        to_associate = diff_f(expected, current)
+        to_unassociate = diff_f(current, expected)
+        return to_associate, to_unassociate
+
+    def _diff_modules_by_nsvca(self, modules_1, modules_2):
+        return self._diff_lists_by_attr(modules_1, modules_2, "nsvca")
+
+    def _diff_md_defaults_by_profiles(self, module_defaults_1, module_defaults_2):
+        return self._diff_lists_by_attr(
+            module_defaults_1, module_defaults_2, flatten_md_defaults_name_profiles
+        )
+
+    def _diff_packages_by_filename(self, packages_1, packages_2):
+        return self._diff_lists_by_attr(packages_1, packages_2, "filename")
+
+    def _diff_lists_by_attr(self, list_1, list_2, attr_or_func):
+        def diff_attr(obj):
+            if callable(attr_or_func):
+                return attr_or_func(obj)
+            return getattr(obj, attr_or_func)
+
+        attrs_list_2 = [diff_attr(obj) for obj in list_2]
+        diff = [obj for obj in list_1 if diff_attr(obj) not in attrs_list_2]
+
+        return diff
+
+    def log_curent_content(self, current_content):
+        _LOG.info("Current modules in repo: %s", self.repo_set.out_repos.rpm.id)
+        for module in current_content.modules:
+            _LOG.info(module.nsvca)
+
+        _LOG.info("Current module_defaults in repo: %s", self.repo_set.out_repos.rpm.id)
+        for md_d in current_content.modulemd_defaults:
+            _LOG.info("module_defaults: %s, profiles: %s", md_d.name, md_d.profiles)
+
+        _LOG.info("Current rpms in repo: %s", self.repo_set.out_repos.rpm.id)
+        for rpm in current_content.binary_rpms:
+            _LOG.info(rpm.filename)
+
+        _LOG.info("Current srpms in repo: %s", self.repo_set.out_repos.source.id)
+        for rpm in current_content.source_rpms:
+            _LOG.info(rpm.filename)
+
+        if self.repo_set.out_repos.debug:
+            _LOG.info("Current rpms in repo: %s", self.repo_set.out_repos.debug.id)
+            for rpm in current_content.debug_rpms:
+                _LOG.info(rpm.filename)
+
+    def log_pulp_actions(self, associations, unassociations):
+        for item in associations:
+            if item.units:
+                for unit in item.units:
+                    _LOG.info(
+                        "Would associate %s from %s to %s",
+                        unit,
+                        unit.associate_source_repo_id,
+                        item.dst_repo.id,
+                    )
+
+            else:
+                _LOG.info(
+                    "No association expected for %s from %s to %s",
+                    item.unit_type.__name__,
+                    [r.id for r in item.src_repos],
+                    item.dst_repo.id,
+                )
+
+        for item in unassociations:
+            if item.units:
+                for unit in item.units:
+                    _LOG.info("Would unassociate %s from %s", unit, item.dst_repo.id)
+            else:
+                _LOG.info(
+                    "No unassociation expected for %s from %s",
+                    item.unit_type.__name__,
+                    item.dst_repo.id,
+                )
+
+    def _do_copy(self, associations):
+        association_fts = []
+        for a in associations:
+            for src_repo_id, units in a.src_repo_id_to_unit_map.items():
+                if units:
+                    src_repo = self.pulp_client.get_repository(src_repo_id)
+                    dst_repo = self.pulp_client.get_repository(a.dst_repo.id)
+                    for chunk in list(batcher(units, self._action_batch_size)):
+                        criteria = self._criteria_for_units(chunk, a.unit_type)
+                        association_fts.append(
+                            self.pulp_client.copy_content(src_repo, dst_repo, criteria)
+                        )
+        return association_fts
+
+    def _do_remove(self, unassociations):
+        unassociation_fts = []
+        for u in unassociations:
+            if u.units:
+                dst_repo = self.pulp_client.get_repository(u.dst_repo.id)
+                for chunk in list(batcher(u.units, self._action_batch_size)):
+                    criteria = self._criteria_for_units(chunk, u.unit_type)
+                    unassociation_fts.append(dst_repo.remove_content(criteria))
+        return unassociation_fts
+
+    def _criteria_for_units(self, units, unit_type):
+        partial_crit = []
+        for unit in units:
+            if unit_type is RpmUnit:
+                partial_crit.append(Criteria.with_field("filename", unit.filename))
+            elif unit_type is ModulemdUnit:
+                md_crit = []
+                nsvca_dict = {
+                    "name": unit.name,
+                    "stream": unit.stream,
+                    "version": unit.version,
+                    "context": unit.context,
+                    "arch": unit.arch,
+                }
+                for md_part, value in nsvca_dict.items():
+                    md_crit.append(Criteria.with_field(md_part, value))
+                partial_crit.append(Criteria.and_(*md_crit))
+            elif unit_type is ModulemdDefaultsUnit:
+                partial_crit.append(
+                    Criteria.and_(
+                        Criteria.with_field("name", unit.name),
+                        Criteria.with_field("stream", unit.stream),
+                    )
+                )
+
+        if partial_crit:
+            return Criteria.and_(
+                Criteria.with_unit_type(unit_type), Criteria.or_(*partial_crit)
+            )
 
     def _publish_out_repos(self):
         to_publish = []
