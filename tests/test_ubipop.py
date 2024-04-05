@@ -10,7 +10,7 @@ from tempfile import NamedTemporaryFile
 
 import pytest
 import ubiconfig
-from mock import MagicMock, call, patch
+from mock import MagicMock, patch
 from more_executors import Executors
 from more_executors.futures import f_proxy, f_return
 from pubtools.pulplib import (
@@ -32,12 +32,7 @@ from ubipop import (
     UbiRepoSet,
 )
 from ubipop._cdn import Publisher
-from ubipop._utils import (
-    AssociateActionModuleDefaults,
-    AssociateActionModules,
-    UnassociateActionModuleDefaults,
-    UnassociateActionModules,
-)
+from ubipop._utils import Association, Unassociation
 
 from .conftest import (
     get_modulemd_defaults_unit,
@@ -624,10 +619,7 @@ def fixture_mock_run_ubi_population():
 
 
 def test_create_output_file_all_repos(
-    mock_ubipop_runner,
-    mock_get_repo_pairs,
-    mocked_ubiconfig_load_all,
-    mock_run_ubi_population,
+    mock_get_repo_pairs, mocked_ubiconfig_load_all, mock_run_ubi_population
 ):
     # pylint: disable=unused-argument
     path = tempfile.mkdtemp("ubipop")
@@ -927,14 +919,8 @@ def test_log_pulp_action(capsys, set_logging, mock_ubipop_runner):
         arch="x86_64",
         src_repo_id=src_repo.id,
     )
-    associations = [
-        AssociateActionModules(
-            [unit_1],
-            dst_repo,
-            [src_repo],
-        )
-    ]
-    unassociations = [UnassociateActionModules([unit_2], dst_repo)]
+    associations = [Association([unit_1], ModulemdUnit, dst_repo, [src_repo])]
+    unassociations = [Unassociation([unit_2], ModulemdUnit, dst_repo)]
 
     mock_ubipop_runner.log_pulp_actions(associations, unassociations)
     out, err = capsys.readouterr()
@@ -955,8 +941,8 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     set_logging.addHandler(logging.StreamHandler(sys.stdout))
     src_repo = get_test_repo(id="test_src")
     dst_repo = get_test_repo(id="test_dst")
-    associations = [AssociateActionModules([], dst_repo, [src_repo])]
-    unassociations = [UnassociateActionModules([], dst_repo)]
+    associations = [Association([], ModulemdUnit, dst_repo, [src_repo])]
+    unassociations = [Unassociation([], ModulemdUnit, dst_repo)]
 
     mock_ubipop_runner.log_pulp_actions(associations, unassociations)
     out, err = capsys.readouterr()
@@ -965,81 +951,12 @@ def test_log_pulp_action_no_actions(capsys, set_logging, mock_ubipop_runner):
     assert err == ""
     assert (
         assoc_line.strip()
-        == "No association expected for modules from ['test_src'] to test_dst"
+        == "No association expected for ModulemdUnit from ['test_src'] to test_dst"
     )
-    assert unassoc_line.strip() == "No unassociation expected for modules from test_dst"
-
-
-def test_associate_units(mock_ubipop_runner):
-    src_repo = get_test_repo(id="test_src")
-    dst_repo = get_test_repo(id="test_dst")
-    unit = get_modulemd_unit(
-        name="test_assoc",
-        stream="fake-stream",
-        version=1,
-        context="fake-context",
-        arch="x86_64",
-        src_repo_id=src_repo.id,
+    assert (
+        unassoc_line.strip()
+        == "No unassociation expected for ModulemdUnit from test_dst"
     )
-    associations = [
-        AssociateActionModules([unit], dst_repo, [src_repo]),
-    ]
-
-    mock_ubipop_runner.pulp_client.associate_modules.return_value = ["task_id"]
-    ret = mock_ubipop_runner._associate_unassociate_units(
-        associations
-    )  # pylint: disable=protected-access
-
-    assert len(ret) == 1
-    assert ret[0].result() == ["task_id"]
-
-
-def test_associate_unassociate_md_defaults(mock_ubipop_runner):
-    src_repo = get_test_repo(id="test_src")
-    dst_repo = get_test_repo(id="tets_dst")
-    unit_1 = get_modulemd_defaults_unit(
-        name="virt",
-        stream="rhel",
-        profiles={"2.5": ["common"]},
-        repo_id="test_src",
-        src_repo_id="test_src",
-    )
-
-    unit_2 = get_modulemd_defaults_unit(
-        name="virt",
-        stream="rhel",
-        profiles={"2.5": ["unique"]},
-        repo_id="test_src",
-        src_repo_id="test_src",
-    )
-
-    associations = AssociateActionModuleDefaults(
-        [unit_1],
-        dst_repo,
-        [src_repo],
-    )
-
-    unassociations = UnassociateActionModuleDefaults(
-        [unit_2],
-        dst_repo,
-    )
-
-    mock_ubipop_runner.pulp_client.unassociate_module_defaults.return_value = [
-        "task_id_0"
-    ]
-    mock_ubipop_runner.pulp_client.associate_module_defaults.return_value = [
-        "task_id_1"
-    ]
-
-    # pylint: disable=protected-access
-    mock_ubipop_runner._associate_unassociate_md_defaults(
-        (associations,),
-        (unassociations,),
-    )
-
-    # the calls has to be in order
-    calls = [call(["task_id_0"]), call(["task_id_1"])]
-    mock_ubipop_runner.pulp_client.wait_for_tasks.assert_has_calls(calls)
 
 
 @pytest.mark.parametrize(
@@ -1190,6 +1107,10 @@ def test_populate_ubi_repos(
         relative_url="content/unit/4/client",
     )
 
+    input_binary_repo = YumRepository(id="input_binary")
+    input_source_repo = YumRepository(id="input_source")
+    input_debug_repo = YumRepository(id="input_debug")
+
     output_binary_repo = YumRepository(
         id="ubi_binary",
         content_set="ubi-8-for-x86_64-appstream-rpms",
@@ -1200,10 +1121,6 @@ def test_populate_ubi_repos(
         distributors=[d1],
         relative_url="content/unit/1/client",
     )
-    input_binary_repo = YumRepository(id="input_binary")
-    input_source_repo = YumRepository(id="input_source")
-    input_debug_repo = YumRepository(id="input_debug")
-
     output_source_repo = YumRepository(
         id="ubi_source",
         population_sources=["input_source"],
@@ -1246,6 +1163,7 @@ def test_populate_ubi_repos(
         arch="x86_64",
         filename="golang-1.a.x86_64.rpm",
         sourcerpm="golang-1.a.x86_64.src.rpm",
+        signing_key="a1b2c3",
     )
 
     new_rpm = RpmUnit(
@@ -1255,6 +1173,7 @@ def test_populate_ubi_repos(
         arch="x86_64",
         filename="golang-2.a.x86_64.rpm",
         sourcerpm="golang-2.a.x86_64.src.rpm",
+        signing_key="a1b2c3",
     )
 
     old_modulemd = ModulemdUnit(
@@ -1284,25 +1203,6 @@ def test_populate_ubi_repos(
         input_binary_repo, [new_rpm, new_modulemd, new_modulemd_defaults]
     )
 
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/".format(
-        dst_repo="ubi_binary"
-    )
-
-    requests_mock.register_uri(
-        "POST", url, json={"spawned_tasks": [{"task_id": "foo_task_id"}]}
-    )
-
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/".format(
-        dst_repo="ubi_binary"
-    )
-    requests_mock.register_uri(
-        "POST", url, json={"spawned_tasks": [{"task_id": "foo_task_id"}]}
-    )
-
-    url = "/pulp/api/v2/tasks/{task_id}/".format(task_id="foo_task_id")
-    requests_mock.register_uri(
-        "GET", url, json={"state": "finished", "task_id": "foo_task_id"}
-    )
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
     _create_fastpurge_mocks(requests_mock)
@@ -1312,22 +1212,25 @@ def test_populate_ubi_repos(
     ubi_populate.populate_ubi_repos()
     history = fake_pulp.publish_history
 
-    # there should be 3 repositories succesfully published
+    # there should be 3 repositories successfully published
     assert len(history) == 3
     expected_published_repo_ids = set(["ubi_binary", "ubi_debug", "ubi_source"])
     repo_ids_published = set()
     for publish in history:
-        assert publish.repository.id in expected_published_repo_ids
-        repo_ids_published.add(publish.repository.id)
+        repo = publish.repository
+        repo_ids_published.add(repo.id)
 
-        assert len(publish.tasks) == 1
-        assert publish.tasks[0].completed
-        assert publish.tasks[0].succeeded
+        assert repo.id in expected_published_repo_ids
+
+        if repo.id == "ubi_binary":
+            assert new_rpm.filename == repo.rpm_content[0].filename
+            assert new_modulemd.nsvca == repo.modulemd_content[0].nsvca
+            assert (
+                new_modulemd_defaults.profiles
+                == repo.modulemd_defaults_content[0].profiles
+            )
 
     assert repo_ids_published == expected_published_repo_ids
-    # unfortunately we can't check actual content od repos because
-    # un/associate calls are using custom client not the pubtools-pulplib Client
-    # TODO add check for actual content after we move to pubtools-pulplib Client
 
     request = requests_mock.request_history[
         -1
@@ -1349,18 +1252,12 @@ def test_populate_ubi_repos(
 
 
 @patch("ubipop._cdn.Publisher")
-@patch("ubipop._pulp_client.Pulp.wait_for_tasks")
 @patch("pubtools.pulplib.YumRepository.get_debug_repository")
 @patch("pubtools.pulplib.YumRepository.get_source_repository")
 def test_populate_ubi_repos_no_publish(
-    get_debug_repository,
-    get_source_repository,
-    wait_for_tasks,
-    publisher,
-    requests_mock,
-    monkeypatch,
+    get_debug_repository, get_source_repository, publisher, requests_mock, monkeypatch
 ):
-    """Test run of populate_ubi_repos which checks that correct asssociations and
+    """Test run of populate_ubi_repos which checks that correct associations and
     unassociations were made in Pulp but no publish was performed. It's simplified to contain
     only actions on RPM packages."""
     monkeypatch.setenv("UBIPOP_SKIP_PUBLISH", "true")
@@ -1485,29 +1382,6 @@ def test_populate_ubi_repos_no_publish(
         input_binary_repo, [new_rpm, new_modulemd, new_modulemd_defaults]
     )
 
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/".format(
-        dst_repo="ubi_binary"
-    )
-    requests_mock.register_uri(
-        "POST", url, json={"spawned_tasks": [{"task_id": "association_task_id"}]}
-    )
-
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/".format(
-        dst_repo="ubi_binary"
-    )
-    requests_mock.register_uri(
-        "POST", url, json={"spawned_tasks": [{"task_id": "unassociation_task_id"}]}
-    )
-
-    url = "/pulp/api/v2/tasks/{task_id}/".format(task_id="association_task_id")
-    requests_mock.register_uri(
-        "GET", url, json={"state": "finished", "task_id": "association_task_id"}
-    )
-    url = "/pulp/api/v2/tasks/{task_id}/".format(task_id="unassociation_task_id")
-    requests_mock.register_uri(
-        "GET", url, json={"state": "finished", "task_id": "unassociation_task_id"}
-    )
-
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
 
@@ -1515,18 +1389,6 @@ def test_populate_ubi_repos_no_publish(
     ubi_populate.populate_ubi_repos()
 
     publisher.assert_not_called()
-    # there should be 3 associations and 3 unassociations
-    wait_for_tasks.assert_has_calls(
-        [
-            call(["association_task_id"]),
-            call(["association_task_id"]),
-            call(["association_task_id"]),
-            call(["unassociation_task_id"]),
-            call(["unassociation_task_id"]),
-            call(["unassociation_task_id"]),
-        ],
-        any_order=True,
-    )
 
 
 @patch("ubipop._cdn.Publisher")
@@ -1664,25 +1526,6 @@ def test_populate_ubi_repos_dry_run(
         input_binary_repo, [new_rpm, new_modulemd, new_modulemd_defaults]
     )
 
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/".format(
-        dst_repo="ubi_binary"
-    )
-
-    requests_mock.register_uri(
-        "POST", url, json={"spawned_tasks": [{"task_id": "foo_task_id"}]}
-    )
-
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/".format(
-        dst_repo="ubi_binary"
-    )
-    requests_mock.register_uri(
-        "POST", url, json={"spawned_tasks": [{"task_id": "foo_task_id"}]}
-    )
-
-    url = "/pulp/api/v2/tasks/{task_id}/".format(task_id="foo_task_id")
-    requests_mock.register_uri(
-        "GET", url, json={"state": "finished", "task_id": "foo_task_id"}
-    )
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
     _create_fastpurge_mocks(requests_mock)
@@ -1818,25 +1661,6 @@ def test_populate_ubi_repos_missing_repos(
         input_binary_repo, [new_rpm, new_modulemd, new_modulemd_defaults]
     )
 
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/associate/".format(
-        dst_repo="ubi_binary"
-    )
-
-    requests_mock.register_uri(
-        "POST", url, json={"spawned_tasks": [{"task_id": "foo_task_id"}]}
-    )
-
-    url = "/pulp/api/v2/repositories/{dst_repo}/actions/unassociate/".format(
-        dst_repo="ubi_binary"
-    )
-    requests_mock.register_uri(
-        "POST", url, json={"spawned_tasks": [{"task_id": "foo_task_id"}]}
-    )
-
-    url = "/pulp/api/v2/tasks/{task_id}/".format(task_id="foo_task_id")
-    requests_mock.register_uri(
-        "GET", url, json={"state": "finished", "task_id": "foo_task_id"}
-    )
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
     _create_fastpurge_mocks(requests_mock)
@@ -1926,9 +1750,8 @@ def _create_cdn_mocks(requests_mock):
 
 
 @patch("ubipop.Client")
-@patch("ubipop.Pulp")
-def test_make_pulp_client_cert(mocked_client, mocked_legacy_client):
-    """Tests that pulp client (pubtools and legacy) can be created with cert/key used for auth"""
+def test_make_pulp_client_cert(mocked_client):
+    """Tests that pulp client can be created with cert/key used for auth"""
     with NamedTemporaryFile() as cert, NamedTemporaryFile() as key:
         cert_path = os.path.abspath(cert.name)
         key_path = os.path.abspath(key.name)
@@ -1940,23 +1763,16 @@ def test_make_pulp_client_cert(mocked_client, mocked_legacy_client):
         mocked_client.assert_called_once_with(
             "https://example.pulp.com", verify=True, cert=auth
         )
-        mocked_legacy_client.assert_called_once_with(
-            "https://example.pulp.com", verify=True, cert=auth
-        )
 
 
 @patch("ubipop.Client")
-@patch("ubipop.Pulp")
-def test_make_pulp_client_username(mocked_client, mocked_legacy_client):
-    """Tests that pulp client (pubtools and legacy) can be created with username/password used for auth"""
+def test_make_pulp_client_username(mocked_client):
+    """Tests that pulp client can be created with username/password used for auth"""
 
     auth = ("username", "password")
     ubi_populate = UbiPopulate("example.pulp.com", auth, dry_run=False)
     _ = ubi_populate.pulp_client
 
     mocked_client.assert_called_once_with(
-        "https://example.pulp.com", verify=True, auth=auth
-    )
-    mocked_legacy_client.assert_called_once_with(
         "https://example.pulp.com", verify=True, auth=auth
     )

@@ -1,23 +1,21 @@
+import json
+import logging
 import os
 import subprocess
-import logging
+
 import pytest
 import requests
 import ubiconfig
-import ubipop
-import json
-
-from ubipop._pulp_client import Pulp
-from ubipop.ubi_manifest_client.client import Client
-
 from pubtools.pulplib import (
     Client,
     Criteria,
     Matcher,
+    ModulemdDefaultsUnit,
     ModulemdUnit,
     RpmUnit,
-    ModulemdDefaultsUnit,
 )
+
+import ubipop
 
 PULP_HOSTNAME = os.getenv("TEST_PULP_HOSTNAME")
 PULP_USER = os.getenv("TEST_PULP_USER")
@@ -79,37 +77,23 @@ def run_ubipop_tool(content_set, workers=10, dry_run=False):
 
 
 def get_repos_from_cs(cs, skip_dot_version=False):
+    kwargs = {"verify": PULP_SECURE}
     if PULP_CERT_PATH is not None:
-        p = Pulp(
-            PULP_HOSTNAME, cert=(PULP_CERT_PATH, PULP_KEY_PATH), verify=PULP_SECURE
-        )
+        kwargs["cert"] = (PULP_CERT_PATH, PULP_KEY_PATH)
     else:
-        p = Pulp(PULP_HOSTNAME, auth=(PULP_USER, PULP_PWD), verify=PULP_SECURE)
+        kwargs["auth"] = (PULP_USER, PULP_PWD)
+    p = Client("https://" + PULP_HOSTNAME, **kwargs)
 
-    ret = p.do_request(
-        "post",
-        "repositories/search/",
-        {
-            "criteria": {
-                "filters": {"notes.content_set": cs},
-            },
-            "distributors": False,
-        },
-    )
+    repos = p.search_repository(Criteria.with_field("notes.content_set", cs))
 
-    ret.raise_for_status()
-
-    for item in ret.json():
-        notes = item["notes"]
-
-        if skip_dot_version and "." in notes["platform_full_version"]:
+    for repo in repos:
+        if skip_dot_version and "." in repo.platform_full_version:
             continue
 
         yield {
-            "id": item["id"],
-            "name": item["display_name"],
-            "url": notes["relative_url"],
-            "arch": notes["arch"],
+            "id": repo.id,
+            "url": repo.relative_url,
+            "arch": repo.arch,
         }
 
 
@@ -644,10 +628,10 @@ def test_ubipop_not_filter_module_rpm_with_different_version(pulp_client):
     mod_name, mod_profile = separate_modules(modulemds)[1]
     assert (
         mod_name == "container-tools"
-    ), "Expected modulemd: httpd, found modulemd: {}".format(mod_name)
+    ), "Expected modulemd: container-tools, found modulemd: {}".format(mod_name)
     assert (
         "common [d]" in mod_profile
-    ), "Modulemd httpd should have common profile as default."
+    ), "Modulemd container-tools should have common profile as default."
 
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
