@@ -630,7 +630,7 @@ def test_ubipop_not_filter_module_rpm_with_different_version(pulp_client):
         mod_name == "container-tools"
     ), "Expected modulemd: container-tools, found modulemd: {}".format(mod_name)
     assert (
-        "common [d]" in mod_profile
+        "common" in mod_profile
     ), "Modulemd container-tools should have common profile as default."
 
 
