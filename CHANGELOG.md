@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
+## [0.15.2] - 2024-04-8
+
+- Replace custom pulp client with pubtools-pulplib
+
 ## [0.15.1] - 2024-01-11
 
 ### Added
@@ -152,7 +156,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.2...HEAD
+[0.15.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.1...0.15.2
 [0.15.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.5...0.15.1
 [0.14.5]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.4...0.14.5
 [0.14.4]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.3...0.14.4
