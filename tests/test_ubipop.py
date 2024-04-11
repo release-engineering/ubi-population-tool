@@ -41,6 +41,9 @@ from .conftest import (
     get_srpm_unit,
 )
 
+# pylint: disable=protected-access
+
+
 TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "./data")
 
 

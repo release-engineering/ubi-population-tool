@@ -11,6 +11,8 @@ from ubipop.ubi_manifest_client.models import (
     UbiManifest,
 )
 
+# pylint: disable=protected-access
+
 
 def test_generate_manifest(requests_mock):
     url = "api/v1/manifest"

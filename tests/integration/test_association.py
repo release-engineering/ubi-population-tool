@@ -550,7 +550,6 @@ def test_ubipop_not_filter_non_module_rpm_and_module_rpm_with_same_package(pulp_
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
 def test_ubipop_not_filter_module_rpm_with_different_version(pulp_client):
-
     """
     Test if ubipop will not filter module rpm in the repo
 
@@ -636,7 +635,6 @@ def test_ubipop_not_filter_module_rpm_with_different_version(pulp_client):
 
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
 def test_ubipop_get_dependencies_module_rpm(pulp_client):
-
     """
     Test if ubipop get the dependencies of module
     ubipop can get the dependencies of rpm
