@@ -21,7 +21,7 @@ def get_requirements():
 
 setup(
     name="ubi-population-tool",
-    version="0.15.1",
+    version="0.15.2",
     license="GNU General Public License",
     author="",
     author_email="",
