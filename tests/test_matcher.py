@@ -14,6 +14,8 @@ from ubipop._matcher import (
     flatten_list_of_sets,
 )
 
+# pylint: disable=protected-access
+
 
 @pytest.fixture(name="ubi_config")
 def fake_ubi_config():

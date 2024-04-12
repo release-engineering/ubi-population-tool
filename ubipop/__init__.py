@@ -37,7 +37,7 @@ RepoSet = namedtuple("RepoSet", ["rpm", "source", "debug"])
 
 
 @attr.s
-class RepoContent(object):
+class RepoContent:
     binary_rpms = attr.ib()
     source_rpms = attr.ib()
     debug_rpms = attr.ib()
@@ -45,7 +45,7 @@ class RepoContent(object):
     modulemd_defaults = attr.ib()
 
 
-class UbiRepoSet(object):
+class UbiRepoSet:
     def __init__(self, input_repos, output_repos):
         self.in_repos = input_repos
         self.out_repos = output_repos
@@ -95,7 +95,7 @@ class UbiRepoSet(object):
             raise RepoMissing()
 
 
-class UbiPopulate(object):
+class UbiPopulate:
     def __init__(
         self,
         pulp_hostname,
@@ -354,7 +354,7 @@ class UbiPopulate(object):
                 out_repos.update(repo_set.get_output_repos())
 
 
-class UbiPopulateRunner(object):
+class UbiPopulateRunner:
     def __init__(
         self,
         pulp_client,

@@ -20,7 +20,7 @@ class UbiManifestTaskFailure(Exception):
     pass
 
 
-class Client(object):
+class Client:
     def __init__(self, url):
         self._url = os.path.join(url, API)
         self._tls = threading.local()

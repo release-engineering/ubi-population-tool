@@ -2,7 +2,7 @@ import attr
 
 
 @attr.s
-class UbiManifest(object):
+class UbiManifest:
     repo_id = attr.ib()
     manifest = attr.ib()
 
@@ -54,7 +54,7 @@ class UbiManifest(object):
 
 
 @attr.s
-class UbiCompatibleUnit(object):
+class UbiCompatibleUnit:
     src_repo_id = attr.ib()
     dst_repo_id = attr.ib()
 

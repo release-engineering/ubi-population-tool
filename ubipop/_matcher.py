@@ -13,7 +13,7 @@ BATCH_SIZE_RPM = int(os.getenv("UBIPOP_BATCH_SIZE_RPM", "15"))
 _LOG = logging.getLogger("ubipop.matcher")
 
 
-class UbiUnit(object):
+class UbiUnit:
     """
     Wrapping class of model classes (*Unit) of pubtools.pulplib.
     """
@@ -36,7 +36,7 @@ class UbiUnit(object):
     #    return hash(self._unit)
 
 
-class Matcher(object):
+class Matcher:
     """
     Generic class can be used for matching units in pulp required for ubipop.
     This class should be subclasses and run() method needs to be implemented.

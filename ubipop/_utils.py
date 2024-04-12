@@ -1,4 +1,4 @@
-class Association(object):
+class Association:
     def __init__(self, units, unit_type, dst_repo, src_repos):
         self.units = units
         self.unit_type = unit_type
@@ -21,7 +21,7 @@ class Association(object):
                 return repo
 
 
-class Unassociation(object):
+class Unassociation:
     def __init__(self, units, unit_type, dst_repo):
         self.units = units
         self.unit_type = unit_type
