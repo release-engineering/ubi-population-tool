@@ -3,7 +3,7 @@ import sys
 import mock
 import pytest
 
-from ubipop.cli import main
+from ubipop.cli import main, USERNAME_REGEX, URL_REGEX
 
 
 @pytest.fixture(name="mock_ubipopulate")
@@ -472,3 +472,38 @@ def test_content_set_regex(mock_ubipopulate):
         content_set_regex="test-regex.*",
         ubi_manifest_url="https://ubi-manifest.com",
     )
+
+
+@pytest.mark.parametrize(
+    "wrong_arg,expected_error",
+    [
+        (["--workers", "0"], "Number of workers must be positive."),
+        (
+            ["--user", "fo o"],
+            f"Value 'fo o' doesn't match regular expression '{USERNAME_REGEX}'.",
+        ),
+        (
+            ["--conf-src", "https://example.com..!!"],
+            f"Value 'https://example.com..!!' doesn't match regular expression '{URL_REGEX}'.",
+        ),
+        (
+            ["--content-set-regex", "test[a-z"],
+            "Value 'test[a-z' could not be compiled into a regex.\n"
+            "Error: unterminated character set",
+        ),
+    ],
+)
+def test_wrong_arguments(capsys, wrong_arg, expected_error):
+    args = [
+        "--pulp-hostname",
+        "foo.pulp.com",
+        "--ubi-manifest-url",
+        "https://ubi-manifest.com",
+    ] + wrong_arg
+
+    with pytest.raises(SystemExit) as e_info:
+        main(args)
+
+    _, err = capsys.readouterr()
+    assert expected_error in err
+    assert e_info.value.code == 2
