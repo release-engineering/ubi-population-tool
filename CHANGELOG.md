@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
-## [0.15.2] - 2024-04-8
+## [0.16.0] - 2024-05-31
+
+- Add input validation
+
+
+## [0.15.2] - 2024-04-08
 
 - Replace custom pulp client with pubtools-pulplib
 
@@ -156,26 +161,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.2...HEAD
-[0.15.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.1...0.15.2
-[0.15.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.5...0.15.1
-[0.14.5]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.4...0.14.5
-[0.14.4]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.3...0.14.4
-[0.14.3]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.2...0.14.3
-[0.14.2]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.1...0.14.2
-[0.14.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.0...0.14.1
-[0.14.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.13.0...0.14.0
-[0.13.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.12.0...0.13.0
-[0.12.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.11.0...0.12.0
-[0.11.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.10.0...0.11.0
-[0.10.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.9.0...0.10.0
-[0.9.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.8.0...0.9.0
-[0.8.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.7.0...0.8.0
-[0.7.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.6.0...0.7.0
-[0.6.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.5.0...0.6.0
-[0.5.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.4.0...0.5.0
-[0.4.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.1...0.4.0
-[0.3.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.0...0.3.1
-[0.3.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.2.0...0.3.0
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.16.0...HEAD
+[0.15.2]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.2...v0.16.0
+[0.15.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.1...v0.15.2
+[0.15.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.5...v0.15.1
+[0.14.5]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.4...v0.14.5
+[0.14.4]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.3...v0.14.4
+[0.14.3]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.2...v0.14.3
+[0.14.2]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.1...v0.14.2
+[0.14.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.14.0...v0.14.1
+[0.14.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.1.19...v0.2.0 
 [0.1.19]: https://github.com/release-engineering/ubi-population-tool/compare/v0.1.18...v0.1.19
