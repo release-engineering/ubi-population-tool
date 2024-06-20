@@ -3,7 +3,6 @@ import os
 import shutil
 import sys
 import tempfile
-import textwrap
 from concurrent.futures import wait
 from datetime import datetime
 from tempfile import NamedTemporaryFile
@@ -1050,37 +1049,9 @@ def test_get_current_content(mock_ubipop_runner, pulp, skip_debug_repo):
     assert source_rpms[0].name == "test-srpm"
 
 
-@pytest.fixture(name="cache_purge_env")
-def fixture_cache_purge_env(monkeypatch):
-    with tempfile.NamedTemporaryFile("w") as fp:
-        monkeypatch.setenv("UBIPOP_EDGERC_CFG", fp.name)
-        monkeypatch.setenv("UBIPOP_CDN_ROOT", "https://test.root-url.com/")
-        monkeypatch.setenv(
-            "UBIPOP_ARL_TEMPLATES",
-            "/test/template-1/{ttl}/{path},/test/template-2/{ttl}/{path}",
-        )
-
-        fp.write(
-            textwrap.dedent(
-                """
-        [default]
-        client_secret = some-secret
-        host = some-host
-        access_token = some-access-token
-        client_token = some-client-token
-        """
-            )
-        )
-        fp.flush()
-
-        yield
-
-
 @patch("pubtools.pulplib.YumRepository.get_debug_repository")
 @patch("pubtools.pulplib.YumRepository.get_source_repository")
-def test_populate_ubi_repos(
-    get_debug_repository, get_source_repository, cache_purge_env, requests_mock
-):
+def test_populate_ubi_repos(get_debug_repository, get_source_repository, requests_mock):
     # pylint: disable=unused-argument
     """Test run of populate_ubi_repos that checks correct number of repo publication.
     It's simplified to contain only actions on RPM packages."""
@@ -1208,8 +1179,6 @@ def test_populate_ubi_repos(
 
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
-    _create_fastpurge_mocks(requests_mock)
-    _create_cdn_mocks(requests_mock)
 
     # let's run actual population
     ubi_populate.populate_ubi_repos()
@@ -1234,24 +1203,6 @@ def test_populate_ubi_repos(
             )
 
     assert repo_ids_published == expected_published_repo_ids
-
-    request = requests_mock.request_history[
-        -1
-    ]  # last request should be for purge cache request
-
-    expected_req = [
-        "https://test.root-url.com/content/unit/3/client/repodata/repomd.xml",
-        "/test/template-1/24h/content/unit/3/client/repodata/repomd.xml",
-        "/test/template-2/24h/content/unit/3/client/repodata/repomd.xml",
-        "https://test.root-url.com/content/unit/2/client/repodata/repomd.xml",
-        "/test/template-1/30m/content/unit/2/client/repodata/repomd.xml",
-        "/test/template-2/30m/content/unit/2/client/repodata/repomd.xml",
-        "https://test.root-url.com/content/unit/1/client/repodata/repomd.xml",
-        "/test/template-1/10s/content/unit/1/client/repodata/repomd.xml",
-        "/test/template-2/10s/content/unit/1/client/repodata/repomd.xml",
-    ]
-
-    assert sorted(request.json()["objects"]) == sorted(expected_req)
 
 
 @patch("ubipop._cdn.Publisher")
@@ -1531,8 +1482,6 @@ def test_populate_ubi_repos_dry_run(
 
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
-    _create_fastpurge_mocks(requests_mock)
-    _create_cdn_mocks(requests_mock)
 
     # let's run actual population
     ubi_populate.populate_ubi_repos()
@@ -1553,9 +1502,7 @@ def test_populate_ubi_repos_dry_run(
 
 
 @patch("pubtools.pulplib.YumRepository.get_source_repository")
-def test_populate_ubi_repos_missing_repos(
-    get_source_repository, cache_purge_env, requests_mock, caplog
-):
+def test_populate_ubi_repos_missing_repos(get_source_repository, requests_mock, caplog):
     # pylint: disable=unused-argument
     """Test run of populate_ubi_repos with a missing repo."""
     dt = datetime(2019, 9, 12, 0, 0, 0)
@@ -1666,8 +1613,6 @@ def test_populate_ubi_repos_missing_repos(
 
     # mock calls to ubi-manifest service
     _create_ubi_manifest_mocks(requests_mock)
-    _create_fastpurge_mocks(requests_mock)
-    _create_cdn_mocks(requests_mock)
 
     # let's run actual population
     ubi_populate.populate_ubi_repos()
@@ -1678,13 +1623,6 @@ def test_populate_ubi_repos_missing_repos(
     # should have logged an error and a warning
     assert "Input Debug repo does not exist" in caplog.text
     assert "Skipping current content triplet, some repos are missing" in caplog.text
-
-
-def _create_fastpurge_mocks(requests_mock):
-    url = "https://some-host/ccu/v3/delete/url/production"
-    seconds = 0.1
-    response = {"some": ["return", "value"], "estimatedSeconds": seconds}
-    requests_mock.register_uri("POST", url, status_code=201, json=response)
 
 
 def _create_ubi_manifest_mocks(requests_mock):
@@ -1738,18 +1676,6 @@ def _create_ubi_manifest_mocks(requests_mock):
     url = os.path.join("https://ubi-manifest.com", url)
     response = {"repo_id": "some-repo-id", "content": []}
     requests_mock.register_uri("GET", url, json=response)
-
-
-def _create_cdn_mocks(requests_mock):
-    url_ttl = [
-        ("https://test.root-url.com/content/unit/1/client/repodata/repomd.xml", "10s"),
-        ("https://test.root-url.com/content/unit/2/client/repodata/repomd.xml", "30m"),
-        ("https://test.root-url.com/content/unit/3/client/repodata/repomd.xml", "24h"),
-    ]
-
-    for url, ttl in url_ttl:
-        headers = {"X-Cache-Key": f"/fake/cache-key/{ttl}/something"}
-        requests_mock.register_uri("HEAD", url, headers=headers)
 
 
 @patch("ubipop.Client")

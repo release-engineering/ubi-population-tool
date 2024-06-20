@@ -124,19 +124,10 @@ class UbiPopulate:
         self._content_set_regex = kwargs.get("content_set_regex", None)
         self._ubi_manifest_url = kwargs.get("ubi_manifest_url") or None
         self._action_batch_size = kwargs.get("action_batch_size", 100)
-        arl_templates = os.getenv("UBIPOP_ARL_TEMPLATES", "")
         self._publisher_args = {
-            "edgerc": os.getenv("UBIPOP_EDGERC_CFG", "/etc/.edgerc"),
             "publish_options": {
                 "clean": True,
             },
-            "cdn_root": os.getenv("UBIPOP_CDN_ROOT", ""),
-            "arl_templates": arl_templates.split(",") if arl_templates else [],
-            "cert": (
-                os.getenv("UBIPOP_CDN_CERT", ""),
-                os.getenv("UBIPOP_CDN_KEY", ""),
-            ),
-            "verify": os.getenv("UBIPOP_CDN_CA_CERT", ""),
         }
         self._skip_publish = os.getenv("UBIPOP_SKIP_PUBLISH", "false")
 
