@@ -1,7 +1,0 @@
-requests
-more-executors>2.1.0
-ubi-config>=3.1.0
-pyrsistent
-pubtools-pulplib>=2.34.2
-attrs
-fastpurge

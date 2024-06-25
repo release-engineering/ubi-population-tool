@@ -18,6 +18,8 @@ jobs:
           python-version: "3.12"
       - name: Install Tox
         run: pip install tox
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
       - name: Run Tox
         run: |
           tox -e docs

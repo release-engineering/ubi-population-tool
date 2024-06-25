@@ -1,0 +1,62 @@
+[tool.poetry]
+name = "ubi-population-tool"
+version = "0.16.0"
+description = "Tool for populating ubi repositories"
+license = "GPL-3.0-or-later"
+readme = "README.md"
+authors = []
+repository = "https://github.com/release-engineering/ubi-population-tool"
+documentation = "https://release-engineering.github.io/ubi-population-tool"
+packages = [{include = "ubipop"}]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[tool.poetry.scripts]
+ubipop = "ubipop.cli:entry_point"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<4.0"
+requires = "*"
+more-executors = "*"
+ubi-config = "*"
+pyrsistent = "*"
+pubtools-pulplib = "*"
+attrs = "*"
+fastpurge = "*"
+urllib3 = "*"
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = "*"
+mock = "*"
+requests-mock = "*"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+black = "*"
+pre-commit = "*"
+mypy = "*"
+pylint = "*"
+pytest-cov = "*"
+bandit = "*"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "*"
+alabaster = "*"
