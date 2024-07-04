@@ -1,5 +1,5 @@
 import os
-from mock import MagicMock
+from mock import MagicMock, patch
 
 import pytest
 
@@ -14,7 +14,8 @@ from ubipop.ubi_manifest_client.models import (
 # pylint: disable=protected-access
 
 
-def test_generate_manifest(requests_mock):
+@patch("requests_kerberos.HTTPKerberosAuth")
+def test_generate_manifest(kerberos_auth, requests_mock):
     url = "api/v1/manifest"
     url = os.path.join("https://foo-bar.com", url)
 
@@ -43,9 +44,11 @@ def test_generate_manifest(requests_mock):
 
         tasks = client.generate_manifest(["repo_id_1", "repo_id_2"])
         tasks.result()
+        kerberos_auth.assert_called()
 
 
-def test_generate_manifest_failure(requests_mock):
+@patch("requests_kerberos.HTTPKerberosAuth")
+def test_generate_manifest_failure(kerberos_auth, requests_mock):
     url = "api/v1/manifest"
     url = os.path.join("https://foo-bar.com", url)
 
@@ -74,6 +77,7 @@ def test_generate_manifest_failure(requests_mock):
         tasks = client.generate_manifest(["repo_id_1", "repo_id_2"])
         with pytest.raises(UbiManifestTaskFailure):
             tasks.result()
+    kerberos_auth.assert_called()
 
 
 def test_unpack_failure():
@@ -84,7 +88,8 @@ def test_unpack_failure():
             client._unpack_response(response)
 
 
-def test_get_manifest(requests_mock):
+@patch("requests_kerberos.HTTPKerberosAuth")
+def test_get_manifest(kerberos_auth, requests_mock):
     url = "api/v1/manifest/some-repo-id"
     url = os.path.join("https://foo-bar.com", url)
 
@@ -149,3 +154,4 @@ def test_get_manifest(requests_mock):
         assert unit.dst_repo_id == "some-repo-id"
         assert unit.name == "name"
         assert unit.stream == "stream"
+        kerberos_auth.assert_called()

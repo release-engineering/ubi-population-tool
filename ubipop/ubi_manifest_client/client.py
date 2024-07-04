@@ -4,6 +4,7 @@ import threading
 from concurrent.futures import as_completed
 
 import requests
+import requests_kerberos
 from more_executors import Executors, f_map, f_proxy
 
 from .models import UbiManifest
@@ -58,6 +59,7 @@ class Client:
     def _session(self):
         if not hasattr(self._tls, "session"):
             self._tls.session = requests.Session()
+            self._tsl.session.auth = requests_kerberos.HTTPKerberosAuth()
         return self._tls.session
 
     def _do_request(self, **kwargs):
