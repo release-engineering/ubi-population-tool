@@ -14,8 +14,7 @@ from ubipop.ubi_manifest_client.models import (
 # pylint: disable=protected-access
 
 
-@patch("requests_kerberos.HTTPKerberosAuth")
-def test_generate_manifest(kerberos_auth, requests_mock):
+def test_generate_manifest(requests_mock):
     url = "api/v1/manifest"
     url = os.path.join("https://foo-bar.com", url)
 
@@ -44,11 +43,9 @@ def test_generate_manifest(kerberos_auth, requests_mock):
 
         tasks = client.generate_manifest(["repo_id_1", "repo_id_2"])
         tasks.result()
-        kerberos_auth.assert_called()
 
 
-@patch("requests_kerberos.HTTPKerberosAuth")
-def test_generate_manifest_failure(kerberos_auth, requests_mock):
+def test_generate_manifest_failure(requests_mock):
     url = "api/v1/manifest"
     url = os.path.join("https://foo-bar.com", url)
 
@@ -77,7 +74,6 @@ def test_generate_manifest_failure(kerberos_auth, requests_mock):
         tasks = client.generate_manifest(["repo_id_1", "repo_id_2"])
         with pytest.raises(UbiManifestTaskFailure):
             tasks.result()
-    kerberos_auth.assert_called()
 
 
 def test_unpack_failure():
@@ -88,8 +84,7 @@ def test_unpack_failure():
             client._unpack_response(response)
 
 
-@patch("requests_kerberos.HTTPKerberosAuth")
-def test_get_manifest(kerberos_auth, requests_mock):
+def test_get_manifest(requests_mock):
     url = "api/v1/manifest/some-repo-id"
     url = os.path.join("https://foo-bar.com", url)
 
@@ -154,4 +149,62 @@ def test_get_manifest(kerberos_auth, requests_mock):
         assert unit.dst_repo_id == "some-repo-id"
         assert unit.name == "name"
         assert unit.stream == "stream"
-        kerberos_auth.assert_called()
+
+
+def test_no_auth(requests_mock):
+    """
+    Tests usage of no authentication to ubi-manifest service.
+    """
+    url = "api/v1/manifest"
+    url = os.path.join("https://foo-bar.com", url)
+    requests_mock.register_uri("GET", url)
+    with Client("https://foo-bar.com") as client:
+        _ = client._do_request(method="GET", url=url)
+        assert client._tls.session.auth is None
+
+
+def test_kerberos_auth_no_principal(requests_mock):
+    """
+    Tests failure when providing empty principal when kerberos auth. is enabled.
+    """
+    url = "api/v1/manifest"
+    url = os.path.join("https://foo-bar.com", url)
+    requests_mock.register_uri("GET", url)
+
+    with patch.dict(
+        os.environ,
+        {
+            "UBIPOP_KERBEROS_ENABLED_UBI_MANIFEST": "true",
+        },
+    ):
+
+        with Client("https://foo-bar.com") as client:
+            with pytest.raises(ValueError):
+                _ = client._do_request(method="GET", url=url)
+
+
+@patch("ubipop.ubi_manifest_client.client.HTTPKerberosAuth")
+def test_kerberos_auth(kerb_mock, requests_mock):
+    """
+    Tests basic flow with kerberos auth. enabled.
+    """
+    url = "api/v1/manifest"
+    url = os.path.join("https://foo-bar.com", url)
+    requests_mock.register_uri("GET", url)
+
+    with patch.dict(
+        os.environ,
+        {
+            "UBIPOP_KERBEROS_ENABLED_UBI_MANIFEST": "true",
+            "UBIPOP_KERBEROS_PRINCIPAL_UBI_MANIFEST": "principal@REALM.COM",
+        },
+    ):
+
+        with Client("https://foo-bar.com") as client:
+            _ = client._do_request(method="GET", url=url)
+            kerb_mock.assert_called_once_with(
+                mutual_authentication=1,
+                force_preemptive=True,
+                principal="principal@REALM.COM",
+            )
+            assert client._tls.session.auth is not None

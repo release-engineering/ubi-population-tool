@@ -2,9 +2,9 @@ import logging
 import os
 import threading
 from concurrent.futures import as_completed
+from requests_kerberos import HTTPKerberosAuth, REQUIRED
 
 import requests
-import requests_kerberos
 from more_executors import Executors, f_map, f_proxy
 
 from .models import UbiManifest
@@ -37,6 +37,8 @@ class Client:
             .with_poll(self._poll_tasks)
             .with_retry()
         )
+        self.krb_enabled = os.getenv("UBIPOP_KERBEROS_ENABLED_UBI_MANIFEST", "")
+        self.krb_principal = os.getenv("UBIPOP_KERBEROS_PRINCIPAL_UBI_MANIFEST", "")
 
     def __enter__(self):
         return self
@@ -59,7 +61,19 @@ class Client:
     def _session(self):
         if not hasattr(self._tls, "session"):
             self._tls.session = requests.Session()
-            self._tsl.session.auth = requests_kerberos.HTTPKerberosAuth()
+
+            if self.krb_enabled.lower() in ("t", "1", "true"):
+                LOG.debug("Using kerberos authentication to ubi-manifest service")
+                if not self.krb_principal:
+                    raise ValueError(
+                        "Please set 'UBIPOP_KERBEROS_PRINCIPAL_UBI_MANIFEST' environment variable"
+                    )
+                self._tls.session.auth = HTTPKerberosAuth(
+                    mutual_authentication=REQUIRED,
+                    force_preemptive=True,
+                    principal=self.krb_principal,
+                )
+
         return self._tls.session
 
     def _do_request(self, **kwargs):
