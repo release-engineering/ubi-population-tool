@@ -203,7 +203,7 @@ def test_kerberos_auth(kerb_mock, requests_mock):
         with Client("https://foo-bar.com") as client:
             _ = client._do_request(method="GET", url=url)
             kerb_mock.assert_called_once_with(
-                mutual_authentication=1,
+                mutual_authentication=2,
                 force_preemptive=True,
                 principal="principal@REALM.COM",
             )
