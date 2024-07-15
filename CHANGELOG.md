@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - n/a
 
+## [0.17.1] - 2024-07-15
+
+- Fixed kerberos authentication setup to ubi-manifest
+
 ## [0.17.0] - 2024-07-12
 
 - Support for kerberos authentication to ubi-manifest
@@ -166,7 +170,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.17.1...HEAD
+[0.17.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/release-engineering/ubi-population-tool/compare/v0.15.1...v0.15.2
