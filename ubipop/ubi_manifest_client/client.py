@@ -2,7 +2,7 @@ import logging
 import os
 import threading
 from concurrent.futures import as_completed
-from requests_kerberos import HTTPKerberosAuth, REQUIRED
+from requests_kerberos import HTTPKerberosAuth, OPTIONAL
 
 import requests
 from more_executors import Executors, f_map, f_proxy
@@ -69,7 +69,7 @@ class Client:
                         "Please set 'UBIPOP_KERBEROS_PRINCIPAL_UBI_MANIFEST' environment variable"
                     )
                 self._tls.session.auth = HTTPKerberosAuth(
-                    mutual_authentication=REQUIRED,
+                    mutual_authentication=OPTIONAL,
                     force_preemptive=True,
                     principal=self.krb_principal,
                 )
