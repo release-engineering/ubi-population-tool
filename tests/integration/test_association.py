@@ -365,9 +365,31 @@ def filter_debug_packages(type, cfg_packages_whitelist):
     return pkgs_expected_exclude
 
 
+def run_pub_client_publish(repo_ids, target):
+    cmd = ["pub", "publish", "--target", target]
+    for repo_id in repo_ids:
+        cmd.extend(["--repo", repo_id])
+    try:
+        ret = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode("utf-8")
+        if "CLOSED" not in ret:
+            logging.info("The publish is not successful, so please check it first")
+            raise Exception("The publish fails as some reason")
+        else:
+            logging.info("The publish is successful")
+    except subprocess.CalledProcessError as ex:
+        logging.error(
+            "Command: %s returns with error %s: %s",
+            ex.cmd,
+            ex.returncode,
+            ex.output,
+        )
+        raise ex
+
+
 @pytest.mark.skipif(INTEGRATION_NOT_SETUP, reason="Integration test is not set up.")
 def test_run_ubi_pop_for_rhel7(pulp_client):
     run_ubipop_tool(["rhel-7-server-rpms"])
+
     (
         content_set_output_repo,
         content_set_output_repo_url,
@@ -381,7 +403,7 @@ def test_run_ubi_pop_for_rhel7(pulp_client):
     ) = get_rpm_from_expected_json("ubi7/expected_rhel7_repo.json")
     rpm_repo = content_set_output_repo["rpm"]
     rpm_repo_url = get_repo_url(content_set_output_repo_url["rpm"])
-
+    run_pub_client_publish([rpm_repo], "target_to_pulp2_ubi")
     for rpm in expected_rpm_list:
         # verify the rpm exist in the repo
         assert get_rpm_from_repo(
@@ -425,6 +447,7 @@ def test_ubipop_does_not_associate_packages_in_exclude_list(pulp_client):
     will not be associated to repo.
     No modules are whitelisted or blacklisted.
     """
+    publish_repos = []
     cfg = load_ubiconfig("rhel-8-for-x86_64-baseos.yaml", "ubi8.5")
     (
         content_set_output_repo,
@@ -446,7 +469,9 @@ def test_ubipop_does_not_associate_packages_in_exclude_list(pulp_client):
         ) == 1
 
     run_ubipop_tool(["rhel-8-for-x86_64-baseos-rpms"])
-
+    for item in content_set_output_repo:
+        publish_repos.append(content_set_output_repo[item])
+    run_pub_client_publish(publish_repos, "target_to_pulp2_ubi")
     # #verify after ubipop, no exclude package rpm exist in the ubi repo, as it is unassoicated
     for item in content_set_output_repo:
         pkg = filter_debug_packages(item, cfg.packages.blacklist)
@@ -479,7 +504,9 @@ def test_ubipop_does_not_associate_packages_in_exclude_list(pulp_client):
         )
     ) == 1
     run_ubipop_tool(["rhel-8-for-x86_64-appstream-rpms"])
-
+    run_pub_client_publish(
+        [content_set_output_repo_appstream["rpm"]], "target_to_pulp2_ubi"
+    )
     # verify after ubipop, the modulemd rpm still not be unassociated, though it's in blacklist
     assert (
         len(
@@ -533,7 +560,7 @@ def test_ubipop_not_filter_non_module_rpm_and_module_rpm_with_same_package(pulp_
         ), "Can't find the rpm in the rhel repo:{}".format(rpm)
 
     run_ubipop_tool(["rhel-8-for-s390x-appstream-rpms"])
-
+    run_pub_client_publish([content_set_output_repo["rpm"]], "target_to_pulp2_ubi")
     rpm_repo_url = get_repo_url(content_set_output_repo_url["rpm"])
 
     # verify the two packages are associated
@@ -597,7 +624,7 @@ def test_ubipop_not_filter_module_rpm_with_different_version(pulp_client):
         ), "modulemd_default exist in the ubi repo"
 
     run_ubipop_tool(["rhel-8-for-ppc64le-appstream-rpms"])
-
+    run_pub_client_publish([rpm_repo], "target_to_pulp2_ubi")
     for rpm in expected_rpm_list:
         if "containers-common" in rpm:
             # verify the containers-common rpm exist in the repo
@@ -665,7 +692,7 @@ def test_ubipop_get_dependencies_module_rpm(pulp_client):
         ), "Can find the modulemd :{}".format(modulemd)
 
     run_ubipop_tool("rhel-8-for-aarch64-appstream-rpms")
-
+    run_pub_client_publish([content_set_output_repo["rpm"]], "target_to_pulp2_ubi")
     # verify the perl:5.24 is in the ubi repo, though the config only include perl:5.32.
 
     for modulemd in expected_module:
@@ -695,7 +722,7 @@ def test_ubipop_get_dependencies_module_rpm(pulp_client):
         ), "packages should not exist in ubi repo :{}".format(package)
 
     run_ubipop_tool("rhel-8-for-aarch64-baseos-rpms")
-
+    run_pub_client_publish([content_set_output_repo_base["rpm"]], "target_to_pulp2_ubi")
     # verify after ubipop, the package exist as depencidies rpm, though no config
     # here also verify the set of repo ubi-8-for-aarch64-base-rpms be published
     for package in expected_packages:
