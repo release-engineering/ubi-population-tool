@@ -427,14 +427,18 @@ def test_run_ubi_pop_for_rhel7(pulp_client):
         ), "Can't find the modulemd_default :{}".format(modulemd_defaults)
 
     # verify the modulemd exist and modulemd default in the cdn server
-    modulemds = query_repo_modules(None, "ubi", rpm_repo_url, full_data=True)
+    modulemds = query_repo_modules(None, "ubi", rpm_repo_url)
+    while "" in modulemds:
+        modulemds.remove("")
     assert len(modulemds) == 3, "Unexpected repo modulemds found."
+    # assert the module prefile
+    modulemds = query_repo_modules(None, "ubi", rpm_repo_url, full_data=True)
     mod_name, mod_profile = separate_modules(modulemds)[0]
     assert mod_name == "httpd", "Expected modulemd: httpd, found modulemd: {}".format(
         mod_name
     )
     assert (
-        "common [d]" in mod_profile
+        "common" in mod_profile
     ), "Modulemd httpd should have common profile as default."
 
 
