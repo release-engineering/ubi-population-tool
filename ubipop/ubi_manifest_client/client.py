@@ -2,10 +2,11 @@ import logging
 import os
 import threading
 from concurrent.futures import as_completed
-from requests_kerberos import HTTPKerberosAuth, OPTIONAL
+from requests_gssapi import HTTPSPNEGOAuth, OPTIONAL
 
 import requests
 from more_executors import Executors, f_map, f_proxy
+from requests_gssapi.compat import gssapi
 
 from .models import UbiManifest
 
@@ -63,15 +64,19 @@ class Client:
             self._tls.session = requests.Session()
 
             if self.krb_enabled.lower() in ("t", "1", "true"):
-                LOG.debug("Using kerberos authentication to ubi-manifest service")
+                LOG.debug("Using gssapi authentication to ubi-manifest service")
                 if not self.krb_principal:
                     raise ValueError(
                         "Please set 'UBIPOP_KERBEROS_PRINCIPAL_UBI_MANIFEST' environment variable"
                     )
-                self._tls.session.auth = HTTPKerberosAuth(
+
+                principal_name = gssapi.Name(self.krb_principal, gssapi.NameType.user)
+                credentials = gssapi.Credentials(name=principal_name, usage="initiate")
+
+                self._tls.session.auth = HTTPSPNEGOAuth(
                     mutual_authentication=OPTIONAL,
-                    force_preemptive=True,
-                    principal=self.krb_principal,
+                    opportunistic_auth=True,
+                    creds=credentials,
                 )
 
         return self._tls.session

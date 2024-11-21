@@ -35,7 +35,7 @@ attrs = "*"
 fastpurge = "*"
 urllib3 = "*"
 
-requests-kerberos = "^0.15.0"
+requests-gssapi = "^1.3.0"
 [tool.poetry.group.test]
 optional = true
 
