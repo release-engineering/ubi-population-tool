@@ -22,7 +22,6 @@ from ubipop._utils import (
     flatten_md_defaults_name_profiles,
 )
 
-from ._cdn import Publisher
 from ._matcher import Matcher
 from .ubi_manifest_client.client import Client as UbimClient
 
@@ -124,12 +123,6 @@ class UbiPopulate:
         self._content_set_regex = kwargs.get("content_set_regex", None)
         self._ubi_manifest_url = kwargs.get("ubi_manifest_url") or None
         self._action_batch_size = kwargs.get("action_batch_size", 100)
-        self._publisher_args = {
-            "publish_options": {
-                "clean": True,
-            },
-        }
-        self._skip_publish = os.getenv("UBIPOP_SKIP_PUBLISH", "false")
 
     @property
     def pulp_client(self):
@@ -241,7 +234,8 @@ class UbiPopulate:
                     used_content_sets.add(cs)
             else:
                 _LOG.debug(
-                    "Skipping %s, since it's been used already", config.file_name
+                    "Skipping %s, since it's been used already",
+                    config.file_name,
                 )
                 continue
             try:
@@ -259,18 +253,7 @@ class UbiPopulate:
         with UbimClient(self._ubi_manifest_url) as ubim_client:
             tasks = ubim_client.generate_manifest(ubi_binary_repos)
             tasks.result()
-
-            if self._skip_publish != "false":
-                _LOG.warning("Repository publishing via ubipop will be skipped")
-                self._run_ubi_population(
-                    repo_sets_list, out_repos, ubim_client, publisher=None
-                )
-            else:
-                with Publisher(**self._publisher_args) as publisher:
-                    self._run_ubi_population(
-                        repo_sets_list, out_repos, ubim_client, publisher
-                    )
-                    publisher.wait_publish()
+            self._run_ubi_population(repo_sets_list, out_repos, ubim_client)
 
         if self.output_repos_file:
             with open(self.output_repos_file, "w") as f:
@@ -327,9 +310,7 @@ class UbiPopulate:
 
         return repos
 
-    def _run_ubi_population(
-        self, repo_sets_list, out_repos, ubim_client=None, publisher=None
-    ):
+    def _run_ubi_population(self, repo_sets_list, out_repos, ubim_client=None):
         for repo_sets in repo_sets_list:
             for repo_set in repo_sets:
                 UbiPopulateRunner(
@@ -338,7 +319,6 @@ class UbiPopulate:
                     self.dry_run,
                     self._executor,
                     ubim_client,
-                    publisher,
                     self._action_batch_size,
                 ).run_ubi_population()
 
@@ -353,7 +333,6 @@ class UbiPopulateRunner:
         dry_run,
         executor,
         ubi_manifest_client=None,
-        publisher=None,
         action_batch_size=100,
     ):
         self.pulp_client = pulp_client
@@ -361,7 +340,6 @@ class UbiPopulateRunner:
         self.repo_set = repo_set
         self.dry_run = dry_run
         self._executor = executor
-        self._publisher = publisher
         self._action_batch_size = action_batch_size
 
     def run_ubi_population(self):
@@ -410,9 +388,6 @@ class UbiPopulateRunner:
             for ft in fts:
                 ft.result()
 
-            if self._publisher:
-                self._publish_out_repos()
-
     def _get_current_content(self):
         """
         Gather current content of output repos
@@ -420,7 +395,9 @@ class UbiPopulateRunner:
         criteria = [Criteria.true()]
         current_modulemds = f_proxy(
             self._executor.submit(
-                Matcher.search_modulemds, criteria, [self.repo_set.out_repos.rpm]
+                Matcher.search_modulemds,
+                criteria,
+                [self.repo_set.out_repos.rpm],
             )
         )
         current_modulemd_defaults = f_proxy(
@@ -444,7 +421,9 @@ class UbiPopulateRunner:
         if self.repo_set.out_repos.debug.result():
             current_debug_rpms = f_proxy(
                 self._executor.submit(
-                    Matcher.search_rpms, criteria, [self.repo_set.out_repos.debug]
+                    Matcher.search_rpms,
+                    criteria,
+                    [self.repo_set.out_repos.debug],
                 )
             )
         else:
@@ -543,7 +522,9 @@ class UbiPopulateRunner:
             self.repo_set.in_repos.rpm,
         )
         mdd_unassociation = Unassociation(
-            md_defaults_unassoc, ModulemdDefaultsUnit, self.repo_set.out_repos.rpm
+            md_defaults_unassoc,
+            ModulemdDefaultsUnit,
+            self.repo_set.out_repos.rpm,
         )
 
         return associations, unassociations, mdd_association, mdd_unassociation
@@ -576,7 +557,9 @@ class UbiPopulateRunner:
 
     def _diff_md_defaults_by_profiles(self, module_defaults_1, module_defaults_2):
         return self._diff_lists_by_attr(
-            module_defaults_1, module_defaults_2, flatten_md_defaults_name_profiles
+            module_defaults_1,
+            module_defaults_2,
+            flatten_md_defaults_name_profiles,
         )
 
     def _diff_packages_by_filename(self, packages_1, packages_2):
@@ -598,7 +581,10 @@ class UbiPopulateRunner:
         for module in current_content.modules:
             _LOG.info(module.nsvca)
 
-        _LOG.info("Current module_defaults in repo: %s", self.repo_set.out_repos.rpm.id)
+        _LOG.info(
+            "Current module_defaults in repo: %s",
+            self.repo_set.out_repos.rpm.id,
+        )
         for md_d in current_content.modulemd_defaults:
             _LOG.info("module_defaults: %s, profiles: %s", md_d.name, md_d.profiles)
 
@@ -698,15 +684,3 @@ class UbiPopulateRunner:
             return Criteria.and_(
                 Criteria.with_unit_type(unit_type), Criteria.or_(*partial_crit)
             )
-
-    def _publish_out_repos(self):
-        to_publish = []
-
-        for repo in (
-            self.repo_set.out_repos.rpm,
-            self.repo_set.out_repos.debug,
-            self.repo_set.out_repos.source,
-        ):
-            if repo.result():
-                to_publish.append(repo)
-        self._publisher.enqueue(*to_publish)

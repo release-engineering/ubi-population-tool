@@ -3,7 +3,6 @@ import os
 import shutil
 import sys
 import tempfile
-from concurrent.futures import wait
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 
@@ -30,7 +29,6 @@ from ubipop import (
     UbiPopulateRunner,
     UbiRepoSet,
 )
-from ubipop._cdn import Publisher
 from ubipop._utils import Association, Unassociation
 
 from .conftest import (
@@ -134,7 +132,6 @@ def fixture_executor():
 
 @pytest.fixture(name="mock_ubipop_runner")
 def fixture_mock_ubipop_runner(ubi_repo_set, executor):
-    publisher_args = {"publish_options": {"clean": True}}
 
     yield UbiPopulateRunner(
         pulp_client=MagicMock(),
@@ -142,9 +139,6 @@ def fixture_mock_ubipop_runner(ubi_repo_set, executor):
         dry_run=False,
         executor=executor,
         ubi_manifest_client=MagicMock(),
-        publisher=Publisher(
-            **publisher_args,
-        ),
     )
 
 
@@ -160,39 +154,6 @@ def get_test_repo(**kwargs):
             )
         )
     )
-
-
-def test_publish_out_repos(mock_ubipop_runner):
-    dt = datetime(2019, 9, 12, 0, 0, 0)
-
-    d1 = Distributor(
-        id="yum_distributor",
-        type_id="yum_distributor",
-        repo_id="repo",
-        last_publish=dt,
-        relative_url="content/unit/2/client",
-    )
-    repo = YumRepository(
-        id="repo",
-        eng_product_id=102,
-        distributors=[d1],
-        relative_url="content/unit/2/client",
-    )
-    fake_pulp = FakeController()
-    repo.__dict__["_client"] = fake_pulp.client
-
-    fake_pulp.insert_repository(repo)
-    # Setup output repos, leave only binary repo as the actual one
-    mock_ubipop_runner.repo_set.out_repos = RepoSet(
-        f_proxy(f_return(repo)), f_proxy(f_return()), f_proxy(f_return())
-    )
-
-    mock_ubipop_runner._publish_out_repos()
-
-    # we should publish only one repository with one distributor
-    assert len(mock_ubipop_runner._publisher._publish_queue) == 1
-    wait(mock_ubipop_runner._publisher._publish_queue)
-    assert [hist.repository.id for hist in fake_pulp.publish_history] == ["repo"]
 
 
 def test_get_population_sources():
@@ -628,15 +589,14 @@ def test_create_output_file_all_repos(
     try:
         out_file_path = os.path.join(path, "output.txt")
         with patch("ubipop.UbimClient"):
-            with patch("ubipop.Publisher"):
-                ubipop = UbiPopulate(
-                    "foo.pulp.com",
-                    ("foo", "foo"),
-                    False,
-                    output_repos_file=out_file_path,
-                    ubi_manifest_url="https://ubi-manifest.com",
-                )
-                ubipop.populate_ubi_repos()
+            ubipop = UbiPopulate(
+                "foo.pulp.com",
+                ("foo", "foo"),
+                False,
+                output_repos_file=out_file_path,
+                ubi_manifest_url="https://ubi-manifest.com",
+            )
+            ubipop.populate_ubi_repos()
 
         with open(out_file_path) as f:
             content = f.readlines()
@@ -1051,7 +1011,9 @@ def test_get_current_content(mock_ubipop_runner, pulp, skip_debug_repo):
 
 @patch("pubtools.pulplib.YumRepository.get_debug_repository")
 @patch("pubtools.pulplib.YumRepository.get_source_repository")
-def test_populate_ubi_repos(get_debug_repository, get_source_repository, requests_mock):
+def test_populate_ubi_repos(
+    get_debug_repository, get_source_repository, requests_mock, monkeypatch, caplog
+):
     # pylint: disable=unused-argument
     """Test run of populate_ubi_repos that checks correct number of repo publication.
     It's simplified to contain only actions on RPM packages."""
@@ -1181,183 +1143,20 @@ def test_populate_ubi_repos(get_debug_repository, get_source_repository, request
     _create_ubi_manifest_mocks(requests_mock)
 
     # let's run actual population
+    ubi_populate.populate_ubi_repos = MagicMock(wraps=ubi_populate.populate_ubi_repos)
     ubi_populate.populate_ubi_repos()
-    history = fake_pulp.publish_history
-
-    # there should be 3 repositories successfully published
-    assert len(history) == 3
-    expected_published_repo_ids = set(["ubi_binary", "ubi_debug", "ubi_source"])
-    repo_ids_published = set()
-    for publish in history:
-        repo = publish.repository
-        repo_ids_published.add(repo.id)
-
-        assert repo.id in expected_published_repo_ids
-
-        if repo.id == "ubi_binary":
-            assert new_rpm.filename == repo.rpm_content[0].filename
-            assert new_modulemd.nsvca == repo.modulemd_content[0].nsvca
-            assert (
-                new_modulemd_defaults.profiles
-                == repo.modulemd_defaults_content[0].profiles
-            )
-
-    assert repo_ids_published == expected_published_repo_ids
+    ubi_populate.populate_ubi_repos.assert_called()
 
 
-@patch("ubipop._cdn.Publisher")
-@patch("pubtools.pulplib.YumRepository.get_debug_repository")
-@patch("pubtools.pulplib.YumRepository.get_source_repository")
-def test_populate_ubi_repos_no_publish(
-    get_debug_repository, get_source_repository, publisher, requests_mock, monkeypatch
-):
-    """Test run of populate_ubi_repos which checks that correct associations and
-    unassociations were made in Pulp but no publish was performed. It's simplified to contain
-    only actions on RPM packages."""
-    monkeypatch.setenv("UBIPOP_SKIP_PUBLISH", "true")
-
-    dt = datetime(2019, 9, 12, 0, 0, 0)
-
-    d1 = Distributor(
-        id="yum_distributor",
-        type_id="yum_distributor",
-        repo_id="ubi_binary",
-        last_publish=dt,
-        relative_url="content/unit/2/client",
-    )
-
-    d2 = Distributor(
-        id="yum_distributor",
-        type_id="yum_distributor",
-        repo_id="ubi_source",
-        last_publish=dt,
-        relative_url="content/unit/3/client",
-    )
-
-    d3 = Distributor(
-        id="yum_distributor",
-        type_id="yum_distributor",
-        repo_id="ubi_debug",
-        last_publish=dt,
-        relative_url="content/unit/4/client",
-    )
-
-    output_binary_repo = YumRepository(
-        id="ubi_binary",
-        content_set="ubi-8-for-x86_64-appstream-rpms",
-        population_sources=["input_binary"],
-        ubi_population=True,
-        ubi_config_version="8",
-        eng_product_id=102,
-        distributors=[d1],
-        relative_url="content/unit/1/client",
-    )
-    input_binary_repo = YumRepository(id="input_binary")
-    input_source_repo = YumRepository(id="input_source")
-    input_debug_repo = YumRepository(id="input_debug")
-
-    output_source_repo = YumRepository(
-        id="ubi_source",
-        population_sources=["input_source"],
-        eng_product_id=102,
-        distributors=[d2],
-        relative_url="content/unit/2/client",
-    )
-    output_debug_repo = YumRepository(
-        id="ubi_debug",
-        population_sources=["input_debug"],
-        eng_product_id=102,
-        distributors=[d3],
-        relative_url="content/unit/3/client",
-    )
-
-    ubi_populate = FakeUbiPopulate(
-        "foo.pulp.com",
-        ("foo", "foo"),
-        False,
-        ubiconfig_dir_or_url=TEST_DATA_DIR,
-        ubi_manifest_url="https://ubi-manifest.com",
-    )
-
-    fake_pulp = ubi_populate.pulp_client_controller
-    fake_pulp.insert_repository(input_binary_repo)
-    fake_pulp.insert_repository(input_source_repo)
-    fake_pulp.insert_repository(input_debug_repo)
-
-    fake_pulp.insert_repository(output_binary_repo)
-    fake_pulp.insert_repository(output_source_repo)
-    fake_pulp.insert_repository(output_debug_repo)
-
-    get_debug_repository.return_value = fake_pulp.client.get_repository("ubi_debug")
-    get_source_repository.return_value = fake_pulp.client.get_repository("ubi_source")
-
-    old_rpm = RpmUnit(
-        name="golang",
-        version="1",
-        release="a",
-        arch="x86_64",
-        filename="golang-1.a.x86_64.rpm",
-        sourcerpm="golang-1.a.x86_64.src.rpm",
-    )
-
-    new_rpm = RpmUnit(
-        name="golang",
-        version="2",
-        release="a",
-        arch="x86_64",
-        filename="golang-2.a.x86_64.rpm",
-        sourcerpm="golang-2.a.x86_64.src.rpm",
-    )
-
-    old_modulemd = ModulemdUnit(
-        name="test_md", stream="s", version="100", context="c", arch="x86_64"
-    )
-    new_modulemd = ModulemdUnit(
-        name="test_md", stream="s", version="200", context="c", arch="x86_64"
-    )
-
-    old_modulemd_defaults = ModulemdDefaultsUnit(
-        name="test_md_defaults",
-        stream="stream",
-        profiles={"minimal": ["name_1"]},
-        repo_id="ubi_binary",
-    )
-    new_modulemd_defaults = ModulemdDefaultsUnit(
-        name="test_md_defaults",
-        stream="stream",
-        profiles={"minimal": ["name_1", "name_2"]},
-        repo_id="input_binary",
-    )
-
-    fake_pulp.insert_units(
-        output_binary_repo, [old_rpm, old_modulemd, old_modulemd_defaults]
-    )
-    fake_pulp.insert_units(
-        input_binary_repo, [new_rpm, new_modulemd, new_modulemd_defaults]
-    )
-
-    # mock calls to ubi-manifest service
-    _create_ubi_manifest_mocks(requests_mock)
-
-    # let's run actual population
-    ubi_populate.populate_ubi_repos()
-
-    publisher.assert_not_called()
-
-
-@patch("ubipop._cdn.Publisher")
 @patch("pubtools.pulplib.YumRepository.get_source_repository")
 @patch("pubtools.pulplib.YumRepository.get_debug_repository")
 def test_populate_ubi_repos_dry_run(
     get_debug_repository,
     get_source_repository,
-    publisher,
     requests_mock,
-    monkeypatch,
     caplog,
 ):
     """Test run of populate_ubi_repos with dry_run enabled."""
-    monkeypatch.setenv("UBIPOP_SKIP_PUBLISH", "true")
 
     dt = datetime(2019, 9, 12, 0, 0, 0)
 
@@ -1420,7 +1219,6 @@ def test_populate_ubi_repos_dry_run(
         dry_run=True,
         ubiconfig_dir_or_url=TEST_DATA_DIR,
         ubi_manifest_url="https://ubi-manifest.com",
-        publisher=publisher,
     )
 
     fake_pulp = ubi_populate.pulp_client_controller
@@ -1485,9 +1283,6 @@ def test_populate_ubi_repos_dry_run(
 
     # let's run actual population
     ubi_populate.populate_ubi_repos()
-
-    # should not have published
-    publisher.assert_not_called()
 
     # should have logged content and actions
     for msg in (
