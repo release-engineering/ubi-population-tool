@@ -183,11 +183,15 @@ def test_kerberos_auth_no_principal(requests_mock):
                 _ = client._do_request(method="GET", url=url)
 
 
-@patch("ubipop.ubi_manifest_client.client.HTTPKerberosAuth")
-def test_kerberos_auth(kerb_mock, requests_mock):
+@patch("ubipop.ubi_manifest_client.client.HTTPSPNEGOAuth")
+@patch("gssapi.Credentials", autospec=True)
+def test_kerberos_auth(credentials_mock, kerb_mock, requests_mock):
     """
     Tests basic flow with kerberos auth. enabled.
     """
+    mocked_credentials = MagicMock()
+    credentials_mock.return_value = mocked_credentials
+
     url = "api/v1/manifest"
     url = os.path.join("https://foo-bar.com", url)
     requests_mock.register_uri("GET", url)
@@ -204,7 +208,7 @@ def test_kerberos_auth(kerb_mock, requests_mock):
             _ = client._do_request(method="GET", url=url)
             kerb_mock.assert_called_once_with(
                 mutual_authentication=2,
-                force_preemptive=True,
-                principal="principal@REALM.COM",
+                opportunistic_auth=True,
+                creds=mocked_credentials,
             )
             assert client._tls.session.auth is not None
