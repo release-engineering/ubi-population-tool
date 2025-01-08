@@ -2,7 +2,6 @@ import argparse
 import logging
 import re
 import sys
-
 from functools import partial
 
 import ubipop

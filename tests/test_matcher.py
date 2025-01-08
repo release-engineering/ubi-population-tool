@@ -1,18 +1,8 @@
 import pytest
-
-from pubtools.pulplib import (
-    RpmUnit,
-    Criteria,
-    YumRepository,
-    ModulemdUnit,
-)
+from pubtools.pulplib import Criteria, ModulemdUnit, RpmUnit, YumRepository
 from ubiconfig import UbiConfig
 
-from ubipop._matcher import (
-    UbiUnit,
-    Matcher,
-    flatten_list_of_sets,
-)
+from ubipop._matcher import Matcher, UbiUnit, flatten_list_of_sets
 
 # pylint: disable=protected-access
 

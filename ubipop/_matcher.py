@@ -1,9 +1,9 @@
-import os
 import logging
+import os
 
-from pubtools.pulplib import Criteria
-from more_executors.futures import f_flat_map, f_return, f_sequence, f_proxy
 from more_executors import Executors
+from more_executors.futures import f_flat_map, f_proxy, f_return, f_sequence
+from pubtools.pulplib import Criteria
 
 BATCH_SIZE = int(os.getenv("UBIPOP_BATCH_SIZE", "250"))
 # need to set significantly lower batches for general rpm search

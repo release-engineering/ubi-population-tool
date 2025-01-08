@@ -1,7 +1,7 @@
 import os
-from mock import MagicMock, patch
 
 import pytest
+from mock import MagicMock, patch
 
 from ubipop.ubi_manifest_client.client import Client, UbiManifestTaskFailure
 from ubipop.ubi_manifest_client.models import (
