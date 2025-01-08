@@ -1,7 +1,20 @@
 repos:
 -   repo: https://github.com/psf/black
-    rev: 22.3.0
+    rev: 24.10.0
     hooks:
     - id: black
-      language_version: python3.9
-
+      language_version: python3.11
+-   repo: https://github.com/pycqa/isort/
+    rev: 5.13.2
+    hooks:
+    - id: isort
+      args: ["--profile", "black"]
+ci:
+    autofix_commit_msg: |
+        [pre-commit.ci] auto fixes from black and isort code formatting
+    autofix_prs: true
+    autoupdate_branch: ''
+    autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+    autoupdate_schedule: weekly
+    skip: []
+    submodules: false
