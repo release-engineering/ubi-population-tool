@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ubi-population-tool"
-version = "0.17.1"
+version = "0.19.0"
 description = "Tool for populating ubi repositories"
 license = "GPL-3.0-or-later"
 readme = "README.md"
