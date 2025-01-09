@@ -3,7 +3,7 @@ import sys
 import mock
 import pytest
 
-from ubipop.cli import main, USERNAME_REGEX, URL_REGEX
+from ubipop.cli import URL_REGEX, USERNAME_REGEX, main
 
 
 @pytest.fixture(name="mock_ubipopulate")

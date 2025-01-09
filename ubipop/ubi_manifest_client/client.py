@@ -2,10 +2,10 @@ import logging
 import os
 import threading
 from concurrent.futures import as_completed
-from requests_gssapi import HTTPSPNEGOAuth, OPTIONAL
 
 import requests
 from more_executors import Executors, f_map, f_proxy
+from requests_gssapi import OPTIONAL, HTTPSPNEGOAuth
 from requests_gssapi.compat import gssapi
 
 from .models import UbiManifest
