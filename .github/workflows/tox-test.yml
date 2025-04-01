@@ -10,7 +10,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
       - name: Install base packages
         run: sudo apt-get install gcc python3-dev libkrb5-dev
       - name: Install Tox
@@ -19,6 +19,22 @@ jobs:
         uses: snok/install-poetry@v1
       - name: Run Tox
         run: tox -e py312
+  py313:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install base packages
+        run: sudo apt-get install gcc python3-dev libkrb5-dev
+      - name: Install Tox
+        run: pip install tox
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      - name: Run Tox
+        run: tox -e py313
   static:
     runs-on: ubuntu-latest
     steps:
