@@ -26,16 +26,12 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
-requires = "*"
 more-executors = "*"
 ubi-config = "*"
-pyrsistent = "*"
 pubtools-pulplib = "*"
 attrs = "*"
-fastpurge = "*"
-urllib3 = "*"
-
 requests-gssapi = "*"
+
 [tool.poetry.group.test]
 optional = true
 
@@ -49,7 +45,6 @@ optional = true
 
 [tool.poetry.group.dev.dependencies]
 black = "25.1.0"
-pre-commit = "4.2.0"
 mypy = "1.15.0"
 pylint = "3.3.6"
 pytest-cov = "6.1.1"
