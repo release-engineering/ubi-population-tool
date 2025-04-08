@@ -9,7 +9,7 @@ import ubipop
 DEFAULT_LOG_FMT = "%(asctime)s [%(levelname)-8s] %(message)s"
 DEFAULT_DATE_FMT = "%Y-%m-%d %H:%M:%S %z"
 
-FOREIGN_LOGGERS = ("pubtools.pulplib", "fastpurge", "ubiconfig")
+FOREIGN_LOGGERS = ("pubtools.pulplib", "ubiconfig")
 _LOG = logging.getLogger("ubipop")
 _LOG.setLevel(logging.DEBUG)
 
