@@ -1153,46 +1153,17 @@ def test_populate_ubi_repos(
 def test_populate_ubi_repos_dry_run(
     get_debug_repository,
     get_source_repository,
-    requests_mock,
     caplog,
 ):
     """Test run of populate_ubi_repos with dry_run enabled."""
 
-    dt = datetime(2019, 9, 12, 0, 0, 0)
-
-    d1 = Distributor(
-        id="yum_distributor",
-        type_id="yum_distributor",
-        repo_id="ubi_binary",
-        last_publish=dt,
-        relative_url="content/unit/2/client",
-    )
-
-    d2 = Distributor(
-        id="yum_distributor",
-        type_id="yum_distributor",
-        repo_id="ubi_source",
-        last_publish=dt,
-        relative_url="content/unit/3/client",
-    )
-
-    d3 = Distributor(
-        id="yum_distributor",
-        type_id="yum_distributor",
-        repo_id="ubi_debug",
-        last_publish=dt,
-        relative_url="content/unit/4/client",
-    )
+    caplog.set_level(logging.INFO)
 
     output_binary_repo = YumRepository(
         id="ubi_binary",
         content_set="ubi-8-for-x86_64-appstream-rpms",
         population_sources=["input_binary"],
         ubi_population=True,
-        ubi_config_version="8",
-        eng_product_id=102,
-        distributors=[d1],
-        relative_url="content/unit/1/client",
     )
     input_binary_repo = YumRepository(id="input_binary")
     input_source_repo = YumRepository(id="input_source")
@@ -1202,15 +1173,11 @@ def test_populate_ubi_repos_dry_run(
         id="ubi_source",
         population_sources=["input_source"],
         eng_product_id=102,
-        distributors=[d2],
-        relative_url="content/unit/2/client",
     )
     output_debug_repo = YumRepository(
         id="ubi_debug",
         population_sources=["input_debug"],
         eng_product_id=102,
-        distributors=[d3],
-        relative_url="content/unit/3/client",
     )
 
     ubi_populate = FakeUbiPopulate(
@@ -1233,58 +1200,10 @@ def test_populate_ubi_repos_dry_run(
     get_debug_repository.return_value = fake_pulp.client.get_repository("ubi_debug")
     get_source_repository.return_value = fake_pulp.client.get_repository("ubi_source")
 
-    old_rpm = RpmUnit(
-        name="golang",
-        version="1",
-        release="a",
-        arch="x86_64",
-        filename="golang-1.a.x86_64.rpm",
-        sourcerpm="golang-1.a.x86_64.src.rpm",
-    )
-
-    new_rpm = RpmUnit(
-        name="golang",
-        version="2",
-        release="a",
-        arch="x86_64",
-        filename="golang-2.a.x86_64.rpm",
-        sourcerpm="golang-2.a.x86_64.src.rpm",
-    )
-
-    old_modulemd = ModulemdUnit(
-        name="test_md", stream="s", version="100", context="c", arch="x86_64"
-    )
-    new_modulemd = ModulemdUnit(
-        name="test_md", stream="s", version="200", context="c", arch="x86_64"
-    )
-
-    old_modulemd_defaults = ModulemdDefaultsUnit(
-        name="test_md_defaults",
-        stream="stream",
-        profiles={"minimal": ["name_1"]},
-        repo_id="ubi_binary",
-    )
-    new_modulemd_defaults = ModulemdDefaultsUnit(
-        name="test_md_defaults",
-        stream="stream",
-        profiles={"minimal": ["name_1", "name_2"]},
-        repo_id="input_binary",
-    )
-
-    fake_pulp.insert_units(
-        output_binary_repo, [old_rpm, old_modulemd, old_modulemd_defaults]
-    )
-    fake_pulp.insert_units(
-        input_binary_repo, [new_rpm, new_modulemd, new_modulemd_defaults]
-    )
-
-    # mock calls to ubi-manifest service
-    _create_ubi_manifest_mocks(requests_mock)
-
-    # let's run actual population
     ubi_populate.populate_ubi_repos()
 
-    # should have logged content and actions
+    assert "DRY-RUN: Would trigger manifest generation for binary repos:" in caplog.text
+    assert "DRY-RUN: Skipping UBI repo population actions." in caplog.text
     for msg in (
         "Current rpms in repo:",
         "Current srpms in repo:",
@@ -1293,7 +1212,7 @@ def test_populate_ubi_repos_dry_run(
         "Would associate",
         "Would unassociate",
     ):
-        assert msg in caplog.text
+        assert msg not in caplog.text
 
 
 @patch("pubtools.pulplib.YumRepository.get_source_repository")

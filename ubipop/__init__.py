@@ -250,10 +250,24 @@ class UbiPopulate:
                 [repo_set.out_repos.rpm.id for repo_set in repo_sets]
             )
 
-        with UbimClient(self._ubi_manifest_url) as ubim_client:
-            tasks = ubim_client.generate_manifest(ubi_binary_repos)
-            tasks.result()
-            self._run_ubi_population(repo_sets_list, out_repos, ubim_client)
+        if self.dry_run:
+            _LOG.info(
+                "DRY-RUN: Would trigger manifest generation for binary repos: %s",
+                ubi_binary_repos,
+            )
+            _LOG.info("DRY-RUN: Skipping UBI repo population actions.")
+
+            # we need to update the out_repos even if we don't call run_ubi_population
+            for repo_sets in repo_sets_list:
+                for repo_set in repo_sets:
+                    out_repos.update(repo_set.get_output_repos())
+        else:
+            with UbimClient(self._ubi_manifest_url) as ubim_client:
+                _LOG.info("Triggering manifest generation for: %s", ubi_binary_repos)
+                tasks = ubim_client.generate_manifest(ubi_binary_repos)
+                tasks.result()
+                _LOG.info("Manifest generation complete.")
+                self._run_ubi_population(repo_sets_list, out_repos, ubim_client)
 
         if self.output_repos_file:
             with open(self.output_repos_file, "w") as f:
@@ -368,7 +382,7 @@ class UbiPopulateRunner:
         ) = self._get_pulp_actions(current_content)
 
         if self.dry_run:
-            self.log_curent_content(current_content)
+            self.log_current_content(current_content)
             self.log_pulp_actions(
                 associations + (mdd_association,),
                 unassociations + (mdd_unassociation,),
@@ -576,7 +590,7 @@ class UbiPopulateRunner:
 
         return diff
 
-    def log_curent_content(self, current_content):
+    def log_current_content(self, current_content):
         _LOG.info("Current modules in repo: %s", self.repo_set.out_repos.rpm.id)
         for module in current_content.modules:
             _LOG.info(module.nsvca)
