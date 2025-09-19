@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import subprocess
 
 import pytest
@@ -140,9 +141,7 @@ def query_repo_modules(
         args.append("--refresh")
 
     if arch_list is not None:
-        args.append(
-            "--archlist={}".format(",".join(arch_list)),
-        )
+        args.append("--archlist={}".format(",".join(arch_list)))
 
     if query is not None:
         args.append(query)
@@ -152,10 +151,24 @@ def query_repo_modules(
     if isinstance(out, bytes):
         out = out.decode()
 
-    lines = out.split("\n")
-    lines = lines[2:-3]
+    lines = []
+    for line in out.splitlines():
+        line = line.strip()
+        # skip headers, footers, or empty lines
+        if not line:
+            continue
+        if (
+            line.startswith("Name")
+            or line.startswith("Last")
+            or line.startswith("Hint")
+        ):
+            continue
+        # keep only data rows
+        lines.append(line)
+
     if not full_data:
-        return [md.split(" ")[0] for md in lines]
+        # first "column" is always the module name
+        return [re.split(r"\s+", md)[0] for md in lines]
     else:
         return lines
 
