@@ -12,6 +12,10 @@
     {
       "matchDepTypes": ["uses-with"],
       "enabled": false
+    },
+    {
+      "matchPackageNames": ["pylint"],
+      "enabled": false
     }
   ],
   "schedule": ["every weekend"]
