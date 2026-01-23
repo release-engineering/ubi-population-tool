@@ -46,7 +46,7 @@ optional = true
 [tool.poetry.group.dev.dependencies]
 black = "25.1.0"
 mypy = "1.17.1"
-pylint = "3.3.8"
+pylint = "==3.3.9"
 pytest-cov = "6.2.1"
 bandit = "1.8.6"
 
