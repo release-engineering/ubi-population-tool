@@ -44,11 +44,11 @@ requests-mock = "*"
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-black = "25.1.0"
-mypy = "1.17.1"
+black = "26.1.0"
+mypy = "1.19.1"
 pylint = "==3.3.9"
-pytest-cov = "6.2.1"
-bandit = "1.8.6"
+pytest-cov = "7.0.0"
+bandit = "1.9.3"
 
 [tool.poetry.group.docs]
 optional = true
