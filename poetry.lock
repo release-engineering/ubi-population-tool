@@ -2442,14 +2442,14 @@ markers = {main = "python_version < \"3.13\"", test = "python_version < \"3.11\"
 
 [[package]]
 name = "ubi-config"
-version = "3.2.2"
+version = "3.3.0"
 description = "A Python Library for accessing Universal Base Image configuration"
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "ubi_config-3.2.2-py3-none-any.whl", hash = "sha256:f4da2d8f94faef5687767a3416fbf335c064b3ab3fae66f720b1027f52831807"},
-    {file = "ubi_config-3.2.2.tar.gz", hash = "sha256:99d1b8523e4c72e5c1428a0c3c9e68b1ebc87b7c96dfa394fd3f5a3102c3c610"},
+    {file = "ubi_config-3.3.0-py3-none-any.whl", hash = "sha256:a5d4c916257435a50d1fcbe62b1c4992555b0009e62a137d13da59a1737dcbdf"},
+    {file = "ubi_config-3.3.0.tar.gz", hash = "sha256:206bf9523a090f137afbee7508a60a0c3d419dbd1fc785228c1f742c49859621"},
 ]
 
 [package.dependencies]

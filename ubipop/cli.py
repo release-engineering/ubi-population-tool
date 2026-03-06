@@ -23,6 +23,7 @@ CONTENT_SET_REGEX = r"^[A-Za-z0-9_\-\.]{1,200}$"
 VERSION_REGEX = r"^[0-9]+(\.[0-9]+)?$"
 REPO_REGEX = r"^[A-Za-z0-9_\-\.]{1,200}$"
 USERNAME_REGEX = r"^\S+$"  # allow all non-white chars
+BRANCH_REGEX = r"^(?![/.])[A-Za-z0-9._/-]{1,200}(?<![/.])$"
 PASSWORD_REGEX = r"^[^\x00]+$"  # allow all chars but null byte
 
 
@@ -57,6 +58,13 @@ def parse_args(args):
         type=dir_or_url_str,
         required=False,
         help="source of ubi config, directory or url",
+    )
+    parser.add_argument(
+        "--conf-src-branch",
+        action="store",
+        type=branch_str,
+        required=False,
+        help="branch prefix if ubi config presents as url",
     )
     parser.add_argument(
         "--dry-run",
@@ -212,6 +220,7 @@ def main(args):
         opts.dry_run,
         opts.input,
         opts.conf_src,
+        opts.conf_src_branch,
         not opts.insecure,
         opts.workers,
         opts.output_repos,
@@ -229,6 +238,7 @@ def entry_point():
 
 file_path_str = partial(str_match_regex, FILE_PATH_REGEX)
 username_str = partial(str_match_regex, USERNAME_REGEX)
+branch_str = partial(str_match_regex, BRANCH_REGEX)
 url_str = partial(str_match_regex, URL_REGEX)
 repo_str = partial(str_match_regex, REPO_REGEX)
 version_str = partial(str_match_regex, VERSION_REGEX)
