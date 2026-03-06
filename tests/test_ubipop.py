@@ -122,7 +122,7 @@ def fixture_ubi_repo_set_no_debug():
 
 @pytest.fixture(name="test_ubiconfig")
 def fixture_test_ubiconfig():
-    yield ubiconfig.get_loader(TEST_DATA_DIR).load("ubi7/conf.yaml")
+    yield ubiconfig.get_loader(TEST_DATA_DIR, "foo").load("ubi7/conf.yaml")
 
 
 @pytest.fixture(name="executor")
