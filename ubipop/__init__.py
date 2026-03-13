@@ -102,6 +102,7 @@ class UbiPopulate:
         dry_run,
         ubiconfig_filename_list=None,
         ubiconfig_dir_or_url=None,
+        ubi_config_branch=None,
         verify=True,
         workers_count=4,
         output_repos_file=None,
@@ -117,6 +118,7 @@ class UbiPopulate:
         self._ubiconfig_list = None
         self._ubiconfig_filename_list = ubiconfig_filename_list
         self._ubiconfig_dir_or_url = ubiconfig_dir_or_url
+        self._ubi_config_branch = ubi_config_branch
         self._content_sets = kwargs.get("content_sets", None)
         self._repo_ids = kwargs.get("repo_ids", None)
         self._version = kwargs.get("version", None)
@@ -145,8 +147,9 @@ class UbiPopulate:
 
     def _load_ubiconfig(self):
         ubiconfig_dir_or_url = self._ubiconfig_dir_or_url
+        ubi_config_branch = self._ubi_config_branch
         filenames = self._ubiconfig_filename_list
-        loader = ubiconfig.get_loader(ubiconfig_dir_or_url)
+        loader = ubiconfig.get_loader(ubiconfig_dir_or_url, ubi_config_branch)
         ubi_conf_list = []
 
         if filenames:
