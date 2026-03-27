@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - n/a
 
-## [0.19.0] - 2026-02-06
+## [0.19.1] - 2026-02-06
 
 - Added new CLI option `--conf-src-branch` for setting content config allowed branch prefix
 
@@ -189,8 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - py26 compatibility issue on travis
 - rpm-py-installer requirement was made conditional  
 
-[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.19.0...HEAD
-[0.19.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.18.2...v0.19.0
+[Unreleased]: https://github.com/release-engineering/ubi-population-tool/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.18.2...v0.19.1
 [0.18.2]: https://github.com/release-engineering/ubi-population-tool/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/release-engineering/ubi-population-tool/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/release-engineering/ubi-population-tool/compare/v0.17.1...v0.18.0
