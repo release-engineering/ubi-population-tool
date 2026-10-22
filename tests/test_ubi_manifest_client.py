@@ -1,6 +1,7 @@
 import os
 
 import pytest
+import requests
 from mock import MagicMock, patch
 
 from ubipop.ubi_manifest_client.client import Client, UbiManifestTaskFailure
@@ -74,6 +75,79 @@ def test_generate_manifest_failure(requests_mock):
         tasks = client.generate_manifest(["repo_id_1", "repo_id_2"])
         with pytest.raises(UbiManifestTaskFailure):
             tasks.result()
+
+
+def test_generate_manifest_task_not_found(requests_mock):
+    """
+    Tests that a task unknown to ubi-manifest makes depsolving of the manifest
+    be requested again, and that the tasks of the new request are awaited.
+    """
+    manifest_url = os.path.join("https://foo-bar.com", "api/v1/manifest")
+    requests_mock.register_uri(
+        "POST",
+        manifest_url,
+        [
+            {"json": [{"task_id": "missing-task-id"}], "status_code": 200},
+            {"json": [{"task_id": "new-task-id"}], "status_code": 200},
+        ],
+    )
+
+    requests_mock.register_uri(
+        "GET",
+        os.path.join("https://foo-bar.com", "api/v1/task/missing-task-id"),
+        json={"detail": "Task missing-task-id not found"},
+        status_code=404,
+    )
+    requests_mock.register_uri(
+        "GET",
+        os.path.join("https://foo-bar.com", "api/v1/task/new-task-id"),
+        json={"task_id": "new-task-id", "state": "SUCCESS"},
+    )
+
+    with Client("https://foo-bar.com") as client:
+        tasks = client.generate_manifest(["repo_id_1", "repo_id_2"])
+        assert tasks.result() == [{"task_id": "new-task-id"}]
+
+    post_requests = [
+        r
+        for r in requests_mock.request_history
+        if r.method == "POST" and r.url == manifest_url
+    ]
+    assert len(post_requests) == 2
+
+
+def test_generate_manifest_task_not_found_gives_up(requests_mock):
+    """
+    Tests that a task missing from ubi-manifest on every attempt fails the
+    manifest generation instead of being requested forever.
+
+    The error is raised as is, a missing task is a problem of the service
+    rather than a failure of the task itself.
+    """
+    manifest_url = os.path.join("https://foo-bar.com", "api/v1/manifest")
+    requests_mock.register_uri(
+        "POST", manifest_url, json=[{"task_id": "missing-task-id"}]
+    )
+    requests_mock.register_uri(
+        "GET",
+        os.path.join("https://foo-bar.com", "api/v1/task/missing-task-id"),
+        json={"detail": "Task missing-task-id not found"},
+        status_code=404,
+    )
+
+    with Client("https://foo-bar.com") as client:
+        tasks = client.generate_manifest(["repo_id_1", "repo_id_2"])
+        with pytest.raises(requests.HTTPError) as exc_info:
+            tasks.result()
+
+        assert exc_info.value.response.status_code == 404
+
+    post_requests = [
+        r
+        for r in requests_mock.request_history
+        if r.method == "POST" and r.url == manifest_url
+    ]
+    assert len(post_requests) == 3
 
 
 def test_unpack_failure():
